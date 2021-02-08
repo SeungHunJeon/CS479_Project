@@ -26,6 +26,7 @@ class ENVIRONMENT {
       visualizable_(visualizable) {
     /// add objects
     world_ = std::make_unique<raisim::World>();
+    world_->setDefaultMaterial(0.6,0,0);
     auto* robot = world_->addArticulatedSystem(resourceDir + "/hubodog/hubodog.urdf");
     robot->setName("robot");
     robot->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
@@ -36,12 +37,13 @@ class ENVIRONMENT {
     READ_YAML(double, simulation_dt_, cfg["simulation_dt"])
     READ_YAML(double, control_dt_, cfg["control_dt"])
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::VELOCITY], cfg["reward"]["velocity"])
-    READ_YAML(double, rewardCoeff_[HubodogController::RewardType::JOINT_POSITION], cfg["reward"]["joint_position"])
+    READ_YAML(double, rewardCoeff_[HubodogController::RewardType::SLIP], cfg["reward"]["slip"])
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::JOINT_VELOCITY], cfg["reward"]["joint_velocity"])
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::JOINT_ACCELERATION], cfg["reward"]["joint_acceleration"])
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::SMOOTHNESS1], cfg["reward"]["smoothness1"])
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::SMOOTHNESS2], cfg["reward"]["smoothness2"])
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::AIRTIME], cfg["reward"]["airtime"])
+    READ_YAML(double, rewardCoeff_[HubodogController::RewardType::TORQUE], cfg["reward"]["torque"])
 
     stepData_.resize(controller_.getStepDataTag().size());
 
@@ -103,7 +105,7 @@ class ENVIRONMENT {
   }
 
   void curriculumUpdate() {
-    curriculumFactor_ *= 0.999;
+    curriculumFactor_ *= 0.9995;
   };
 
   float getCurriculumFactor() {
@@ -132,13 +134,13 @@ class ENVIRONMENT {
 
   raisim::World *getWorld() { return world_.get(); }
 
-  void turnOffVisualization() { server_->hibernate(); }
+  void turnOffVisualization() { if(server_) server_->hibernate(); visualize_ = false;}
 
-  void turnOnVisualization() { server_->wakeup(); }
+  void turnOnVisualization() { if(server_) server_->wakeup(); visualize_ = true;}
 
-  void startRecordingVideo(const std::string &videoName) { server_->startRecordingVideo(videoName); }
+  void startRecordingVideo(const std::string &videoName) { if(server_) server_->startRecordingVideo(videoName); }
 
-  void stopRecordingVideo() { server_->stopRecordingVideo(); }
+  void stopRecordingVideo() { if(server_) server_->stopRecordingVideo(); }
 
  private:
   bool visualizable_ = false;
@@ -153,6 +155,7 @@ class ENVIRONMENT {
   double control_dt_ = 0.01;
   std::unique_ptr<raisim::RaisimServer> server_;
   Eigen::VectorXd stepData_;
+  bool visualize_ = false;
 };
 }
 

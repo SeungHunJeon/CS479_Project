@@ -68,7 +68,7 @@ class RaisimGymVecEnv:
             if update_mean:
                 self.obs_rms.update(self._observation)
 
-            return self._normalize_observation(self._observation)
+            return self._normalize_observation(self._observation).copy()
         else:
             return self._observation.copy()
 
@@ -109,7 +109,7 @@ class RaisimGymVecEnv:
         return self.wrapper.getStepDataTag()
 
     def get_step_data(self, data_size, data_mean, data_var, data_min, data_max):
-        self.wrapper.getStepData(data_size, data_mean, data_var, data_min, data_max)
+        return self.wrapper.getStepData(data_size, data_mean, data_var, data_min, data_max)
 
     @property
     def num_envs(self):

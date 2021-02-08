@@ -1,8 +1,8 @@
-import os
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import rsg_hubodog as Env
+from raisimGymTorch.env.bin import rsg_minicheetah
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
+import os
 import math
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
@@ -15,7 +15,7 @@ import argparse
 
 
 # task specification
-task_name = "hubo_locomotion"
+task_name = "minicheetah_locomotion"
 
 # configuration
 parser = argparse.ArgumentParser()
@@ -36,7 +36,7 @@ home_path = task_path + "/../../../.."
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
-env = VecEnv(Env.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+env = VecEnv(rsg_minicheetah.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
@@ -45,7 +45,9 @@ act_dim = env.num_acts
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
+
 avg_rewards = []
+
 actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
                          device)
@@ -61,9 +63,8 @@ ppo = PPO.PPO(actor=actor,
               num_envs=cfg['environment']['num_envs'],
               num_transitions_per_env=n_steps,
               num_learning_epochs=4,
-              gamma=0.998,
+              gamma=0.996,
               lam=0.95,
-              learning_rate=1e-4,
               num_mini_batches=4,
               device=device,
               log_dir=saver.data_dir,
@@ -76,6 +77,9 @@ if mode == 'retrain':
 for update in range(1000000):
     start = time.time()
     env.reset()
+    reward_ll_sum = 0
+    done_sum = 0
+    average_dones = 0.
 
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
@@ -85,31 +89,22 @@ for update in range(1000000):
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
+        # we create another graph just to demonstrate the save/load method
+        loaded_graph = ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim)
+        loaded_graph.load_state_dict(torch.load(saver.data_dir+"/full_"+str(update)+'.pt')['actor_architecture_state_dict'])
 
         env.turn_on_visualization()
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
-        data_tags = env.get_step_data_tag()
-        data_size = 0
-        data_mean = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
-        data_var = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
-        data_min = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
-        data_max = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
-
         for step in range(n_steps*2):
             frame_start = time.time()
             obs = env.observe(False)
-            action_ll = actor.architecture.architecture(torch.from_numpy(obs).to(device))
+            action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
             reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
-            data_size = env.get_step_data(data_size, data_mean, data_var, data_min, data_max)
-
-        data_std = np.sqrt(data_var / (data_size-1+1e-16))
-
-        for data_id in range(len(data_tags)):
-            ppo.writer.add_scalar(data_tags[data_id]+'/mean', data_mean[data_id], global_step=update)
-            ppo.writer.add_scalar(data_tags[data_id]+'/std', data_std[data_id], global_step=update)
-            ppo.writer.add_scalar(data_tags[data_id]+'/min', data_min[data_id], global_step=update)
-            ppo.writer.add_scalar(data_tags[data_id]+'/max', data_max[data_id], global_step=update)
+            frame_end = time.time()
+            wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
+            if wait_time > 0.:
+                time.sleep(wait_time)
 
         env.stop_video_recording()
         env.turn_off_visualization()
@@ -123,18 +118,24 @@ for update in range(1000000):
         action = ppo.observe(obs)
         reward, dones = env.step(action)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
+        done_sum = done_sum + sum(dones)
+        reward_ll_sum = reward_ll_sum + sum(reward)
 
     # take st step to get value obs
     obs = env.observe()
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
+    average_ll_performance = reward_ll_sum / total_steps
+    average_dones = done_sum / total_steps
+    avg_rewards.append(average_ll_performance)
 
     actor.distribution.enforce_minimum_std((torch.ones(12)*0.2).to(device))
-    env.curriculum_callback()
 
     end = time.time()
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
+    print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
+    print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
     print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)

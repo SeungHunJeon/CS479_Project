@@ -13,7 +13,7 @@
 
 namespace raisim {
 
-class AnymalController {
+class MinicheetahController {
 
  public:
   bool create(raisim::World *world) {

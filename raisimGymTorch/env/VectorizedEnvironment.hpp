@@ -67,13 +67,13 @@ class VectorizedEnvironment {
     return environments_[0]->getStepDataTag();
   }
 
-  void getStepData(int& sample_size,
-                   Eigen::Ref<EigenDoubleVec> &mean,
-                   Eigen::Ref<EigenDoubleVec> &var,
-                   Eigen::Ref<EigenDoubleVec> &min,
-                   Eigen::Ref<EigenDoubleVec> &max) {
+  int getStepData(int sample_size,
+                  Eigen::Ref<EigenDoubleVec> &mean,
+                  Eigen::Ref<EigenDoubleVec> &var,
+                  Eigen::Ref<EigenDoubleVec> &min,
+                  Eigen::Ref<EigenDoubleVec> &max) {
     size_t data_size = getStepDataTag().size();
-    if( data_size == 0 ) return;
+    if( data_size == 0 ) return sample_size;
 
     RSFATAL_IF(mean.size() != data_size ||
         var.size() != data_size ||
@@ -96,7 +96,7 @@ class VectorizedEnvironment {
       }
     }
 
-    sample_size += num_envs_;
+    return sample_size + num_envs_;
   }
 
   void step(Eigen::Ref<EigenRowMajorMat> &action,

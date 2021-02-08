@@ -14,7 +14,7 @@
 // raisimGymTorch include
 #include "../../Yaml.hpp"
 #include "../../BasicEigenTypes.hpp"
-#include "AnymalController.hpp"
+#include "MinicheetahController.hpp"
 
 namespace raisim {
 
@@ -26,7 +26,7 @@ class ENVIRONMENT {
       visualizable_(visualizable) {
     /// add objects
     world_ = std::make_unique<raisim::World>();
-    auto* robot = world_->addArticulatedSystem(resourceDir + "/anymal/urdf/anymal.urdf");
+    auto* robot = world_->addArticulatedSystem(resourceDir + "/minicheetah/mini-cheetah.urdf");
     robot->setName("robot");
     robot->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
     world_->addGround();
@@ -125,7 +125,7 @@ class ENVIRONMENT {
   double terminalRewardCoeff_ = -10.;
   double forwardVelRewardCoeff_ = 0.;
   double torqueRewardCoeff_ = 0.;
-  AnymalController controller_;
+  MinicheetahController controller_;
   std::unique_ptr<raisim::World> world_;
   double simulation_dt_ = 0.001;
   double control_dt_ = 0.01;
