@@ -68,13 +68,14 @@ class ENVIRONMENT {
   }
 
   float step(const Eigen::Ref<EigenVec> &action) {
+    stepData_.setZero();
     controller_.advance(world_.get(), action);
     for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
       if (server_) server_->lockVisualizationServerMutex();
       world_->integrate();
       if (server_) server_->unlockVisualizationServerMutex();
     }
-
+    stepData_ += controller_.getStepData();
     return controller_.getReward(world_.get(), forwardVelRewardCoeff_, torqueRewardCoeff_);
   }
 

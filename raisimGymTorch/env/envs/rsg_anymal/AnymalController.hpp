@@ -55,6 +55,10 @@ class AnymalController {
     footIndices_.insert(anymal->getBodyIdx("RH_SHANK"));
 
     updateObservation(world);
+
+    stepDataTag_ = {"vel_rew", "joint_torque_rew"};
+    stepData_.resize(stepDataTag_.size());
+
     return true;
   }
 
@@ -84,7 +88,11 @@ class AnymalController {
 
   double getReward(raisim::World *world, double forwardVelCoeff, double torqueCoeff) {
     auto* anymal = reinterpret_cast<raisim::ArticulatedSystem*>(world->getObject("robot"));
-    return std::min(4.0, bodyLinearVel_[0]) * forwardVelCoeff + anymal->getGeneralizedForce().squaredNorm() * torqueCoeff;
+    double velReward = std::min(4.0, bodyLinearVel_[0]) * forwardVelCoeff;
+    double jointTorqueReward = anymal->getGeneralizedForce().squaredNorm() * torqueCoeff;
+    stepData_[0] = velReward;
+    stepData_[1] = jointTorqueReward;
+    return velReward + jointTorqueReward;
   }
 
   void updateObservation(raisim::World *world) {
@@ -126,6 +134,14 @@ class AnymalController {
     return actionDim_;
   }
 
+    const std::vector<std::string>& getStepDataTag() {
+        return stepDataTag_;
+    }
+
+    const Eigen::VectorXd& getStepData() {
+        return stepData_;
+    }
+
  private:
   int gcDim_, gvDim_, nJoints_;
   Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, vTarget_;
@@ -133,6 +149,9 @@ class AnymalController {
   Eigen::Vector3d bodyLinearVel_, bodyAngularVel_;
   std::set<size_t> footIndices_;
   int obDim_=0, actionDim_=0;
+
+  Eigen::VectorXd stepData_;
+  std::vector<std::string> stepDataTag_;
 };
 
 }
