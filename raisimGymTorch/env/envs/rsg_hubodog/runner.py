@@ -54,7 +54,7 @@ critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.L
 
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp"])
-tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
+# tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 ppo = PPO.PPO(actor=actor,
               critic=critic,
@@ -63,7 +63,7 @@ ppo = PPO.PPO(actor=actor,
               num_learning_epochs=4,
               gamma=0.998,
               lam=0.95,
-              learning_rate=1e-4,
+              learning_rate=2e-5,
               num_mini_batches=4,
               device=device,
               log_dir=saver.data_dir,
@@ -76,6 +76,7 @@ if mode == 'retrain':
 for update in range(1000000):
     start = time.time()
     env.reset()
+    reward_ll_sum = 0
 
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
@@ -99,8 +100,8 @@ for update in range(1000000):
         for step in range(n_steps*2):
             frame_start = time.time()
             obs = env.observe(False)
-            action_ll = actor.architecture.architecture(torch.from_numpy(obs).to(device))
-            reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
+            actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
+            reward_ll, dones = env.step(actions.cpu().detach().numpy())
             data_size = env.get_step_data(data_size, data_mean, data_var, data_min, data_max)
 
         data_std = np.sqrt(data_var / (data_size-1+1e-16))
@@ -123,6 +124,7 @@ for update in range(1000000):
         action = ppo.observe(obs)
         reward, dones = env.step(action)
         ppo.step(value_obs=obs, rews=reward, dones=dones)
+        reward_ll_sum = reward_ll_sum + sum(reward)
 
     # take st step to get value obs
     obs = env.observe()
@@ -130,11 +132,13 @@ for update in range(1000000):
 
     actor.distribution.enforce_minimum_std((torch.ones(12)*0.2).to(device))
     env.curriculum_callback()
-
+    average_ll_performance = reward_ll_sum / total_steps
+    avg_rewards.append(average_ll_performance)
     end = time.time()
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
+    print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
     print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)

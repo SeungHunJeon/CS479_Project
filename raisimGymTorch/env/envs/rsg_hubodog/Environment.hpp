@@ -105,7 +105,7 @@ class ENVIRONMENT {
   }
 
   void curriculumUpdate() {
-    curriculumFactor_ *= 0.9995;
+    curriculumFactor_ *= 0.9998;
   };
 
   float getCurriculumFactor() {
@@ -148,7 +148,7 @@ class ENVIRONMENT {
   double terminalRewardCoeff_ = -0.;
   double forwardVelRewardCoeff_ = 0.;
   double torqueRewardCoeff_ = 0.;
-  double curriculumFactor_ = 1.;
+  double curriculumFactor_ = 1.0;
   HubodogController controller_;
   std::unique_ptr<raisim::World> world_;
   double simulation_dt_ = 0.001;

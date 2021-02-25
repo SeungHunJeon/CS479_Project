@@ -3,21 +3,21 @@ record_video: yes
 
 environment:
   render: False
-  num_envs: 500
+  num_envs: 800
   eval_every_n: 100
-  num_threads: 32
+  num_threads: 34
   simulation_dt: 0.001
   control_dt: 0.01
-  max_time: 4.0
+  max_time: 6.0
   reward:
     velocity: 0.3
     airtime: 0.3
-    torque: -3e-4
+    torque: -2e-4
     joint_velocity: 0
     joint_acceleration: 0
-    slip: -8e-2
-    smoothness1: -0.1
-    smoothness2: -0.1
+    slip: -4e-2
+    smoothness1: -1.0
+    smoothness2: -2.0
 architecture:
-  policy_net: [256, 192, 64]
-  value_net: [256, 192, 64]
+  policy_net: [256, 192]
+  value_net: [256, 192]

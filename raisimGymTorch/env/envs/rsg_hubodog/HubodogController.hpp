@@ -48,8 +48,8 @@ class HubodogController {
 
     /// set pd gains
     Eigen::VectorXd jointPgain(gvDim_), jointDgain(gvDim_);
-    jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(100.0);
-    jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.2);
+    jointPgain.setZero(); jointPgain.tail(nJoints_).setConstant(50.0);
+    jointDgain.setZero(); jointDgain.tail(nJoints_).setConstant(0.3);
     hubodog->setPdGains(jointPgain, jointDgain);
     hubodog->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
@@ -110,22 +110,19 @@ class HubodogController {
 
   void reset(raisim::World *world, double curriculumFactor) {
     auto* hubodog = reinterpret_cast<raisim::ArticulatedSystem*>(world->getObject("robot"));
-    do{
-      command_ << uniDist_(gen_) * 2.0, uniDist_(gen_) * 0.7, uniDist_(gen_) * 1.0;
-    } while (command_.norm() < 0.5);
-
-    footPhaseAngles_.setZero();
+    command_ << uniDist_(gen_) * 2.0, uniDist_(gen_) * 0.7, uniDist_(gen_) * 1.0;
+    if (command_.norm() > 2.5 * (1. - 0.7 * curriculumFactor)) command_ *= 2.5 * (1. - 0.7 * curriculumFactor) / command_.norm();
 
     Eigen::VectorXd gv_init_noisy(hubodog->getDOF());
     gv_init_noisy = gv_init_;
-    gv_init_noisy[0] += uniDist_(gen_) * 2.5;
-    gv_init_noisy[1] += uniDist_(gen_) * 2.5;
-    gv_init_noisy[2] += uniDist_(gen_) * 1.5;
-    gv_init_noisy[5] += uniDist_(gen_) * 2.5;
+    gv_init_noisy[0] += uniDist_(gen_) * .5;
+    gv_init_noisy[1] += uniDist_(gen_) * .5;
+    gv_init_noisy[2] += uniDist_(gen_) * 0.3;
+    gv_init_noisy[5] += uniDist_(gen_) * 0.8;
 
     hubodog->setState(gc_init_, gv_init_noisy);
     updateObservation(world);
-    pTarget12_.setZero(); targetT_1_.setZero(); targetT_2_.setZero(); airTime_.setZero(); preJointVel_.setZero(); footPhaseAngles_.setZero();
+    pTarget12_.setZero(); targetT_1_.setZero(); targetT_2_.setZero(); airTime_.setZero(); preJointVel_.setZero();
   }
 
   void updateHistory() {
@@ -140,17 +137,13 @@ class HubodogController {
 
   float getReward(raisim::World *world, const std::map<RewardType, float>& rewardCoeff, double simulation_dt, double curriculumFactor) {
     auto* hubodog = reinterpret_cast<raisim::ArticulatedSystem*>(world->getObject("robot"));
-    preJointVel_ = gv_.tail(nJoints_);
     updateObservation(world);
-
-    float VelReward = std::min(command_.head(2).norm(), (bodyLinearVel_[0] * command_[0] + bodyLinearVel_[1] * command_[1]) / command_.head(2).norm());
-
-    if (command_[2] > 0.)
-      VelReward += 0.5 * std::min(command_[2], bodyAngularVel_[2]);
-    else
-      VelReward -= 0.5 * std::max(command_[2], bodyAngularVel_[2]);
-
-    VelReward *= rewardCoeff.at(RewardType::VELOCITY);
+    preJointVel_ = gv_.tail(nJoints_);
+    float velReward = 0;
+    velReward += command_[0] > 0 ? std::min(bodyLinearVel_[0], command_[0]) : -std::max(bodyLinearVel_[0], command_[0]);
+    velReward += command_[1] > 0 ? std::min(bodyLinearVel_[1], command_[1]) : -std::max(bodyLinearVel_[1], command_[1]);
+    velReward += command_[2] > 0 ? std::min(bodyAngularVel_[2], command_[2]) : -std::max(bodyAngularVel_[2], command_[2]);
+    velReward *= rewardCoeff.at(RewardType::VELOCITY);
 
     float slipExp = 0.f;
 
@@ -173,13 +166,6 @@ class HubodogController {
     float smoothness2Exp = rewardCoeff.at(RewardType::SMOOTHNESS2) * (1.0-curriculumFactor*0.85)
         * (pTarget12_- 2 * targetT_1_ + targetT_2_).norm();
 
-    for(size_t i=0; i<4; i++)
-      footContactState_[i] = false;
-
-    for(auto& contact: hubodog->getContacts())
-      for(size_t i=0; i<4; i++)
-        if(contact.getlocalBodyIndex() == footIndices_[i])
-          footContactState_[i] = true;
 
     float airtimeRew = 0;
 
@@ -197,7 +183,7 @@ class HubodogController {
     airtimeRew *= rewardCoeff.at(RewardType::AIRTIME) * (0.05 + curriculumFactor);
 
 //      stepDataTag_ = {"vel_rew", "slip", "joint_acc_rew", "joint_vel_rew", "smooth_rew1", "smooth_rew2", "airtime", "torque", "total"};
-    stepData_[0] = VelReward;
+    stepData_[0] = velReward;
     stepData_[1] = slipExp;
     stepData_[2] = jointAccelerationExp;
     stepData_[3] = jointVelocityExp;
@@ -205,13 +191,23 @@ class HubodogController {
     stepData_[5] = smoothness2Exp;
     stepData_[6] = airtimeRew;
     stepData_[7] = jointTorqueExp;
-    double total_reward = (airtimeRew + VelReward) * exp(jointVelocityExp + jointAccelerationExp + slipExp + smoothness1Exp + smoothness2Exp + jointTorqueExp);
+    double total_reward = (airtimeRew + velReward) * exp(jointVelocityExp + jointAccelerationExp + slipExp + smoothness1Exp + smoothness2Exp + jointTorqueExp);
     stepData_[8] = total_reward;
     return total_reward;
   }
 
   void updateObservation(raisim::World *world) {
     auto* hubodog = reinterpret_cast<raisim::ArticulatedSystem*>(world->getObject("robot"));
+
+    for(size_t i=0; i<4; i++)
+      footContactState_[i] = false;
+
+    for(auto& contact: hubodog->getContacts())
+      for(size_t i=0; i<4; i++)
+        if(contact.getlocalBodyIndex() == footIndices_[i])
+          footContactState_[i] = true;
+
+
     hubodog->getState(gc_, gv_);
     quat_[0] = gc_[3]; quat_[1] = gc_[4]; quat_[2] = gc_[5]; quat_[3] = gc_[6];
     raisim::quatToRotMat(quat_, rot_);
@@ -271,7 +267,6 @@ class HubodogController {
   Eigen::VectorXd gc_init_, gv_init_, gc_, gv_, pTarget_, pTarget12_, targetT_1_, targetT_2_, vTarget_;
   Eigen::Vector3d command_, bodyPos_;
   std::array<bool, 4> footContactState_;
-  Eigen::VectorXd footPhaseAngles_;
   Eigen::VectorXd airTime_;
   Eigen::VectorXd actionMean_, actionStd_;
   Eigen::VectorXd obDouble_;

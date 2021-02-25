@@ -28,6 +28,7 @@ class ENVIRONMENT {
     world_ = std::make_unique<raisim::World>();
     auto* robot = world_->addArticulatedSystem(resourceDir + "/anymal/urdf/anymal.urdf");
     robot->setName("robot");
+
     robot->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
     world_->addGround();
 
