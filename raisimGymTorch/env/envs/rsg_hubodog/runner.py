@@ -93,18 +93,18 @@ for update in range(1000000):
         data_tags = env.get_step_data_tag()
         data_size = 0
         data_mean = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
-        data_var = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
-        data_min = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
-        data_max = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
+        data_square_sum = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
+        data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
+        data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
         for step in range(n_steps*2):
             frame_start = time.time()
             obs = env.observe(False)
             actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
             reward_ll, dones = env.step(actions.cpu().detach().numpy())
-            data_size = env.get_step_data(data_size, data_mean, data_var, data_min, data_max)
+            data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
-        data_std = np.sqrt(data_var / (data_size-1+1e-16))
+        data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
         for data_id in range(len(data_tags)):
             ppo.writer.add_scalar(data_tags[data_id]+'/mean', data_mean[data_id], global_step=update)
