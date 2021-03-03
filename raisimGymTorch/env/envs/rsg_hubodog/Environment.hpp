@@ -45,7 +45,7 @@ class ENVIRONMENT {
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::AIRTIME], cfg["reward"]["airtime"])
     READ_YAML(double, rewardCoeff_[HubodogController::RewardType::TORQUE], cfg["reward"]["torque"])
 
-    stepData_.resize(controller_.getStepDataTag().size());
+    stepData_.resize(getStepDataTag().size());
 
     /// visualize if it is the first environment
     if (visualizable_) {

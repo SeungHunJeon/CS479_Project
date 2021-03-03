@@ -182,7 +182,6 @@ class HubodogController {
     }
     airtimeRew *= rewardCoeff.at(RewardType::AIRTIME) * (0.05 + curriculumFactor);
 
-//      stepDataTag_ = {"vel_rew", "slip", "joint_acc_rew", "joint_vel_rew", "smooth_rew1", "smooth_rew2", "airtime", "torque", "total"};
     stepData_[0] = velReward;
     stepData_[1] = slipExp;
     stepData_[2] = jointAccelerationExp;

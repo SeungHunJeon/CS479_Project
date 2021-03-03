@@ -37,8 +37,7 @@ class ENVIRONMENT {
     READ_YAML(double, forwardVelRewardCoeff_, cfg["reward"]["forwardVelCoeff"])
     READ_YAML(double, torqueRewardCoeff_, cfg["reward"]["torqueCoeff"])
 
-    stepDataTag_ = {"vel_rew", "joint_torque_rew"};
-    stepData_.resize(stepDataTag_.size());
+    stepData_.resize(getStepDataTag().size());
 
     /// visualize if it is the first environment
     if (visualizable_) {
@@ -59,7 +58,7 @@ class ENVIRONMENT {
   }
 
   const std::vector<std::string>& getStepDataTag() {
-    return stepDataTag_;
+    return controller_.getStepDataTag();
   }
 
   const Eigen::VectorXd& getStepData() {
@@ -133,7 +132,6 @@ class ENVIRONMENT {
   double control_dt_ = 0.01;
   std::unique_ptr<raisim::RaisimServer> server_;
   Eigen::VectorXd stepData_;
-  std::vector<std::string> stepDataTag_;
 };
 }
 
