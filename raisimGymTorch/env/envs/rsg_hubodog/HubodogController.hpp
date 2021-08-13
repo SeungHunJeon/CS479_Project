@@ -137,7 +137,6 @@ class HubodogController {
 
   float getReward(raisim::World *world, const std::map<RewardType, float>& rewardCoeff, double simulation_dt, double curriculumFactor) {
     auto* hubodog = reinterpret_cast<raisim::ArticulatedSystem*>(world->getObject("robot"));
-    updateObservation(world);
     preJointVel_ = gv_.tail(nJoints_);
     float velReward = 0;
     velReward += command_[0] > 0 ? std::min(bodyLinearVel_[0], command_[0]) : -std::max(bodyLinearVel_[0], command_[0]);

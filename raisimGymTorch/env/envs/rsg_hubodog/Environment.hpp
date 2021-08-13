@@ -87,6 +87,7 @@ class ENVIRONMENT {
 
       if(i % 5 == 0) controller_.updateHistory();
     }
+    controller_.updateObservation(world_.get());
 
     return reward;
   }

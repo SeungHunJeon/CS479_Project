@@ -75,7 +75,6 @@ class AnymalController {
     pTarget12_ += actionMean_;
     pTarget_.tail(nJoints_) = pTarget12_;
     anymal->setPdTarget(pTarget_, vTarget_);
-    updateObservation(world);
     return true;
   }
 

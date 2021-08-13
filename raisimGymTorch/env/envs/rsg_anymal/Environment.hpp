@@ -74,6 +74,7 @@ class ENVIRONMENT {
       world_->integrate();
       if (server_) server_->unlockVisualizationServerMutex();
     }
+    controller_.updateObservation(world_.get());
     stepData_ += controller_.getStepData();
     return controller_.getReward(world_.get(), forwardVelRewardCoeff_, torqueRewardCoeff_);
   }
