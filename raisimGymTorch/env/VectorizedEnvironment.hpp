@@ -53,12 +53,13 @@ class VectorizedEnvironment {
 
   // resets all environments and returns observation
   void reset() {
-    for (auto env: environments_)
-      env->reset();
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < num_envs_; i++)
+      environments_[i]->reset();
   }
 
   void observe(Eigen::Ref<EigenRowMajorMat> &ob) {
-#pragma omp parallel for
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       environments_[i]->observe(ob.row(i));
   }
@@ -105,7 +106,7 @@ class VectorizedEnvironment {
   void step(Eigen::Ref<EigenRowMajorMat> &action,
             Eigen::Ref<EigenVec> &reward,
             Eigen::Ref<EigenBoolVec> &done) {
-#pragma omp parallel for
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       perAgentStep(i, action, reward, done);
   }

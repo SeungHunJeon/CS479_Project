@@ -62,6 +62,8 @@ FOREACH(subdir ${SUBDIRS})
     target_include_directories(${subdir} PUBLIC ${EIGEN3_INCLUDE_DIRS} ${RAISIMGYM_ENV_DIR}/${subdir})
     target_compile_options(${subdir} PRIVATE -mtune=native -fPIC -O3 -g -mno-avx2)
     target_compile_definitions(${subdir} PRIVATE "-DRAISIMGYM_TORCH_ENV_NAME=${subdir}")
+    target_compile_definitions(${subdir} PRIVATE EIGEN_DONT_PARALLELIZE)
+    target_compile_definitions(${subdir} PRIVATE "$<$<CONFIG:RELEASE>:EIGEN_NO_DEBUG>")
 
     if (CMAKE_BUILD_TYPE STREQUAL "DEBUG" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
         message("[RAISIM_GYM] BUILDING THE DEBUG APP for ${subdir}")

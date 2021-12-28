@@ -25,24 +25,21 @@ class ENVIRONMENT {
   explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable) :
       visualizable_(visualizable) {
     /// add objects
-    world_ = std::make_unique<raisim::World>();
-    auto* robot = world_->addArticulatedSystem(resourceDir + "/anymal/urdf/anymal.urdf");
+    auto* robot = world_.addArticulatedSystem(resourceDir + "/anymal/urdf/anymal.urdf");
     robot->setName("robot");
 
     robot->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-    world_->addGround();
+    world_.addGround();
 
-    controller_.create(world_.get());
+    controller_.create(&world_);
+    controller_.setRewardConfig(cfg);
     READ_YAML(double, simulation_dt_, cfg["simulation_dt"])
     READ_YAML(double, control_dt_, cfg["control_dt"])
-    READ_YAML(double, forwardVelRewardCoeff_, cfg["reward"]["forwardVelCoeff"])
-    READ_YAML(double, torqueRewardCoeff_, cfg["reward"]["torqueCoeff"])
-
     stepData_.resize(getStepDataTag().size());
 
     /// visualize if it is the first environment
     if (visualizable_) {
-      server_ = std::make_unique<raisim::RaisimServer>(world_.get());
+      server_ = std::make_unique<raisim::RaisimServer>(&world_);
       server_->launchServer();
       server_->focusOn(robot);
     }
@@ -55,7 +52,7 @@ class ENVIRONMENT {
   void init() {}
 
   void reset() {
-    controller_.reset(world_.get());
+    controller_.reset(&world_);
   }
 
   const std::vector<std::string>& getStepDataTag() {
@@ -68,15 +65,15 @@ class ENVIRONMENT {
 
   float step(const Eigen::Ref<EigenVec> &action) {
     stepData_.setZero();
-    controller_.advance(world_.get(), action);
+    controller_.advance(&world_, action);
     for (int i = 0; i < int(control_dt_ / simulation_dt_ + 1e-10); i++) {
       if (server_) server_->lockVisualizationServerMutex();
-      world_->integrate();
+      world_.integrate();
       if (server_) server_->unlockVisualizationServerMutex();
     }
-    controller_.updateObservation(world_.get());
+    controller_.updateObservation(&world_);
     stepData_ += controller_.getStepData();
-    return controller_.getReward(world_.get(), forwardVelRewardCoeff_, torqueRewardCoeff_);
+    return controller_.getReward(&world_);
   }
 
   void observe(Eigen::Ref<EigenVec> ob) {
@@ -84,7 +81,7 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float &terminalReward) {
-    if(controller_.isTerminalState(world_.get())) {
+    if(controller_.isTerminalState(&world_)) {
       terminalReward = terminalRewardCoeff_;
       return true;
     }
@@ -100,7 +97,7 @@ class ENVIRONMENT {
 
   void setSimulationTimeStep(double dt) {
     simulation_dt_ = dt;
-    world_->setTimeStep(dt);
+    world_.setTimeStep(dt);
   }
   void setControlTimeStep(double dt) { control_dt_ = dt; }
 
@@ -112,7 +109,7 @@ class ENVIRONMENT {
 
   double getSimulationTimeStep() { return simulation_dt_; }
 
-  raisim::World *getWorld() { return world_.get(); }
+  raisim::World *getWorld() { return &world_; }
 
   void turnOffVisualization() { server_->hibernate(); }
 
@@ -125,10 +122,8 @@ class ENVIRONMENT {
  private:
   bool visualizable_ = false;
   double terminalRewardCoeff_ = -10.;
-  double forwardVelRewardCoeff_ = 0.;
-  double torqueRewardCoeff_ = 0.;
   AnymalController controller_;
-  std::unique_ptr<raisim::World> world_;
+  raisim::World world_;
   double simulation_dt_ = 0.001;
   double control_dt_ = 0.01;
   std::unique_ptr<raisim::RaisimServer> server_;
