@@ -33,22 +33,23 @@ class VectorizedEnvironment {
   void init() {
     omp_set_num_threads(cfg_["num_threads"].template As<int>());
     num_envs_ = cfg_["num_envs"].template As<int>();
+    double simDt, conDt;
+    READ_YAML(double, simDt, cfg_["simulation_dt"])
+    READ_YAML(double, conDt, cfg_["control_dt"])
 
     for (int i = 0; i < num_envs_; i++) {
-      environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0));
-      environments_.back()->setSimulationTimeStep(cfg_["simulation_dt"].template As<double>());
-      environments_.back()->setControlTimeStep(cfg_["control_dt"].template As<double>());
+      environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0, i));
+      environments_.back()->setSimulationTimeStep(simDt);
+      environments_.back()->setControlTimeStep(conDt);
     }
 
-    setSeed(0);
-
+    int startSeed;
+    READ_YAML(int, startSeed, cfg_["seed"])
     for (int i = 0; i < num_envs_; i++) {
-      // only the first environment is visualized
+      environments_[i]->setSeed(startSeed + i);
       environments_[i]->init();
       environments_[i]->reset();
     }
-
-    RSFATAL_IF(environments_[0]->getObDim() == 0 || environments_[0]->getActionDim() == 0, "Observation/Action dimension must be defined in the constructor of each environment!")
   }
 
   // resets all environments and returns observation

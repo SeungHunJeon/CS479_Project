@@ -1,5 +1,8 @@
+# task specification
+task_name = "rsg_raibo_rough_terrain"
+
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import rsg_anymal
+from raisimGymTorch.env.bin import rsg_raibo_rough_terrain
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
 import os
@@ -13,9 +16,6 @@ import torch
 import datetime
 import argparse
 
-
-# task specification
-task_name = "anymal_locomotion"
 
 # configuration
 parser = argparse.ArgumentParser()
@@ -36,7 +36,7 @@ home_path = task_path + "/../../../.."
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
-env = VecEnv(rsg_anymal.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
@@ -106,6 +106,10 @@ for update in range(1000000):
             actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
             reward_ll, dones = env.step(actions.cpu().detach().numpy())
             data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
+            frame_end = time.time()
+            wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
+            if wait_time > 0.:
+                time.sleep(wait_time)
 
         data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
