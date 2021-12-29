@@ -267,7 +267,7 @@ class RaiboController {
     READ_YAML(double, torqueRewardCoeff_, cfg["reward"]["torque_reward_coeff"])
     READ_YAML(double, smoothRewardCoeff_, cfg["reward"]["smooth_reward_coeff"])
     READ_YAML(double, orientationRewardCoeff_, cfg["reward"]["orientation_reward_coeff"])
-    READ_YAML(double, jointVelocityRewardCoeff_, cfg["joint_velocity_reward_coeff"])
+    READ_YAML(double, jointVelocityRewardCoeff_, cfg["reward"]["joint_velocity_reward_coeff"])
     READ_YAML(double, slipRewardCoeff_, cfg["reward"]["slip_reward_coeff"])
     READ_YAML(double, airtimeRewardCoeff_, cfg["reward"]["airtime_reward_coeff"])
     READ_YAML(double, heightRewardCoeff_, cfg["reward"]["height_reward_coeff"])
@@ -343,7 +343,7 @@ class RaiboController {
   static double getConDt() { return conDt_; }
 
   void setSimDt(double dt) { RSFATAL_IF(fabs(dt - simDt_) > 1e-12, "sim dt is fixed to " << simDt_)};
-  void setConDt(double dt) { RSFATAL_IF(fabs(dt - conDt_) > 1e-12, "sim dt is fixed to " << conDt_)};
+  void setConDt(double dt) { RSFATAL_IF(fabs(dt - conDt_) > 1e-12, "con dt is fixed to " << conDt_)};
 
   inline const std::vector<std::string> &getStepDataTag() { return stepDataTag_; }
   inline const Eigen::VectorXd &getStepData() { return stepData_; }
@@ -380,7 +380,7 @@ class RaiboController {
   std::vector<std::vector<raisim::Vec<2>>> scanPoint_;
 
   // control variables
-  static constexpr double conDt_ = 0.01;
+  static constexpr double conDt_ = 0.02;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_, previousAction_;
   Eigen::VectorXd pTarget_, vTarget_; // full robot gc dim

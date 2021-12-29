@@ -27,7 +27,6 @@ class ENVIRONMENT {
   explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable, int id) :
       visualizable_(visualizable) {
     setSeed(id);
-    stepData_.resize(getStepDataTag().size());
 
     /// add objects
     raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
@@ -90,7 +89,7 @@ class ENVIRONMENT {
   void startRecordingVideo(const std::string& videoName ) { server_->startRecordingVideo(videoName); }
   void stopRecordingVideo() { server_->stopRecordingVideo(); }
   const std::vector<std::string>& getStepDataTag() { return controller_.getStepDataTag(); }
-  const Eigen::VectorXd& getStepData() { return stepData_; }
+  const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void reset() {
     // orientation
@@ -178,6 +177,7 @@ class ENVIRONMENT {
         break;
       }
     }
+
     return fmax(0.f, float(controller_.getRewardSum() / float(howManySteps+1)));
   }
 
@@ -243,7 +243,6 @@ class ENVIRONMENT {
   RaiboController controller_;
 
   std::unique_ptr<raisim::RaisimServer> server_;
-  Eigen::VectorXd stepData_;
 
   thread_local static std::mt19937 gen_;
   thread_local static std::normal_distribution<double> normDist_;

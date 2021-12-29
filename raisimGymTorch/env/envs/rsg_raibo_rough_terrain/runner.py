@@ -143,6 +143,7 @@ for update in range(1000000):
 
     actor.distribution.enforce_minimum_std((torch.ones(12)*0.2).to(device))
 
+    env.curriculum_callback()
     end = time.time()
 
     print('----------------------------------------------------')
