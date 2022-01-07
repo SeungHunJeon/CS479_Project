@@ -19,6 +19,7 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("reset", &VectorizedEnvironment<ENVIRONMENT>::reset)
     .def("observe", &VectorizedEnvironment<ENVIRONMENT>::observe)
     .def("step", &VectorizedEnvironment<ENVIRONMENT>::step)
+    .def("step_visualize", &VectorizedEnvironment<ENVIRONMENT>::step_visualize)
     .def("setSeed", &VectorizedEnvironment<ENVIRONMENT>::setSeed)
     .def("close", &VectorizedEnvironment<ENVIRONMENT>::close)
     .def("isTerminalState", &VectorizedEnvironment<ENVIRONMENT>::isTerminalState)

@@ -10,18 +10,23 @@ class Actor:
 
         self.architecture = architecture
         self.distribution = distribution
+        self.action_mean = None
+        self.actions = None
+        self.log_prob = None
+
         self.architecture.to(device)
         self.distribution.to(device)
         self.device = device
 
+
     def sample(self, obs):
-        logits = self.architecture.architecture(obs)
-        actions, log_prob = self.distribution.sample(logits)
-        return actions.cpu().detach(), log_prob.cpu().detach()
+        self.action_mean = self.architecture.architecture(obs).detach()
+        self.actions, self.log_prob = self.distribution.sample(self.action_mean)
+        return self.actions.cpu().detach(), self.log_prob.cpu().detach()
 
     def evaluate(self, obs, actions):
-        action_mean = self.architecture.architecture(obs)
-        return self.distribution.evaluate(obs, action_mean, actions)
+        self.action_mean = self.architecture.architecture(obs)
+        return self.distribution.evaluate(obs, self.action_mean, actions)
 
     def parameters(self):
         return [*self.architecture.parameters(), *self.distribution.parameters()]

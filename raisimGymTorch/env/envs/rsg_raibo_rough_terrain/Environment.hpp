@@ -66,7 +66,7 @@ class ENVIRONMENT {
     gv_init_from_.setZero(gvDim_);
 
     /// this is nominal configuration of anymal
-    nominalJointConfig_<< 0.03, 0.4, -0.8, -0.03, 0.4, -0.8, 0.03, -0.4, 0.8, -0.03, -0.4, 0.8;
+    nominalJointConfig_<< 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12;
     gc_init_.head(7) << 0, 0, 0.54, 1.0, 0.0, 0.0, 0.0;
     gc_init_.tail(12) = nominalJointConfig_;
     gc_init_from_ = gc_init_;
@@ -76,8 +76,10 @@ class ENVIRONMENT {
     controller_.setRewardConfig(cfg);
 
     // visualize if it is the first environment
-    if (visualizable_)
+    if (visualizable_) {
       server_ = std::make_unique<raisim::RaisimServer>(&world_);
+      server_->launchServer();
+    }
   }
 
   void init () { }
@@ -104,40 +106,40 @@ class ENVIRONMENT {
     gc_init_.segment(3, 4) = quaternion.e();
 
     // joint angles
-    for(size_t i=0 ; i<nJoints_; i++)
-      gc_init_[i+7] = nominalJointConfig_[i] + 0.2 * normDist_(gen_);
-
-    /// randomize generalized velocities
-    // base linear velocity
-    raisim::Vec<3> bodyVel_b, bodyVel_w;
-    bodyVel_b[0] = 0.4 * normDist_(gen_) * curriculumFactor_;
-    bodyVel_b[1] = .5 * normDist_(gen_) * curriculumFactor_;
-    bodyVel_b[2] = 0.2 * normDist_(gen_) * curriculumFactor_;
-    raisim::matvecmul(rotMat, bodyVel_b, bodyVel_w);
-
-    // base angular velocities (just define this in the world frame since it is isometric)
-    raisim::Vec<3> bodyAng_w;
-    for(size_t i=0; i<3; i++) bodyAng_w[i] = 0.4 * normDist_(gen_) * curriculumFactor_;
-
-    // joint velocities
-    Eigen::VectorXd jointVel(12);
-    for(size_t i=0; i<12; i++) jointVel[i] = 3. * normDist_(gen_) * curriculumFactor_;
-
-    // combine
-    gv_init_ << bodyVel_w.e(), bodyAng_w.e(), jointVel;
+    for(int i=0 ; i<nJoints_; i++)
+      gc_init_[i+7] = nominalJointConfig_[i] + 0.3 * normDist_(gen_);
 
     // command
-    const bool standingMode = normDist_(gen_) > 1.7;
+//    const bool standingMode = normDist_(gen_) > 1.7;
+    const bool standingMode = false;
     controller_.setStandingMode(standingMode);
     if(standingMode) {
       command_.setZero();
     } else {
       do {
-        command_ << .8 * 2. * (uniDist_(gen_) - 0.5),
-            0.4 * 2. * (uniDist_(gen_) - 0.5),
-            0.6 * 2. * (uniDist_(gen_) - 0.5);
-      } while(command_.norm() > 0.8 || command_.norm() < 0.5);
+        command_ << 2.5 * 2. * (uniDist_(gen_) - 0.5),
+            1.0 * 2. * (uniDist_(gen_) - 0.5),
+            1.2 * 2. * (uniDist_(gen_) - 0.5);
+      } while(command_.norm() > 3.5 || command_.head(2).norm() * fabs(command_[2]) > 4. || command_.norm() < 0.5);
     }
+
+    /// randomize generalized velocities
+    raisim::Vec<3> bodyVel_b, bodyVel_w;
+    bodyVel_b[0] = command_[0] + 0.5 * normDist_(gen_) * curriculumFactor_;
+    bodyVel_b[1] = command_[1] + 1.0 * normDist_(gen_) * curriculumFactor_;
+    bodyVel_b[2] = 0.3 * normDist_(gen_) * curriculumFactor_;
+    raisim::matvecmul(rotMat, bodyVel_b, bodyVel_w);
+
+    // base angular velocities (just define this in the world frame since it is isometric)
+    raisim::Vec<3> bodyAng_w;
+    for(int i=0; i<3; i++) bodyAng_w[i] = 0.4 * normDist_(gen_) * curriculumFactor_;
+
+    // joint velocities
+    Eigen::VectorXd jointVel(12);
+    for(int i=0; i<12; i++) jointVel[i] = 3. * normDist_(gen_) * curriculumFactor_;
+
+    // combine
+    gv_init_ << bodyVel_w.e(), bodyAng_w.e(), jointVel;
 
     // randomly initialize from previous trajectories
     if(uniDist_(gen_) < 0.25) {
@@ -155,7 +157,7 @@ class ENVIRONMENT {
       double terrainHeightMinusFootPosition = heightMap_->getHeight(footPosition[0], footPosition[1]) - footPosition[2];
       maxNecessaryShift = maxNecessaryShift > terrainHeightMinusFootPosition ? maxNecessaryShift : terrainHeightMinusFootPosition;
     }
-    gc_init_[2] += maxNecessaryShift;
+    gc_init_[2] += maxNecessaryShift + 0.07;
 
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
@@ -163,7 +165,7 @@ class ENVIRONMENT {
     controller_.updateStateVariables();
   }
 
-  double step(const Eigen::Ref<EigenVec>& action) {
+  double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
     controller_.advance(&world_, action, curriculumFactor_);
 
@@ -172,19 +174,24 @@ class ENVIRONMENT {
 
     for(howManySteps = 0; howManySteps< int(control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
       subStep();
+      if (visualize and visualizable_) {
+        std::this_thread::sleep_for(std::chrono::microseconds(size_t(3 * simulation_dt_ * 1e6)));
+      }
+
       if(isTerminalState(dummy)) {
         howManySteps++;
         break;
       }
     }
 
-    return fmax(0.f, float(controller_.getRewardSum() / float(howManySteps+1)));
+    return controller_.getRewardSum(visualize);
   }
 
   void subStep() {
     controller_.updateHistory();
+    world_.integrate1();
     if (server_) server_->lockVisualizationServerMutex();
-    world_.integrate();
+    world_.integrate2();
     if (server_) server_->unlockVisualizationServerMutex();
     controller_.updateStateVariables();
     controller_.accumulateRewards(curriculumFactor_, command_);

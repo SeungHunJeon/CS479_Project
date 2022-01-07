@@ -11,6 +11,8 @@ class RolloutStorage:
         self.actor_obs = torch.zeros(num_transitions_per_env, num_envs, *actor_obs_shape).to(self.device)
         self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape).to(self.device)
+        self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape).to(self.device)
+        self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape).to(self.device)
         self.dones = torch.zeros(num_transitions_per_env, num_envs, 1).byte().to(self.device)
 
         # For PPO
@@ -18,19 +20,20 @@ class RolloutStorage:
         self.values = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.returns = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
         self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1).to(self.device)
-
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
         self.device = device
 
         self.step = 0
 
-    def add_transitions(self, actor_obs, critic_obs, actions, rewards, dones, values, actions_log_prob):
+    def add_transitions(self, actor_obs, critic_obs, actions, mu, sigma, rewards, dones, values, actions_log_prob):
         if self.step >= self.num_transitions_per_env:
             raise AssertionError("Rollout buffer overflow")
         self.critic_obs[self.step].copy_(torch.from_numpy(critic_obs).to(self.device))
         self.actor_obs[self.step].copy_(torch.from_numpy(actor_obs).to(self.device))
         self.actions[self.step].copy_(actions.to(self.device))
+        self.sigma[self.step].copy_(sigma.to(self.device))
+        self.mu[self.step].copy_(mu.to(self.device))
         self.rewards[self.step].copy_(torch.from_numpy(rewards).view(-1, 1).to(self.device))
         self.dones[self.step].copy_(torch.from_numpy(dones).view(-1, 1).to(self.device))
         self.values[self.step].copy_(values.to(self.device))
@@ -45,10 +48,8 @@ class RolloutStorage:
         for step in reversed(range(self.num_transitions_per_env)):
             if step == self.num_transitions_per_env - 1:
                 next_values = last_values
-                # next_is_not_terminal = 1.0 - self.dones[step].float()
             else:
                 next_values = self.values[step + 1]
-                # next_is_not_terminal = 1.0 - self.dones[step+1].float()
 
             next_is_not_terminal = 1.0 - self.dones[step].float()
             delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
@@ -67,11 +68,13 @@ class RolloutStorage:
             actor_obs_batch = self.actor_obs.view(-1, *self.actor_obs.size()[2:])[indices]
             critic_obs_batch = self.critic_obs.view(-1, *self.critic_obs.size()[2:])[indices]
             actions_batch = self.actions.view(-1, self.actions.size(-1))[indices]
+            sigma_batch = self.sigma.view(-1, self.sigma.size(-1))[indices]
+            mu_batch = self.mu.view(-1, self.mu.size(-1))[indices]
             values_batch = self.values.view(-1, 1)[indices]
             returns_batch = self.returns.view(-1, 1)[indices]
             old_actions_log_prob_batch = self.actions_log_prob.view(-1, 1)[indices]
             advantages_batch = self.advantages.view(-1, 1)[indices]
-            yield actor_obs_batch, critic_obs_batch, actions_batch, values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch
+            yield actor_obs_batch, critic_obs_batch, actions_batch, sigma_batch, mu_batch, values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch
 
     def mini_batch_generator_inorder(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env
@@ -81,6 +84,8 @@ class RolloutStorage:
             yield self.actor_obs.view(-1, *self.actor_obs.size()[2:])[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.critic_obs.view(-1, *self.critic_obs.size()[2:])[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.actions.view(-1, self.actions.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+                self.sigma.view(-1, self.sigma.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+                self.mu.view(-1, self.mu.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.values.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.advantages.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
                 self.returns.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \

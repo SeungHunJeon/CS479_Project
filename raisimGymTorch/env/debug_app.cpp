@@ -5,8 +5,25 @@
 
 #include "Environment.hpp"
 #include "VectorizedEnvironment.hpp"
+#include <chrono>
 
 using namespace raisim;
+
+void print_timediff(const char *prefix, int loopCount,
+                    const std::chrono::steady_clock::time_point &start,
+                    const std::chrono::steady_clock::time_point &end) {
+  double milliseconds = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  std::cout<<milliseconds<<" microseconds"<<std::endl;
+  printf("The simulation of %s is running at: %lf MHz\n", prefix, loopCount / milliseconds);
+}
+
+inline std::string loadResource (const std::string& file) {
+  std::string urdfPath(__FILE__);
+  while (urdfPath.back() != raisim::Path::separator()[0])
+    urdfPath.erase(urdfPath.size() - 1, 1);
+  urdfPath += "../res/" + file;
+  return urdfPath;
+};
 
 int main(int argc, char *argv[]) {
   RSFATAL_IF(argc != 3, "got "<<argc<<" arguments. "<<"This executable takes three arguments: 1. resource directory, 2. configuration file")
@@ -47,9 +64,9 @@ int main(int argc, char *argv[]) {
   Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
   Eigen::Ref<EigenVec> reward_ref(reward);
   Eigen::Ref<EigenBoolVec> dones_ref(dones);
-
   vecEnv.reset();
   vecEnv.step(action_ref, reward_ref, dones_ref);
+  vecEnv.observe(ob_ref);
 
   return 0;
 }

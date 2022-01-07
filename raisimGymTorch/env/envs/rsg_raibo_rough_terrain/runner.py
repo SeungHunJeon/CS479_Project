@@ -46,8 +46,6 @@ act_dim = env.num_acts
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 
-avg_rewards = []
-
 actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim, 1.0),
                          device)
@@ -66,6 +64,7 @@ ppo = PPO.PPO(actor=actor,
               gamma=0.998,
               lam=0.95,
               num_mini_batches=4,
+              learning_rate=2e-4,
               device=device,
               log_dir=saver.data_dir,
               shuffle_batch=False,
@@ -74,7 +73,7 @@ ppo = PPO.PPO(actor=actor,
 if mode == 'retrain':
     load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
 
-for update in range(1000000):
+for update in range(100000):
     start = time.time()
     env.reset()
     reward_ll_sum = 0
@@ -100,16 +99,11 @@ for update in range(1000000):
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
-        for step in range(n_steps*2):
-            frame_start = time.time()
+        for step in range(n_steps):
             obs = env.observe(False)
             actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
-            reward_ll, dones = env.step(actions.cpu().detach().numpy())
+            reward, dones = env.step_visualize(actions.cpu().detach().numpy())
             data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
-            frame_end = time.time()
-            wait_time = cfg['environment']['control_dt'] - (frame_end-frame_start)
-            if wait_time > 0.:
-                time.sleep(wait_time)
 
         data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
@@ -139,21 +133,25 @@ for update in range(1000000):
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
-    avg_rewards.append(average_ll_performance)
+    actor.distribution.enforce_minimum_std((torch.ones(12)*(0.8*math.exp(-0.001*update) + 0.2)).to(device))
 
-    actor.distribution.enforce_minimum_std((torch.ones(12)*0.2).to(device))
+    if update % 100 == 0 and update > 1000:
+        env.curriculum_callback()
 
-    env.curriculum_callback()
+    for data_id in range(len(data_tags)):
+        ppo.writer.add_scalar('Training/average_reward', average_ll_performance, global_step=update)
+        ppo.writer.add_scalar('Training/dones', average_dones, global_step=update)
+        ppo.writer.add_scalar('Training/learning_rate', ppo.learning_rate, global_step=update)
+
     end = time.time()
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
     print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
     print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
+    print('{:<40} {:>6}'.format("learning rate: ", '{:0.6f}'.format(ppo.learning_rate)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
     print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)
                                                                        * cfg['environment']['control_dt'])))
-    print('std: ')
-    print(np.exp(actor.distribution.std.cpu().detach().numpy()))
     print('----------------------------------------------------\n')

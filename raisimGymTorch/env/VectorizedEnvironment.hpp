@@ -109,7 +109,15 @@ class VectorizedEnvironment {
             Eigen::Ref<EigenBoolVec> &done) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
-      perAgentStep(i, action, reward, done);
+      perAgentStep(i, action, reward, done, false);
+  }
+
+  void step_visualize(Eigen::Ref<EigenRowMajorMat> &action,
+                      Eigen::Ref<EigenVec> &reward,
+                      Eigen::Ref<EigenBoolVec> &done) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < num_envs_; i++)
+      perAgentStep(i, action, reward, done, true);
   }
 
   void turnOnVisualization() { if(render_) environments_[0]->turnOnVisualization(); }
@@ -160,8 +168,9 @@ class VectorizedEnvironment {
   inline void perAgentStep(int agentId,
                            Eigen::Ref<EigenRowMajorMat> &action,
                            Eigen::Ref<EigenVec> &reward,
-                           Eigen::Ref<EigenBoolVec> &done) {
-    reward[agentId] = environments_[agentId]->step(action.row(agentId));
+                           Eigen::Ref<EigenBoolVec> &done,
+                           bool visualize) {
+    reward[agentId] = environments_[agentId]->step(action.row(agentId), visualize);
 
     float terminalReward = 0;
     done[agentId] = environments_[agentId]->isTerminalState(terminalReward);

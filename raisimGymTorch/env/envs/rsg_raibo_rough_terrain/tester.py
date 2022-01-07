@@ -1,5 +1,5 @@
 from ruamel.yaml import YAML, dump, RoundTripDumper
-from raisimGymTorch.env.bin import rsg_anymal
+from raisimGymTorch.env.bin import rsg_raibo_rough_terrain
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.ppo.module as ppo_module
 import os
@@ -16,7 +16,7 @@ args = parser.parse_args()
 
 # directories
 task_path = os.path.dirname(os.path.realpath(__file__))
-home_path = task_path + "/../../../../.."
+home_path = task_path + "/../../../.."
 
 # config
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
@@ -24,7 +24,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 
-env = VecEnv(rsg_anymal.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
@@ -58,7 +58,7 @@ else:
     max_steps = 1000 ## 10 secs
 
     for step in range(max_steps):
-        time.sleep(0.01)
+        time.sleep(0.03)
         obs = env.observe(False)
         action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
         reward_ll, dones = env.step(action_ll.cpu().detach().numpy())

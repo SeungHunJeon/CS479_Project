@@ -3,6 +3,7 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from adamp import AdamP
 from torch.utils.tensorboard import SummaryWriter
 from .storage import RolloutStorage
 
@@ -22,6 +23,8 @@ class PPO:
                  entropy_coef=0.0,
                  learning_rate=5e-4,
                  max_grad_norm=0.5,
+                 desired_kl=0.01,
+                 schedule='adaptive',
                  use_clipped_value_loss=True,
                  log_dir='run',
                  device='cpu',
@@ -37,7 +40,10 @@ class PPO:
         else:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
+        self.learning_rate = learning_rate
+        self.optimizer = AdamP([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
+        self.schedule = schedule
+        self.desired_kl = desired_kl
         self.device = device
 
         # env parameters
@@ -74,7 +80,7 @@ class PPO:
 
     def step(self, value_obs, rews, dones):
         values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
-        self.storage.add_transitions(self.actor_obs, value_obs, self.actions, rews, dones, values,
+        self.storage.add_transitions(self.actor_obs, value_obs, self.actions, self.actor.action_mean, self.actor.distribution.std.detach(), rews, dones, values,
                                      self.actions_log_prob)
 
     def update(self, actor_obs, value_obs, log_this_iteration, update):
@@ -100,11 +106,28 @@ class PPO:
         mean_value_loss = 0
         mean_surrogate_loss = 0
         for epoch in range(self.num_learning_epochs):
-            for actor_obs_batch, critic_obs_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
+            for actor_obs_batch, critic_obs_batch, actions_batch, old_sigma_batch, old_mu_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 value_batch = self.critic.evaluate(critic_obs_batch)
+                mu_batch = self.actor.action_mean
+                sigma_batch = self.actor.distribution.std
+
+                # KL
+                if self.desired_kl != None and self.schedule == 'adaptive':
+                    with torch.inference_mode():
+                        kl = torch.sum(
+                            torch.log(sigma_batch / old_sigma_batch + 1.e-5) + (torch.square(old_sigma_batch) + torch.square(old_mu_batch - mu_batch)) / (2.0 * torch.square(sigma_batch)) - 0.5, axis=-1)
+                        kl_mean = torch.mean(kl)
+
+                        if kl_mean > self.desired_kl * 2.0:
+                            self.learning_rate = max(1e-5, self.learning_rate / 1.2)
+                        elif kl_mean < self.desired_kl / 2.0 and kl_mean > 0.0:
+                            self.learning_rate = min(1e-2, self.learning_rate * 1.2)
+
+                        for param_group in self.optimizer.param_groups:
+                            param_group['lr'] = self.learning_rate
 
                 # Surrogate loss
                 ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
