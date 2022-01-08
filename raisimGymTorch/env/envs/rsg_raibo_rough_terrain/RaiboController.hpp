@@ -309,7 +309,7 @@ class RaiboController {
     torqueReward_ += cf * torqueRewardCoeff_ * (raibo_->getGeneralizedForce().e().tail(12).squaredNorm()) * simDt_;
     commandTrackingReward_ += command[0] > 0 ? std::min(bodyLinVel_[0], command[0]) : -std::max(bodyLinVel_[0], command[0]);
     commandTrackingReward_ += command[1] > 0 ? std::min(bodyLinVel_[1], command[1]) : -std::max(bodyLinVel_[1], command[1]);
-    commandTrackingReward_ -= 0.2 * bodyLinVel_[2] * bodyLinVel_[2];
+    commandTrackingReward_ -= 0.4 * bodyLinVel_[2] * bodyLinVel_[2];
     commandTrackingReward_ += 0.5 * (command[2] > 0 ? std::min(bodyAngVel_[2], command[2]) : -std::max(bodyAngVel_[2], command[2]));
 
     commandTrackingReward_ *= commandTrackingRewardCoeff * simDt_;
@@ -317,9 +317,15 @@ class RaiboController {
     orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);
     jointVelocityReward_ += cf * jointVelocityRewardCoeff_ * simDt_ * jointVelocity_.squaredNorm();
 
-    for (size_t i = 0; i < 4; i++)
-      if (footContactState_[i])
-        slipReward_ += cf * slipRewardCoeff_ * footVel_[i].e().head(2).squaredNorm();
+    raisim::Vec<3> conVel;
+    for (int i=0; i< raibo_->getContacts().size(); i++) {
+      if (raibo_->getContacts()[i].isSelfCollision() ) continue;
+      raibo_->getContactPointVel(i, conVel);
+      slipReward_ += cf * slipRewardCoeff_ * conVel.e().head(2).squaredNorm();
+    }
+//    for (size_t i = 0; i < 4; i++)
+//      if (footContactState_[i])
+//        slipReward_ += cf * slipRewardCoeff_ * footVel_[i].e().head(2).squaredNorm();
 
     if (standingMode_) {
       for (int i = 0; i < 4; i++) {
@@ -328,7 +334,7 @@ class RaiboController {
     } else {
       for (int i = 0; i < 4; i++)
         if (airTime_[i] < 0.41)
-          airtimeReward_ += std::min(airTime_[i], 0.2) * airtimeRewardCoeff_;
+          airtimeReward_ += std::min(airTime_[i], 0.3) * airtimeRewardCoeff_;
 
       for (int i = 0; i < 4; i++)
         if (stanceTime_[i] < 0.55)

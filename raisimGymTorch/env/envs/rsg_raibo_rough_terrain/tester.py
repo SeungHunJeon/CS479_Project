@@ -23,6 +23,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
+cfg['environment']['render'] = True
 
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
@@ -38,7 +39,6 @@ if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
 else:
     print("Loaded weight from {}\n".format(weight_path))
-    start = time.time()
     env.reset()
     reward_ll_sum = 0
     done_sum = 0
@@ -58,7 +58,6 @@ else:
     max_steps = 1000 ## 10 secs
 
     for step in range(max_steps):
-        time.sleep(0.03)
         obs = env.observe(False)
         action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
         reward_ll, dones = env.step(action_ll.cpu().detach().numpy())

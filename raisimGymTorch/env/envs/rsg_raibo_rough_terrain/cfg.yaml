@@ -2,24 +2,24 @@ record_video: yes
 
 environment:
   seed: 1
-  render: True
-  num_envs: 800
+  render: False
+  num_envs: 300
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.001
   control_dt: 0.02
-  max_time: 4.0
+  max_time: 3.0
   reward:
     command_tracking_reward_coeff: 20
 #    height_reward_coeff: .3
 #    torque_reward_coeff: -2e-5
 #    orientation_reward_coeff: -1.
-    joint_velocity_reward_coeff: -0.7e-1
-    slip_reward_coeff: -5e-2
+    joint_velocity_reward_coeff: -1e-1
+    slip_reward_coeff: -1e-2
     airtime_reward_coeff: 3e-2
     smooth_reward_coeff: 0
     con_switch_rew_coeff: 0
-    torque_reward_coeff: -1.2e-2
+    torque_reward_coeff: -0.7e-2
     orientation_reward_coeff: -200
 #    joint_velocity_reward_coeff: 0
 #    slip_reward_coeff: 0

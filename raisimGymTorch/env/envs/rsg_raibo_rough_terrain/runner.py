@@ -89,9 +89,6 @@ for update in range(100000):
             'optimizer_state_dict': ppo.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
 
-        env.turn_on_visualization()
-        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
-
         data_tags = env.get_step_data_tag()
         data_size = 0
         data_mean = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
@@ -112,9 +109,6 @@ for update in range(100000):
             ppo.writer.add_scalar(data_tags[data_id]+'/std', data_std[data_id], global_step=update)
             ppo.writer.add_scalar(data_tags[data_id]+'/min', data_min[data_id], global_step=update)
             ppo.writer.add_scalar(data_tags[data_id]+'/max', data_max[data_id], global_step=update)
-
-        env.stop_video_recording()
-        env.turn_off_visualization()
 
         env.reset()
         env.save_scaling(saver.data_dir, str(update))
