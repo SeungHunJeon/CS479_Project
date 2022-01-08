@@ -117,10 +117,10 @@ class ENVIRONMENT {
       command_.setZero();
     } else {
       do {
-        command_ << 2.5 * 2. * (uniDist_(gen_) - 0.5),
+        command_ << 3.5 * 2. * (uniDist_(gen_) - 0.5),
             1.0 * 2. * (uniDist_(gen_) - 0.5),
             1.2 * 2. * (uniDist_(gen_) - 0.5);
-      } while(command_.norm() > 3.5 || command_.head(2).norm() * fabs(command_[2]) > 4. || command_.norm() < 0.5);
+      } while(command_.norm() > 4. || command_.head(2).norm() * fabs(command_[2]) > 4. || command_.norm() < 0.5);
     }
 
     /// randomize generalized velocities

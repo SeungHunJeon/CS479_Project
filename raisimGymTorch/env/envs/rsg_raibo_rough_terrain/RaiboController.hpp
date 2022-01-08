@@ -309,7 +309,6 @@ class RaiboController {
     torqueReward_ += cf * torqueRewardCoeff_ * (raibo_->getGeneralizedForce().e().tail(12).squaredNorm()) * simDt_;
     commandTrackingReward_ += command[0] > 0 ? std::min(bodyLinVel_[0], command[0]) : -std::max(bodyLinVel_[0], command[0]);
     commandTrackingReward_ += command[1] > 0 ? std::min(bodyLinVel_[1], command[1]) : -std::max(bodyLinVel_[1], command[1]);
-    commandTrackingReward_ -= 0.4 * bodyLinVel_[2] * bodyLinVel_[2];
     commandTrackingReward_ += 0.5 * (command[2] > 0 ? std::min(bodyAngVel_[2], command[2]) : -std::max(bodyAngVel_[2], command[2]));
 
     commandTrackingReward_ *= commandTrackingRewardCoeff * simDt_;
@@ -341,9 +340,15 @@ class RaiboController {
           airtimeReward_ += std::min(stanceTime_[i], 0.3) * airtimeRewardCoeff_;
     }
 
-    for (size_t i = 0; i < 4; i++)
-      if (!footContactState_[i] && prevfootContactState_[i])
-        contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
+    if (footContactState_[0] && footContactState_[3])
+      contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
+    else if (footContactState_[0] != footContactState_[3])
+      contactSwitchReward_ -= 0.5 * cf * contactSwitchRewardCoeff_ * simDt_;
+
+    if (footContactState_[1] && footContactState_[2])
+      contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
+    else if (footContactState_[1] != footContactState_[2])
+      contactSwitchReward_ -= 0.5 * cf * contactSwitchRewardCoeff_ * simDt_;
   }
 
   void updateHeightScan(const raisim::HeightMap *map) {
