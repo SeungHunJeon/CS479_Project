@@ -129,7 +129,7 @@ for update in range(100000):
     average_dones = done_sum / total_steps
     actor.distribution.enforce_minimum_std((torch.ones(12)*(0.8*math.exp(-0.001*update) + 0.2)).to(device))
 
-    if update % 100 == 0 and update > 1000:
+    if update % 100 == 0:
         env.curriculum_callback()
 
     for data_id in range(len(data_tags)):

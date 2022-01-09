@@ -164,7 +164,7 @@ class RaiboController {
     for (auto &contact: raibo_->getContacts()) {
       auto it = std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex());
       size_t index = it - footIndices_.begin();
-      if (index < 4)
+      if (index < 4 && !contact.isSelfCollision())
         footContactState_[index] = true;
     }
 
@@ -340,15 +340,23 @@ class RaiboController {
           airtimeReward_ += std::min(stanceTime_[i], 0.3) * airtimeRewardCoeff_;
     }
 
-    if (footContactState_[0] && footContactState_[3])
+    if (footContactState_[0] == footContactState_[3])
       contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
-    else if (footContactState_[0] != footContactState_[3])
-      contactSwitchReward_ -= 0.5 * cf * contactSwitchRewardCoeff_ * simDt_;
 
-    if (footContactState_[1] && footContactState_[2])
+    if (footContactState_[1] == footContactState_[2])
       contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
-    else if (footContactState_[1] != footContactState_[2])
-      contactSwitchReward_ -= 0.5 * cf * contactSwitchRewardCoeff_ * simDt_;
+
+    if (footContactState_[0] == footContactState_[2])
+      contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
+
+    if (footContactState_[0] == footContactState_[1])
+      contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
+
+   if (footContactState_[3] == footContactState_[2])
+     contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
+
+   if (footContactState_[3] == footContactState_[1])
+     contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
   }
 
   void updateHeightScan(const raisim::HeightMap *map) {
