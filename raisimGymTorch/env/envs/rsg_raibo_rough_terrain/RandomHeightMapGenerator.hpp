@@ -39,8 +39,8 @@ class RandomHeightMapGenerator {
       case GroundType::HEIGHT_MAP:
         terrainProperties_.frequency = 0.8;
         terrainProperties_.zScale = targetRoughness * curriculumFactor;
-        terrainProperties_.xSize = 20.0;
-        terrainProperties_.ySize = 20.0;
+        terrainProperties_.xSize = 12.0;
+        terrainProperties_.ySize = 12.0;
         terrainProperties_.xSamples = 60;
         terrainProperties_.ySamples = 60;
         terrainProperties_.fractalOctaves = 5;
@@ -51,13 +51,13 @@ class RandomHeightMapGenerator {
         terrainProperties_.stepSize = 0.;
         genPtr = std::make_unique<raisim::TerrainGenerator>(terrainProperties_);
         heightVec = genPtr->generatePerlinFractalTerrain();
-        return world->addHeightMap(60, 60, 20.0, 20.0, 0., 0., heightVec);
+        return world->addHeightMap(60, 60, 12.0, 12.0, 0., 0., heightVec);
 
       case GroundType::HEIGHT_MAP_DISCRETE:
         terrainProperties_.frequency = 0.3;
         terrainProperties_.zScale = targetRoughness * curriculumFactor * 1.2;
-        terrainProperties_.xSize = 20.0;
-        terrainProperties_.ySize = 20.0;
+        terrainProperties_.xSize = 12.0;
+        terrainProperties_.ySize = 12.0;
         terrainProperties_.xSamples = 80;
         terrainProperties_.ySamples = 80;
         terrainProperties_.fractalOctaves = 3;
@@ -68,7 +68,7 @@ class RandomHeightMapGenerator {
         genPtr = std::make_unique<raisim::TerrainGenerator>(terrainProperties_);
         heightVec = genPtr->generatePerlinFractalTerrain();
 
-        return world->addHeightMap(80, 80, 20.0, 20.0, 0., 0., heightVec);
+        return world->addHeightMap(80, 80, 12.0, 12.0, 0., 0., heightVec);
 
       case GroundType::STEPS:
 
@@ -84,7 +84,7 @@ class RandomHeightMapGenerator {
           }
         }
 
-        return world->addHeightMap(120, 120, 20.0, 20.0, 0., 0., heightVec);
+        return world->addHeightMap(120, 120, 12.0, 12.0, 0., 0., heightVec);
 
       case GroundType::STAIRS:
         heightVec.resize(200*200);
@@ -93,7 +93,7 @@ class RandomHeightMapGenerator {
             heightVec[xBlock*200*200/25 + i] = xBlock * targetRoughness * 0.17 * curriculumFactor;
           }
         }
-        return world->addHeightMap(200, 200, 20., 20., 0., 0., heightVec);
+        return world->addHeightMap(200, 200, 12., 12., 0., 0., heightVec);
     }
     return nullptr;
   }
