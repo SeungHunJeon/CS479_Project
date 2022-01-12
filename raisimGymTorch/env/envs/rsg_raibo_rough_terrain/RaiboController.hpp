@@ -45,7 +45,7 @@ class RaiboController {
     obDouble_.setZero(obDim_);
 
     /// pd controller
-    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(30.0);
+    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(15.0);
     jointDgain_.setZero(gvDim_); jointDgain_.tail(nJoints_).setConstant(0.5);
     raibo_->setPdGains(jointPgain_, jointDgain_);
     pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_);

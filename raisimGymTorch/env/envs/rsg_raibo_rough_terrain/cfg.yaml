@@ -14,11 +14,11 @@ environment:
 #    height_reward_coeff: .3
 #    torque_reward_coeff: -2e-5
 #    orientation_reward_coeff: -1.
-    joint_velocity_reward_coeff: -1.2e-1
+    joint_velocity_reward_coeff: -1.0e-1
     slip_reward_coeff: -0.7e-2
-    airtime_reward_coeff: 0.5e-1
+    airtime_reward_coeff: 0.3e-1
     smooth_reward_coeff: 0
-    con_switch_rew_coeff: 1.5e1
+    con_switch_rew_coeff: 1.0e1
     torque_reward_coeff: -1.0e-2
     orientation_reward_coeff: -200
 #    joint_velocity_reward_coeff: 0
@@ -30,5 +30,5 @@ environment:
     decay_factor: 0.95
 
 architecture:
-  policy_net: [512, 256, 128]
-  value_net: [512, 256, 128]
+  policy_net: [512, 400, 128]
+  value_net: [512, 400, 128]
