@@ -16,8 +16,8 @@ class RaiboController {
     jointVelocity_.resize(12);
 
     /// foot scan config
-    scanConfig_.setZero(4);
-    scanConfig_ << 6, 8, 10, 12;
+    scanConfig_.setZero(5);
+    scanConfig_ << 6, 8, 10, 12, 14;
     scanPoint_.resize(4, std::vector<raisim::Vec<2>>(scanConfig_.sum()));
     heightScan_.resize(4, raisim::VecDyn(scanConfig_.sum()));
 
@@ -55,8 +55,8 @@ class RaiboController {
         0.0, 0.0, 1.4, /// gravity axis 3
         Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
         nominalJointConfig_, /// joint pos
-        Eigen::VectorXd::Constant(nJoints_ * (3 - 1), 0.0), /// joint position error history
-        Eigen::VectorXd::Constant(nJoints_ * 3, 0.0), /// joint vel history
+        Eigen::VectorXd::Constant(nJoints_ * (4 - 1), 0.0), /// joint position error history
+        Eigen::VectorXd::Constant(nJoints_ * 4, 0.0), /// joint vel history
         Eigen::VectorXd::Constant(scanConfig_.sum() * 4, -0.03), /// height scan
         Eigen::VectorXd::Constant(4, 0.), /// airtime
         nominalJointConfig_, /// previous action
@@ -68,8 +68,8 @@ class RaiboController {
         Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
         Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
         Eigen::VectorXd::Constant(nJoints_, 1.), /// joint angles
-        Eigen::VectorXd::Constant(nJoints_ * (3 - 1), 0.6), /// joint position error history
-        Eigen::VectorXd::Constant(nJoints_ * 3, 10.0), /// joint velocities
+        Eigen::VectorXd::Constant(nJoints_ * (4 - 1), 0.6), /// joint position error history
+        Eigen::VectorXd::Constant(nJoints_ * 4, 10.0), /// joint velocities
         Eigen::VectorXd::Constant(scanConfig_.sum() * 4, 0.1),
         Eigen::VectorXd::Constant(4, 0.3),
         actionStd_ * 1.5, /// previous action
@@ -261,7 +261,7 @@ class RaiboController {
     updateHeightScan(map);
 
     /// height of the origin of the body frame
-    obDouble_[0] = 0.5 + nosify * (normDist_(gen_) * 0.01);
+    obDouble_[0] = gc_[2] - map->getHeight(gc_[0], gc_[1]);
 
     /// body orientation
     obDouble_.segment(1, 3) = baseRot_.e().row(2);
@@ -272,29 +272,31 @@ class RaiboController {
 
     /// except the first joints, the joint history stores target-position
     obDouble_.segment(10, nJoints_) = gc_.tail(12);
-    obDouble_.segment(22, 12) = jointPositionHistory_.segment((historyLength_ - 1 - 5) * 12, 12);
-    obDouble_.segment(34, 12) = jointPositionHistory_.segment((historyLength_ - 1 - 3) * 12, 12);
+    obDouble_.segment(22, 12) = jointPositionHistory_.segment((historyLength_ - 1 - 6) * 12, 12);
+    obDouble_.segment(34, 12) = jointPositionHistory_.segment((historyLength_ - 1 - 4) * 12, 12);
+    obDouble_.segment(46, 12) = jointPositionHistory_.segment((historyLength_ - 1 - 2) * 12, 12);
 
-    obDouble_.segment(46, 12) = jointVelocityHistory_.segment((historyLength_ - 1 - 5) * 12, 12);
-    obDouble_.segment(58, 12) = jointVelocityHistory_.segment((historyLength_ - 1 - 3) * 12, 12);
-    obDouble_.segment(70, 12) = jointVelocityHistory_.segment((historyLength_ - 1) * 12, 12);
+    obDouble_.segment(58, 12) = jointVelocityHistory_.segment((historyLength_ - 1 - 6) * 12, 12);
+    obDouble_.segment(70, 12) = jointVelocityHistory_.segment((historyLength_ - 1 - 4) * 12, 12);
+    obDouble_.segment(82, 12) = jointVelocityHistory_.segment((historyLength_ - 1 - 2) * 12, 12);
+    obDouble_.segment(94, 12) = jointVelocityHistory_.segment((historyLength_ - 1) * 12, 12);
 
     /// height scan
     for (int i = 0; i < 4; i++)
       for (int j = 0; j < scanConfig_.sum(); j++)
-        obDouble_[10 + 2 * nJoints_ * 3 + i * scanConfig_.sum() + j] = heightScan_[i][j];
+        obDouble_[10 + 2 * nJoints_ * 4 + i * scanConfig_.sum() + j] = heightScan_[i][j];
 
     /// airtime
     for (int i = 0; i < 4; i++)
-      obDouble_[10 + 2 * nJoints_ * 3 + 4 * scanConfig_.sum() + i] =
+      obDouble_[10 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum() + i] =
           airTime_[i] > 0 ? airTime_[i] : -stanceTime_[i];
 
     /// previous action
-    obDouble_.segment(14 + 2 * nJoints_ * 3 + 4 * scanConfig_.sum(), 12) = previousAction_;
-    obDouble_.segment(26 + 2 * nJoints_ * 3 + 4 * scanConfig_.sum(), 12) = previousAction_ - prevprevAction_;
+    obDouble_.segment(14 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 12) = previousAction_;
+    obDouble_.segment(26 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 12) = previousAction_ - prevprevAction_;
 
     /// command
-    obDouble_.segment(38 + 2 * nJoints_ * 3 + 4 * scanConfig_.sum(), 3) = command;
+    obDouble_.segment(38 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 3) = command;
   }
 
   inline void setRewardConfig(const Yaml::Node &cfg) {
@@ -334,12 +336,12 @@ class RaiboController {
       }
     } else {
       for (int i = 0; i < 4; i++)
-        if (airTime_[i] < 0.55)
-          airtimeReward_ += std::min(airTime_[i], 0.35) * airtimeRewardCoeff_;
+        if (airTime_[i] < 0.35)
+          airtimeReward_ += std::min(airTime_[i], 0.2) * airtimeRewardCoeff_;
 
       for (int i = 0; i < 4; i++)
         if (stanceTime_[i] < 0.55)
-          airtimeReward_ += std::min(stanceTime_[i], 0.35) * airtimeRewardCoeff_;
+          airtimeReward_ += std::min(stanceTime_[i], 0.25) * airtimeRewardCoeff_;
     }
 
     if (footContactState_[0] == footContactState_[3])
@@ -404,7 +406,7 @@ class RaiboController {
   static constexpr int nJoints_ = 12;
   static constexpr int actionDim_ = 12;
   static constexpr size_t historyLength_ = 14;
-  static constexpr size_t obDim_ = 257;
+  static constexpr size_t obDim_ = 337;
   static constexpr double simDt_ = .001;
   static constexpr int gcDim_ = 19;
   static constexpr int gvDim_ = 18;
