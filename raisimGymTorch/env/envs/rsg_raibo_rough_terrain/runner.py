@@ -127,7 +127,7 @@ for update in range(100000):
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
-    actor.distribution.enforce_minimum_std((torch.ones(12)*(0.8*math.exp(-0.001*update) + 0.2)).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(12)*(0.8*math.exp(-0.0002*update) + 0.2)).to(device))
 
     if update % 100 == 0:
         env.curriculum_callback()

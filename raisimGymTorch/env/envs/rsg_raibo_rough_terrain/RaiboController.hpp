@@ -38,14 +38,14 @@ class RaiboController {
     prevprevAction_.setZero(actionDim_);
 
     actionMean_ << nominalJointConfig_; /// joint target
-    actionStd_ << Eigen::VectorXd::Constant(12, 0.25); /// joint target
+    actionStd_ << Eigen::VectorXd::Constant(12, 0.35); /// joint target
 
     obMean_.setZero(obDim_);
     obStd_.setZero(obDim_);
     obDouble_.setZero(obDim_);
 
     /// pd controller
-    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(15.0);
+    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(55.0);
     jointDgain_.setZero(gvDim_); jointDgain_.tail(nJoints_).setConstant(0.5);
     raibo_->setPdGains(jointPgain_, jointDgain_);
     pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_);
