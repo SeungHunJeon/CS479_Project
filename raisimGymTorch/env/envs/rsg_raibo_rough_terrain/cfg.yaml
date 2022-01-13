@@ -18,9 +18,9 @@ environment:
     slip_reward_coeff: -0.5e-2
     airtime_reward_coeff: 0.2e-1
     smooth_reward_coeff: 0
-    con_switch_rew_coeff: 1.0e1
+    con_switch_rew_coeff: 0
     torque_reward_coeff: -0.5e-2
-    orientation_reward_coeff: -200
+    orientation_reward_coeff: -30
 #    joint_velocity_reward_coeff: 0
 #    slip_reward_coeff: 0
 #    airtime_reward_coeff: 0

@@ -38,14 +38,14 @@ class RaiboController {
     prevprevAction_.setZero(actionDim_);
 
     actionMean_ << nominalJointConfig_; /// joint target
-    actionStd_ << Eigen::VectorXd::Constant(12, 0.35); /// joint target
+    actionStd_ << Eigen::VectorXd::Constant(12, 0.05); /// joint target
 
     obMean_.setZero(obDim_);
     obStd_.setZero(obDim_);
     obDouble_.setZero(obDim_);
 
     /// pd controller
-    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(55.0);
+    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(75.0);
     jointDgain_.setZero(gvDim_); jointDgain_.tail(nJoints_).setConstant(0.5);
     raibo_->setPdGains(jointPgain_, jointDgain_);
     pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_);
@@ -317,7 +317,9 @@ class RaiboController {
     commandTrackingReward_ += 0.5 * (cm[2] > 0 ? std::min(bodyAngVel_[2], cm[2]) : -std::max(bodyAngVel_[2], cm[2]));
     commandTrackingReward_ *= commandTrackingRewardCoeff * simDt_;
 
-    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);
+//    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);
+    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * (gc_[7]*gc_[7] + gc_[10]*gc_[10] + gc_[13]*gc_[13] + gc_[16]*gc_[16]);
+
     jointVelocityReward_ += cf * jointVelocityRewardCoeff_ * simDt_ * jointVelocity_.squaredNorm();
 
     raisim::Vec<3> conVel;

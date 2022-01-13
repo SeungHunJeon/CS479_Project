@@ -175,7 +175,7 @@ class ENVIRONMENT {
     for(howManySteps = 0; howManySteps< int(control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
       subStep();
       if (visualize and visualizable_) {
-        std::this_thread::sleep_for(std::chrono::microseconds(size_t(5 * simulation_dt_ * 1e6)));
+        std::this_thread::sleep_for(std::chrono::microseconds(size_t(10 * simulation_dt_ * 1e6)));
       }
 
       if(isTerminalState(dummy)) {
