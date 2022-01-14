@@ -365,7 +365,7 @@ class RaiboController {
         !footContactState_[1] &&
         !footContactState_[2] &&
         !footContactState_[3])
-      contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
+      contactSwitchReward_ += contactSwitchRewardCoeff_ * simDt_;
   }
 
   void updateHeightScan(const raisim::HeightMap *map) {

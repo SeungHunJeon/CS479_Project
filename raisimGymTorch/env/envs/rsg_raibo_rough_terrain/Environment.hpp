@@ -82,6 +82,7 @@ class ENVIRONMENT {
     }
   }
 
+  ~ENVIRONMENT() { if (server_) server_->killServer(); }
   void init () { }
   void close () { }
   void setSimulationTimeStep(double dt) { controller_.setSimDt(dt); };

@@ -132,7 +132,7 @@ for update in range(100000):
     if update % 100 == 0:
         env.curriculum_callback()
 
-    for data_id in range(len(data_tags)):
+    if update % 10 == 0:
         ppo.writer.add_scalar('Training/average_reward', average_ll_performance, global_step=update)
         ppo.writer.add_scalar('Training/dones', average_dones, global_step=update)
         ppo.writer.add_scalar('Training/learning_rate', ppo.learning_rate, global_step=update)
