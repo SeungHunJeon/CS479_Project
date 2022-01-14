@@ -113,15 +113,9 @@ class ENVIRONMENT {
 //    const bool standingMode = normDist_(gen_) > 1.7;
     const bool standingMode = false;
     controller_.setStandingMode(standingMode);
-    if(standingMode) {
-      command_.setZero();
-    } else {
-      do {
-        command_ << 3.5 * 2. * (uniDist_(gen_) - 0.5),
-            1.0 * 2. * (uniDist_(gen_) - 0.5),
-            1.2 * 2. * (uniDist_(gen_) - 0.5);
-      } while(command_.norm() > 4. || command_.head(2).norm() * fabs(command_[2]) > 4. || command_.norm() < 0.5);
-    }
+    const double angle = 2. * (uniDist_(gen_) - 0.5) * M_PI;
+    const double heading = 2. * (uniDist_(gen_) - 0.5) * M_PI;
+    command_ << 5.0 * cos(angle), 5.0 * sin(angle), heading;
 
     /// randomize generalized velocities
     raisim::Vec<3> bodyVel_b, bodyVel_w;

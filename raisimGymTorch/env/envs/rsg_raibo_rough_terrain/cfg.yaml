@@ -8,9 +8,9 @@ environment:
   num_threads: 30
   simulation_dt: 0.001
   control_dt: 0.02
-  max_time: 2.5
+  max_time: 2.
   reward:
-    command_tracking_reward_coeff: 20
+    command_tracking_reward_coeff: 500
 #    height_reward_coeff: .3
 #    torque_reward_coeff: -2e-5
 #    orientation_reward_coeff: -1.

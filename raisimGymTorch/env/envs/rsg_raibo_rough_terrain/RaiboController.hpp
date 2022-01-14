@@ -38,7 +38,7 @@ class RaiboController {
     prevprevAction_.setZero(actionDim_);
 
     actionMean_ << nominalJointConfig_; /// joint target
-    actionStd_ << Eigen::VectorXd::Constant(12, 0.05); /// joint target
+    actionStd_ << Eigen::VectorXd::Constant(12, 0.1); /// joint target
 
     obMean_.setZero(obDim_);
     obStd_.setZero(obDim_);
@@ -295,8 +295,16 @@ class RaiboController {
     obDouble_.segment(14 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 12) = previousAction_;
     obDouble_.segment(26 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 12) = previousAction_ - prevprevAction_;
 
+    Eigen::Vector3d posXyz; posXyz << gc_[0], gc_[1], gc_[2];
+    Eigen::Vector3d target; target << command[0], command[1], map->getHeight(command[0], command[1])+0.56;
+    Eigen::Vector3d targetRel = target - posXyz;
+    Eigen::Vector3d targetRelBody = baseRot_.e().transpose() * targetRel;
+    const double dist = targetRelBody.norm();
+    targetRelBody *= 1./targetRelBody.norm();
+
     /// command
-    obDouble_.segment(38 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 3) = command;
+    obDouble_.segment(38 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 2) << targetRelBody[0], targetRelBody[1];
+    obDouble_[38 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum() + 2] = dist;
   }
 
   inline void setRewardConfig(const Yaml::Node &cfg) {
@@ -312,9 +320,16 @@ class RaiboController {
 
   inline void accumulateRewards(double cf, const Eigen::Vector3d &cm) {
     torqueReward_ += cf * torqueRewardCoeff_ * (raibo_->getGeneralizedForce().e().tail(12).squaredNorm()) * simDt_;
-    commandTrackingReward_ += cm[0] > 0 ? std::min(bodyLinVel_[0], cm[0]) : -std::max(bodyLinVel_[0], cm[0]);
-    commandTrackingReward_ += cm[1] > 0 ? std::min(bodyLinVel_[1], cm[1]) : -std::max(bodyLinVel_[1], cm[1]);
-    commandTrackingReward_ += 0.5 * (cm[2] > 0 ? std::min(bodyAngVel_[2], cm[2]) : -std::max(bodyAngVel_[2], cm[2]));
+//    commandTrackingReward_ += cm[0] > 0 ? std::min(bodyLinVel_[0], cm[0]) : -std::max(bodyLinVel_[0], cm[0]);
+//    commandTrackingReward_ += cm[1] > 0 ? std::min(bodyLinVel_[1], cm[1]) : -std::max(bodyLinVel_[1], cm[1]);
+//    commandTrackingReward_ -= 2.0 * fabs(bodyLinVel_[2]);
+//    commandTrackingReward_ += 0.5 * (cm[2] > 0 ? std::min(bodyAngVel_[2], cm[2]) : -std::max(bodyAngVel_[2], cm[2]));
+
+    Eigen::Vector2d posXy; posXy << gc_[0], gc_[1];
+    Eigen::Vector2d targetRel; targetRel = cm.head(2) - posXy;
+    Eigen::Vector2d heading; heading << baseRot_[0], baseRot_[1];
+    commandTrackingReward_ += 5. - targetRel.norm();
+    commandTrackingReward_ += heading.dot(targetRel) / (targetRel.norm() * heading.norm());
     commandTrackingReward_ *= commandTrackingRewardCoeff * simDt_;
 
 //    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);
@@ -346,23 +361,11 @@ class RaiboController {
           airtimeReward_ += std::min(stanceTime_[i], 0.25) * airtimeRewardCoeff_;
     }
 
-    if (footContactState_[0] == footContactState_[3])
+    if (!footContactState_[0] &&
+        !footContactState_[1] &&
+        !footContactState_[2] &&
+        !footContactState_[3])
       contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
-
-    if (footContactState_[1] == footContactState_[2])
-      contactSwitchReward_ += cf * contactSwitchRewardCoeff_ * simDt_;
-
-    if (footContactState_[0] == footContactState_[2])
-      contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
-
-    if (footContactState_[0] == footContactState_[1])
-      contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
-
-    if (footContactState_[3] == footContactState_[2])
-      contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
-
-    if (footContactState_[3] == footContactState_[1])
-      contactSwitchReward_ -= cf * contactSwitchRewardCoeff_ * simDt_;
   }
 
   void updateHeightScan(const raisim::HeightMap *map) {
