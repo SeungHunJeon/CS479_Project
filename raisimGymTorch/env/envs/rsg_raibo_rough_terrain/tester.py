@@ -54,7 +54,7 @@ else:
     env.turn_on_visualization()
 
     # max_steps = 1000000
-    max_steps = 1000 ## 10 secs
+    max_steps = 150 ## 10 secs
 
     for step in range(max_steps):
         obs = env.observe(False)
