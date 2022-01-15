@@ -23,7 +23,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 cfg['environment']['render'] = True
-cfg['environment']['curriculum']['initial_factor'] = 0.3
+cfg['environment']['curriculum']['initial_factor'] = 0.6
 
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 

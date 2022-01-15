@@ -438,7 +438,7 @@ class RaiboController {
   Eigen::MatrixXd scanCos_;
 
   // control variables
-  static constexpr double conDt_ = 0.01;
+  static constexpr double conDt_ = 0.005;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_, previousAction_, prevprevAction_;
   Eigen::VectorXd pTarget_, vTarget_; // full robot gc dim
