@@ -238,7 +238,7 @@ class RaiboController {
     slipReward_ = 0.;
     airtimeReward_ = 0.;
 
-    return float(stepData_[0] * std::exp(stepData_.tail(7).sum()));
+    return float(stepData_.sum());
   }
 
   [[nodiscard]] bool isTerminalState(float &terminalReward) {
@@ -328,7 +328,7 @@ class RaiboController {
     Eigen::Vector2d posXy; posXy << gc_[0], gc_[1];
     Eigen::Vector2d targetRel; targetRel = cm.head(2) - posXy;
     Eigen::Vector2d heading; heading << baseRot_[0], baseRot_[1];
-    commandTrackingReward_ += 5. - targetRel.norm();
+    commandTrackingReward_ += 6. - targetRel.norm();
     commandTrackingReward_ += heading.dot(targetRel) / (targetRel.norm() * heading.norm());
     commandTrackingReward_ *= commandTrackingRewardCoeff * simDt_;
 
@@ -438,7 +438,7 @@ class RaiboController {
   Eigen::MatrixXd scanCos_;
 
   // control variables
-  static constexpr double conDt_ = 0.02;
+  static constexpr double conDt_ = 0.01;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_, previousAction_, prevprevAction_;
   Eigen::VectorXd pTarget_, vTarget_; // full robot gc dim
