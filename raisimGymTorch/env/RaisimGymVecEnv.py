@@ -52,7 +52,7 @@ class RaisimGymVecEnv:
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
 
-    def load_scaling(self, dir_name, iteration, count=1e5):
+    def load_scaling(self, dir_name, iteration, count=1e8):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
         var_file_name = dir_name + "/var" + str(iteration) + ".csv"
         self.obs_rms.count = count

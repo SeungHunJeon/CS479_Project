@@ -329,7 +329,7 @@ class RaiboController {
     Eigen::Vector2d targetRel; targetRel = cm.head(2) - posXy;
     Eigen::Vector2d heading; heading << baseRot_[0], baseRot_[1];
     commandTrackingReward_ += 6. - targetRel.norm();
-    commandTrackingReward_ += 0.6 * heading.dot(targetRel) / (targetRel.norm() * heading.norm());
+    commandTrackingReward_ += 1.2 * heading.dot(targetRel) / (targetRel.norm() * heading.norm());
     commandTrackingReward_ *= commandTrackingRewardCoeff * simDt_;
 
 //    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);
@@ -347,9 +347,9 @@ class RaiboController {
 //      if (footContactState_[i])
 //        slipReward_ += cf * slipRewardCoeff_ * footVel_[i].e().head(2).squaredNorm();
 
-    if (standingMode_) {
+    if (targetRel.squaredNorm() < 1.5) {
       for (int i = 0; i < 4; i++) {
-        airtimeReward_ += std::min(stanceTime_[i], 0.40) * airtimeRewardCoeff_;
+        airtimeReward_ += 0.20 * airtimeRewardCoeff_;
       }
     } else {
       for (int i = 0; i < 4; i++)

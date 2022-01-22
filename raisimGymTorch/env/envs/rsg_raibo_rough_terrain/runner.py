@@ -77,6 +77,7 @@ if mode == 'retrain':
 for update in range(100000):
     start = time.time()
     env.reset()
+    env.reset()
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.

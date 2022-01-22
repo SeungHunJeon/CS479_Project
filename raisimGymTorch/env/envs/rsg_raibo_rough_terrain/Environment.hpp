@@ -120,8 +120,8 @@ class ENVIRONMENT {
 
     /// randomize generalized velocities
     raisim::Vec<3> bodyVel_b, bodyVel_w;
-    bodyVel_b[0] = command_[0] + 0.5 * normDist_(gen_) * curriculumFactor_;
-    bodyVel_b[1] = command_[1] + 1.0 * normDist_(gen_) * curriculumFactor_;
+    bodyVel_b[0] = 0.6 * normDist_(gen_) * curriculumFactor_;
+    bodyVel_b[1] = 0.6 * normDist_(gen_) * curriculumFactor_;
     bodyVel_b[2] = 0.3 * normDist_(gen_) * curriculumFactor_;
     raisim::matvecmul(rotMat, bodyVel_b, bodyVel_w);
 

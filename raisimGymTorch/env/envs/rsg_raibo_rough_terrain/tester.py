@@ -23,7 +23,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 cfg['environment']['render'] = True
-cfg['environment']['curriculum']['initial_factor'] = 0.4
+cfg['environment']['curriculum']['initial_factor'] = .4
 
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
@@ -34,6 +34,8 @@ act_dim = env.num_acts
 weight_path = args.weight
 iteration_number = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0]
 weight_dir = weight_path.rsplit('/', 1)[0] + '/'
+env.curriculum_callback()
+env.curriculum_callback()
 
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
@@ -41,6 +43,7 @@ else:
     print("Loaded weight from {}\n".format(weight_path))
     env.reset()
     env.reset()
+
 
     reward_ll_sum = 0
     done_sum = 0
@@ -56,15 +59,14 @@ else:
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
 
-    # max_steps = 1000000
-    max_steps = 150 ## 10 secs
+    print(total_steps)
 
-    for step in range(max_steps):
+    for step in range(total_steps):
         obs = env.observe(False)
         action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
         reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
         reward_ll_sum = reward_ll_sum + reward_ll[0]
-        if dones or step == max_steps - 1:
+        if dones or step == total_steps - 1:
             print('----------------------------------------------------')
             print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum / (step + 1 - start_step_id))))
             print('{:<40} {:>6}'.format("time elapsed [sec]: ", '{:6.4f}'.format((step + 1 - start_step_id) * 0.01)))
