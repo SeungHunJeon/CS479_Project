@@ -35,6 +35,7 @@ weight_path = args.weight
 iteration_number = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0]
 weight_dir = weight_path.rsplit('/', 1)[0] + '/'
 env.curriculum_callback()
+env.curriculum_callback()
 
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
@@ -42,7 +43,6 @@ else:
     print("Loaded weight from {}\n".format(weight_path))
     env.reset()
     env.reset()
-
 
     reward_ll_sum = 0
     done_sum = 0
