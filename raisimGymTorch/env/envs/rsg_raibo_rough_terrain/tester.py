@@ -23,7 +23,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 cfg['environment']['render'] = True
-cfg['environment']['curriculum']['initial_factor'] = .4
+cfg['environment']['curriculum']['initial_factor'] = 1.
 
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
@@ -34,7 +34,6 @@ act_dim = env.num_acts
 weight_path = args.weight
 iteration_number = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0]
 weight_dir = weight_path.rsplit('/', 1)[0] + '/'
-env.curriculum_callback()
 env.curriculum_callback()
 
 if weight_path == "":
@@ -69,11 +68,9 @@ else:
         if dones or step == total_steps - 1:
             print('----------------------------------------------------')
             print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum / (step + 1 - start_step_id))))
-            print('{:<40} {:>6}'.format("time elapsed [sec]: ", '{:6.4f}'.format((step + 1 - start_step_id) * 0.01)))
             print('----------------------------------------------------\n')
             start_step_id = step + 1
             reward_ll_sum = 0.0
 
     env.turn_off_visualization()
     env.reset()
-    print("Finished at the maximum visualization steps")
