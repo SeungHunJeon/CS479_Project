@@ -131,6 +131,16 @@ class VectorizedEnvironment {
       env->setSeed(seed_inc++);
   }
 
+  void moveControllerCursor(int id, Eigen::Ref<EigenVec> pos) {
+    if (environments_.size() > id)
+      environments_[id]->moveControllerCursor(pos);
+  }
+
+  void setCommand(int id) {
+    if (environments_.size() > id)
+      environments_[id]->setCommand();
+  }
+
   void close() {
     for (auto *env: environments_)
       env->close();

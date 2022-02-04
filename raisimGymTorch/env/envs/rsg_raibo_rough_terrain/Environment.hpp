@@ -79,6 +79,8 @@ class ENVIRONMENT {
     if (visualizable_) {
       server_ = std::make_unique<raisim::RaisimServer>(&world_);
       server_->launchServer();
+      commandSphere_ = server_->addVisualSphere("commandSphere", 0.3, 1, 0, 0, 1);
+      controllerSphere_ = server_->addVisualSphere("controllerSphere", 0.3, 0, 1, 0, 0.1);
     }
   }
 
@@ -169,9 +171,6 @@ class ENVIRONMENT {
 
     for(howManySteps = 0; howManySteps< int(control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
       subStep();
-      if (visualize and visualizable_) {
-        std::this_thread::sleep_for(std::chrono::microseconds(size_t(10 * simulation_dt_ * 1e6)));
-      }
 
       if(isTerminalState(dummy)) {
         howManySteps++;
@@ -221,6 +220,15 @@ class ENVIRONMENT {
     heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
   }
 
+  void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
+    controllerSphere_->setPosition(pos[0], pos[1], heightMap_->getHeight(pos[0], pos[1]));
+  }
+
+  void setCommand() {
+    command_ = controllerSphere_->getPosition();
+    commandSphere_->setPosition(command_);
+  }
+
   int getObDim() { return controller_.getObDim(); }
   int getActionDim() { return controller_.getActionDim(); }
 
@@ -245,6 +253,7 @@ class ENVIRONMENT {
   RaiboController controller_;
 
   std::unique_ptr<raisim::RaisimServer> server_;
+  raisim::Visuals *commandSphere_, *controllerSphere_;
 
   thread_local static std::mt19937 gen_;
   thread_local static std::normal_distribution<double> normDist_;

@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import platform
+import pygame
 
 from setuptools import Extension, find_packages
 from setuptools.command.build_ext import build_ext
@@ -75,7 +76,7 @@ setup(
     description='gym for raisim using torch.',
     long_description='',
     ext_modules=[CMakeExtension('_raisim_gym')],
-    install_requires=['ruamel.yaml', 'numpy', 'torch', 'tensorboard'],
+    install_requires=['ruamel.yaml', 'numpy', 'torch', 'tensorboard', 'pygame'],
     cmdclass=dict(build_ext=CMakeBuild),
     include_package_data=True,
     zip_safe=False,

@@ -1,3 +1,6 @@
+import time
+
+import numpy as np
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_raibo_rough_terrain
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
@@ -6,6 +9,7 @@ import os
 import math
 import torch
 import argparse
+import pygame
 
 
 # configuration
@@ -38,15 +42,18 @@ env.curriculum_callback()
 env.curriculum_callback()
 env.curriculum_callback()
 
+command = np.zeros(2, dtype=np.float32)
+
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
 else:
     print("Loaded weight from {}\n".format(weight_path))
-    env.reset()
-    env.reset()
-    env.reset()
-    env.reset()
-    env.reset()
+
+    pygame.init()
+    pygame.joystick.init()
+    joysticks = [pygame.joystick.Joystick(i) for i in range(pygame.joystick.get_count())]
+    for joystick in joysticks:
+        print(joystick.get_name())
 
     reward_ll_sum = 0
     done_sum = 0
@@ -62,19 +69,32 @@ else:
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
 
-    print(total_steps)
+    for step in range(total_steps*100000):
+        for event in pygame.event.get(): # User did something.
 
-    for step in range(total_steps):
+            if event.type == pygame.JOYBUTTONDOWN: # If user clicked close.
+                if event.button == 0:
+                    env.set_command(0)
+                    print("set new goal")
+                elif event.button == 1:
+                    env.reset()
+                    print("env reset")
+                elif event.button == 2:
+                    env.curriculum_callback()
+                    print("change env")
+
+        if abs(joysticks[0].get_axis(0)) > 0.05:
+            command.flat[0] = command.flat[0] + joysticks[0].get_axis(0)*0.02
+
+        if abs(joysticks[0].get_axis(1)) > 0.05:
+            command.flat[1] = command.flat[1] + joysticks[0].get_axis(1)*-0.02
+
+        env.move_controller_cursor(0, command)
         obs = env.observe(False)
         action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
         reward_ll, dones = env.step(action_ll.cpu().detach().numpy())
         reward_ll_sum = reward_ll_sum + reward_ll[0]
-        if dones or step == total_steps - 1:
-            print('----------------------------------------------------')
-            print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(reward_ll_sum / (step + 1 - start_step_id))))
-            print('----------------------------------------------------\n')
-            start_step_id = step + 1
-            reward_ll_sum = 0.0
+        time.sleep(cfg['environment']['control_dt'])
 
     env.turn_off_visualization()
     env.reset()

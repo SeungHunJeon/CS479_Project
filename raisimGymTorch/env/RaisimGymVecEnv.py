@@ -29,9 +29,6 @@ class RaisimGymVecEnv:
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
 
-    def set_command(self, command):
-        self.wrapper.setCommand(command)
-
     def turn_on_visualization(self):
         self.wrapper.turnOnVisualization()
 
@@ -105,6 +102,12 @@ class RaisimGymVecEnv:
 
     def close(self):
         self.wrapper.close()
+
+    def set_command(self, id):
+        self.wrapper.setCommand(id)
+
+    def move_controller_cursor(self, id, pos):
+        self.wrapper.moveControllerCursor(id, pos)
 
     def curriculum_callback(self):
         self.wrapper.curriculumUpdate()
