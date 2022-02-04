@@ -104,6 +104,10 @@ class VectorizedEnvironment {
     return sample_size;
   }
 
+  void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
+    environments_[0]->getState(gc, gv);
+  }
+
   void step(Eigen::Ref<EigenRowMajorMat> &action,
             Eigen::Ref<EigenVec> &reward,
             Eigen::Ref<EigenBoolVec> &done) {

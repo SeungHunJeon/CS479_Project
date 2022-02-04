@@ -118,6 +118,9 @@ class RaisimGymVecEnv:
     def get_step_data(self, data_size, data_mean, data_var, data_min, data_max):
         return self.wrapper.getStepData(data_size, data_mean, data_var, data_min, data_max)
 
+    def get_state(self, gc, gv):
+        self.wrapper.getState(gc, gv)
+
     @property
     def num_envs(self):
         return self.wrapper.getNumOfEnvs()

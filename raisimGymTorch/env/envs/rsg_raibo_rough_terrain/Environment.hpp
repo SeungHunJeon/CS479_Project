@@ -232,6 +232,10 @@ class ENVIRONMENT {
   int getObDim() { return controller_.getObDim(); }
   int getActionDim() { return controller_.getActionDim(); }
 
+  void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
+    controller_.getState(gc, gv);
+  }
+
  protected:
   static constexpr int nJoints_ = 12;
   raisim::World world_;

@@ -36,5 +36,6 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("getStepDataTag", &VectorizedEnvironment<ENVIRONMENT>::getStepDataTag)
     .def("getStepData", &VectorizedEnvironment<ENVIRONMENT>::getStepData)
     .def("setCommand", &VectorizedEnvironment<ENVIRONMENT>::setCommand)
-    .def("moveControllerCursor", &VectorizedEnvironment<ENVIRONMENT>::moveControllerCursor);
+    .def("moveControllerCursor", &VectorizedEnvironment<ENVIRONMENT>::moveControllerCursor)
+    .def("getState", &VectorizedEnvironment<ENVIRONMENT>::getState);
 }

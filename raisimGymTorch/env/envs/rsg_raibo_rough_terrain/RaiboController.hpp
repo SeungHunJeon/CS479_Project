@@ -361,6 +361,7 @@ class RaiboController {
   [[nodiscard]] static constexpr int getActionDim() { return actionDim_; }
   [[nodiscard]] static constexpr double getSimDt() { return simDt_; }
   [[nodiscard]] static constexpr double getConDt() { return conDt_; }
+  void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) { gc = gc_.cast<float>(); gv = gv_.cast<float>(); }
 
   static void setSimDt(double dt) { RSFATAL_IF(fabs(dt - simDt_) > 1e-12, "sim dt is fixed to " << simDt_)};
   static void setConDt(double dt) { RSFATAL_IF(fabs(dt - conDt_) > 1e-12, "con dt is fixed to " << conDt_)};
