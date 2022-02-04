@@ -78,7 +78,7 @@ class RandomHeightMapGenerator {
             double height = 0.1 * uniDist(gen) * curriculumFactor;
             for(int i=0; i<8; i++) {
               for(int j=0; j<8; j++) {
-                heightVec[120 * (8*xBlock+i) + (8*yBlock+j)] = height + xBlock * targetRoughness * 0.15 * curriculumFactor;
+                heightVec[120 * (8*xBlock+i) + (8*yBlock+j)] = height + xBlock * targetRoughness * 0.25 * curriculumFactor;
               }
             }
           }

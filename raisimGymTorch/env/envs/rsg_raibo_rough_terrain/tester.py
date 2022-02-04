@@ -23,7 +23,7 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 cfg['environment']['render'] = True
-cfg['environment']['curriculum']['initial_factor'] = 1.
+cfg['environment']['curriculum']['initial_factor'] = .9
 
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
@@ -36,11 +36,15 @@ iteration_number = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)
 weight_dir = weight_path.rsplit('/', 1)[0] + '/'
 env.curriculum_callback()
 env.curriculum_callback()
+env.curriculum_callback()
 
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
 else:
     print("Loaded weight from {}\n".format(weight_path))
+    env.reset()
+    env.reset()
+    env.reset()
     env.reset()
     env.reset()
 
