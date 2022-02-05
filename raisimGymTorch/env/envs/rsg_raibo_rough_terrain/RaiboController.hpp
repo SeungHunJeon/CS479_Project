@@ -45,7 +45,7 @@ class RaiboController {
     obDouble_.setZero(obDim_);
 
     /// pd controller
-    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(75.0);
+    jointPgain_.setZero(gvDim_); jointPgain_.tail(nJoints_).setConstant(60.0);
     jointDgain_.setZero(gvDim_); jointDgain_.tail(nJoints_).setConstant(0.5);
     raibo_->setPdGains(jointPgain_, jointDgain_);
     pTarget_.setZero(gcDim_); vTarget_.setZero(gvDim_);
@@ -313,7 +313,8 @@ class RaiboController {
 //    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);
     orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * (gc_[7]*gc_[7] + gc_[10]*gc_[10] + gc_[13]*gc_[13] + gc_[16]*gc_[16]);
 
-    jointVelocityReward_ += cf * jointVelocityRewardCoeff_ * simDt_ * jointVelocity_.squaredNorm();
+    for(int i=0; i<12; i++)
+      jointVelocityReward_ += cf * jointVelocityRewardCoeff_ * simDt_ * std::abs(jointVelocity_[i]*jointVelocity_[i]*jointVelocity_[i]);
 
     raisim::Vec<3> conVel;
     for (int i=0; i< raibo_->getContacts().size(); i++) {
