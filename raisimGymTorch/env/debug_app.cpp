@@ -68,5 +68,8 @@ int main(int argc, char *argv[]) {
   vecEnv.step(action_ref, reward_ref, dones_ref);
   vecEnv.observe(ob_ref);
 
+  vecEnv.reset();
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  vecEnv.observe(ob_ref);
   return 0;
 }

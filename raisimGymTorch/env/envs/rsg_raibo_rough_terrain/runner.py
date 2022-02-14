@@ -13,7 +13,6 @@ import raisimGymTorch.algo.ppo.ppo as PPO
 import torch.nn as nn
 import numpy as np
 import torch
-import datetime
 import argparse
 
 
@@ -36,7 +35,7 @@ home_path = task_path + "/../../../.."
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
-env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
@@ -71,12 +70,13 @@ ppo = PPO.PPO(actor=actor,
               desired_kl=0.006,
               )
 
-if mode == 'retrain':
-    load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
+iteration_number = 0
 
-for update in range(100000):
+if mode == 'retrain':
+    iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
+
+for update in range(iteration_number, 100000):
     start = time.time()
-    env.reset()
     env.reset()
     reward_ll_sum = 0
     done_sum = 0
@@ -99,10 +99,11 @@ for update in range(100000):
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
         for step in range(n_steps):
-            obs = env.observe(False)
-            actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
-            reward, dones = env.step_visualize(actions.cpu().detach().numpy())
-            data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
+            with torch.no_grad():
+                obs = env.observe(False)
+                actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
+                reward, dones = env.step_visualize(actions.cpu().detach().numpy())
+                data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
         data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
@@ -117,12 +118,13 @@ for update in range(100000):
 
     # actual training
     for step in range(n_steps):
-        obs = env.observe()
-        action = ppo.observe(obs)
-        reward, dones = env.step(action)
-        ppo.step(value_obs=obs, rews=reward, dones=dones)
-        done_sum = done_sum + np.sum(dones)
-        reward_ll_sum = reward_ll_sum + np.sum(reward)
+        with torch.no_grad():
+            obs = env.observe()
+            action = ppo.observe(obs)
+            reward, dones = env.step(action)
+            ppo.step(value_obs=obs, rews=reward, dones=dones)
+            done_sum = done_sum + np.sum(dones)
+            reward_ll_sum = reward_ll_sum + np.sum(reward)
 
     # take st step to get value obs
     obs = env.observe()

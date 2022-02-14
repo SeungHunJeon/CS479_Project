@@ -313,8 +313,9 @@ class RaiboController {
 //    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);
     orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * (gc_[7]*gc_[7] + gc_[10]*gc_[10] + gc_[13]*gc_[13] + gc_[16]*gc_[16]);
 
-    for(int i=0; i<12; i++)
-      jointVelocityReward_ += cf * jointVelocityRewardCoeff_ * simDt_ * std::abs(jointVelocity_[i]*jointVelocity_[i]*jointVelocity_[i]);
+    jointVelocityReward_ += cf * jointVelocityRewardCoeff_ * simDt_ * jointVelocity_.squaredNorm();
+//    for(int i=0; i<12; i++)
+//      jointVelocityReward_ += cf * jointVelocityRewardCoeff_ * simDt_ * std::abs(jointVelocity_[i]*jointVelocity_[i]*jointVelocity_[i]);
 
     raisim::Vec<3> conVel;
     for (int i=0; i< raibo_->getContacts().size(); i++) {
@@ -347,7 +348,7 @@ class RaiboController {
               footPos_[i][1] + controlFrameX_[1] * distance * scanCos_(k,j) + controlFrameY_[1] * distance * scanSin_(k,j);
           heightScan_[i][scanConfig_.head(k).sum() + j] =
               map->getHeight(scanPoint_[i][scanConfig_.head(k).sum() + j][0],
-                             scanPoint_[i][scanConfig_.head(k).sum() + j][1]) - footPos_[i][2] + normDist_(gen_) * 0.015;
+                             scanPoint_[i][scanConfig_.head(k).sum() + j][1]) - footPos_[i][2] + normDist_(gen_) * 0.025;
         }
       }
     }

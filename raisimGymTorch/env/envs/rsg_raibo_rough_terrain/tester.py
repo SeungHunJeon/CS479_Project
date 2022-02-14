@@ -29,9 +29,9 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1
 cfg['environment']['render'] = True
-cfg['environment']['curriculum']['initial_factor'] = .5
+cfg['environment']['curriculum']['initial_factor'] = 1.
 
-env = VecEnv(rsg_raibo_rough_terrain.RaisimGymEnv(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 # env.set_command(0)  # ensures that the initial command is zero
 
 # shortcuts
@@ -49,7 +49,7 @@ gv = np.zeros(18, dtype=np.float32)
 # plotting
 gcHistory = []
 gvHistory = []
-buffer_size = 200
+buffer_size = 20
 
 for i in range(3):
     gcHistory.append(collections.deque(np.zeros(buffer_size)))
@@ -66,6 +66,22 @@ ax.cla()
 ax1.cla()
 ax.set_ylim(-25, 25)
 ax1.set_ylim(-25, 25)
+gcPlot = []
+gvPlot = []
+
+for i in range(3):
+    gcHistory[i].popleft()
+    gcHistory[i].append(gc[7+i])
+    gvHistory[i].popleft()
+    gvHistory[i].append(gv[6+i])
+
+    # plot gc
+    gcp, = ax.plot(gcHistory[i])
+    gcPlot.append(gcp)
+
+    # plot gv
+    gvp, = ax1.plot(gvHistory[i])
+    gvPlot.append(gvp)
 
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
@@ -89,7 +105,7 @@ else:
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
 
-    for step in range(total_steps):
+    for step in range(total_steps*20):
         for event in pygame.event.get():  # User did something.
 
             if event.type == pygame.JOYBUTTONDOWN:  # If user clicked close.
@@ -105,10 +121,10 @@ else:
 
         if len(joysticks) > 0:
             if abs(joysticks[0].get_axis(0)) > 0.05:
-                command.flat[0] = command.flat[0] + joysticks[0].get_axis(0)*0.02
+                command.flat[0] = command.flat[0] + joysticks[0].get_axis(0)*0.1
 
             if abs(joysticks[0].get_axis(1)) > 0.05:
-                command.flat[1] = command.flat[1] + joysticks[0].get_axis(1)*-0.02
+                command.flat[1] = command.flat[1] + joysticks[0].get_axis(1)*-0.1
 
         env.move_controller_cursor(0, command)
         obs = env.observe(False)
@@ -125,13 +141,12 @@ else:
             gvHistory[i].append(gv[6+i])
 
             # plot gc
-            ax.plot(gcHistory[i])
+            gcPlot[i].set_ydata(gcHistory[i])
 
             # plot memory
-            ax1.plot(gvHistory[i])
+            gvPlot[i].set_ydata(gvHistory[i])
 
         plt.pause(cfg['environment']['control_dt'])
 
-    plt.pause(100000)
     env.turn_off_visualization()
     env.reset()

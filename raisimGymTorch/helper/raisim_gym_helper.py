@@ -58,3 +58,4 @@ def load_param(weight_path, env, actor, critic, optimizer, data_dir):
     actor.distribution.load_state_dict(checkpoint['actor_distribution_state_dict'])
     critic.architecture.load_state_dict(checkpoint['critic_architecture_state_dict'])
     optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+    return int(iteration_number)

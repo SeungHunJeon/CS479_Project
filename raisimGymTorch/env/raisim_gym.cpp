@@ -13,7 +13,7 @@ namespace py = pybind11;
 using namespace raisim;
 
 PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
-  py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, "RaisimGymEnv")
+  py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, "RaisimGymRaiboRoughTerrain")
     .def(py::init<std::string, std::string>())
     .def("init", &VectorizedEnvironment<ENVIRONMENT>::init)
     .def("reset", &VectorizedEnvironment<ENVIRONMENT>::reset)
