@@ -177,16 +177,13 @@ class ENVIRONMENT {
         break;
       }
     }
-
     return controller_.getRewardSum(visualize);
   }
 
   void subStep() {
     controller_.updateHistory();
     world_.integrate1();
-    if (server_) server_->lockVisualizationServerMutex();
     world_.integrate2();
-    if (server_) server_->unlockVisualizationServerMutex();
     controller_.updateStateVariables();
     controller_.accumulateRewards(curriculumFactor_, command_);
 
@@ -194,6 +191,7 @@ class ENVIRONMENT {
       raibo_->getState(gc_init_from_, gv_init_from_);
       gc_init_from_[0] = 0.;
       gc_init_from_[1] = 0.;
+
     }
   }
 

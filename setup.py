@@ -67,7 +67,7 @@ class CMakeBuild(build_ext):
         subprocess.check_call(['cmake', '--build', '.'] + build_args, cwd=self.build_temp)
 
 setup(
-    name='raisim_gym_torch',
+    name='raisimGymTorch',
     version='0.0.0',
     author='Jemin Hwangbo',
     license="proprietary",

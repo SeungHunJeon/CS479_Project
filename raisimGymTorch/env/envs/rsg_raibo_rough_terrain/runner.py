@@ -75,8 +75,9 @@ iteration_number = 0
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
 
-for update in range(iteration_number, 100000):
+for update in range(iteration_number, 1000000):
     start = time.time()
+    env.reset()
     env.reset()
     reward_ll_sum = 0
     done_sum = 0
