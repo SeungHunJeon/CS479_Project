@@ -35,6 +35,8 @@ home_path = task_path + "/../../../.."
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
 # create environment from the configuration file
+if mode == 'retrain':
+    cfg['environment']['curriculum']['initial_factor'] = 1
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
@@ -78,7 +80,6 @@ if mode == 'retrain':
 for update in range(iteration_number, 1000000):
     start = time.time()
     env.reset()
-    env.reset()
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.
@@ -120,7 +121,7 @@ for update in range(iteration_number, 1000000):
     # actual training
     for step in range(n_steps):
         with torch.no_grad():
-            obs = env.observe()
+            obs = env.observe(update < 10000)
             action = ppo.observe(obs)
             reward, dones = env.step(action)
             ppo.step(value_obs=obs, rews=reward, dones=dones)
@@ -128,7 +129,7 @@ for update in range(iteration_number, 1000000):
             reward_ll_sum = reward_ll_sum + np.sum(reward)
 
     # take st step to get value obs
-    obs = env.observe()
+    obs = env.observe(update < 10000)
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps

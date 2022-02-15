@@ -3,7 +3,7 @@ record_video: yes
 environment:
   seed: 2
   render: False
-  num_envs: 500
+  num_envs: 800
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.001
