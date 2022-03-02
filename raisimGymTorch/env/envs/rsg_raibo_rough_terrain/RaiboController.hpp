@@ -59,7 +59,7 @@ class RaiboController {
         Eigen::VectorXd::Constant(nJoints_ * 4, 0.0), /// joint vel history
         Eigen::VectorXd::Constant(scanConfig_.sum() * 4, -0.03), /// height scan
         nominalJointConfig_, /// previous action
-        Eigen::VectorXd::Constant(12, 0.), /// preprev action
+        nominalJointConfig_, /// preprev action
         Eigen::VectorXd::Constant(3, 0.0); /// command
 
     obStd_ << 0.05, /// height
@@ -183,7 +183,7 @@ class RaiboController {
     pTarget_.tail(nJoints_) = jointTarget_;
     raibo_->setPdTarget(pTarget_, vTarget_);
 
-    smoothReward_ = curriculumFactor * smoothRewardCoeff_ * (prevprevAction_ + jointTarget_ - 2 * previousAction_).squaredNorm() * (1./ std::pow(conDt_,4));
+    smoothReward_ = curriculumFactor * smoothRewardCoeff_ * (prevprevAction_ + jointTarget_ - 2 * previousAction_).squaredNorm();
     return true;
   }
 
@@ -271,18 +271,18 @@ class RaiboController {
 
     /// previous action
     obDouble_.segment(10 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 12) = previousAction_;
-    obDouble_.segment(22 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 12) = previousAction_ - prevprevAction_;
+    obDouble_.segment(22 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 12) = prevprevAction_;
 
     Eigen::Vector3d posXyz; posXyz << gc_[0], gc_[1], gc_[2];
     Eigen::Vector3d target; target << command[0], command[1], map->getHeight(command[0], command[1])+0.56;
     Eigen::Vector3d targetRel = target - posXyz;
     Eigen::Vector3d targetRelBody = baseRot_.e().transpose() * targetRel;
     const double dist = targetRelBody.norm();
-    targetRelBody *= 1./targetRelBody.norm();
+    targetRelBody *= 1./targetRelBody.head<2>().norm();
 
     /// command
     obDouble_.segment(34 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 2) << targetRelBody[0], targetRelBody[1];
-    obDouble_[34 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum() + 2] = dist;
+    obDouble_[34 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum() + 2] = std::min(3., dist);
   }
 
   inline void setRewardConfig(const Yaml::Node &cfg) {

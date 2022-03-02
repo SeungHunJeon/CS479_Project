@@ -13,6 +13,8 @@
 
 namespace raisim {
 
+extern int THREAD_COUNT;
+
 template<class ChildEnvironment>
 class VectorizedEnvironment {
 
@@ -50,6 +52,17 @@ class VectorizedEnvironment {
       environments_[i]->init();
       environments_[i]->reset();
     }
+
+    /// ob scaling
+    if (normalizeObservation_) {
+      obMean_.setZero(getObDim());
+      obVar_.setOnes(getObDim());
+      recentMean_.setZero(getObDim());
+      recentVar_.setZero(getObDim());
+      delta_.setZero(getObDim());
+      epsilon.setZero(getObDim());
+      epsilon.setConstant(1e-8);
+    }
   }
 
   // resets all environments and returns observation
@@ -59,10 +72,13 @@ class VectorizedEnvironment {
       environments_[i]->reset();
   }
 
-  void observe(Eigen::Ref<EigenRowMajorMat> &ob) {
+  void observe(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics=false) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       environments_[i]->observe(ob.row(i));
+
+    if (normalizeObservation_)
+      updateObservationStatisticsAndNormalize(ob, updateStatistics);
   }
 
   std::vector<std::string> getStepDataTag() {
@@ -78,7 +94,7 @@ class VectorizedEnvironment {
     if( data_size == 0 ) return sample_size;
 
     RSFATAL_IF(mean.size() != data_size ||
-               squareSum.size() != data_size ||
+        squareSum.size() != data_size ||
         min.size() != data_size ||
         max.size() != data_size, "vector size mismatch")
 
@@ -128,6 +144,10 @@ class VectorizedEnvironment {
   void turnOffVisualization() { if(render_) environments_[0]->turnOffVisualization(); }
   void startRecordingVideo(const std::string& videoName) { if(render_) environments_[0]->startRecordingVideo(videoName); }
   void stopRecordingVideo() { if(render_) environments_[0]->stopRecordingVideo(); }
+  void getObStatistics(Eigen::Ref<EigenVec> &mean, Eigen::Ref<EigenVec> &var, float &count) {
+    mean = obMean_; var = obVar_; count = obCount_; }
+  void setObStatistics(Eigen::Ref<EigenVec> &mean, Eigen::Ref<EigenVec> &var, float count) {
+    obMean_ = mean; obVar_ = var; obCount_ = count; }
 
   void setSeed(int seed) {
     int seed_inc = seed;
@@ -167,8 +187,8 @@ class VectorizedEnvironment {
       env->setControlTimeStep(dt);
   }
 
-  int getObDim() { return environments_[0]->getObDim(); }
-  int getActionDim() { return environments_[0]->getActionDim(); }
+  int getObDim() { return ChildEnvironment::getObDim(); }
+  int getActionDim() { return ChildEnvironment::getActionDim(); }
   int getNumOfEnvs() { return num_envs_; }
 
   ////// optional methods //////
@@ -178,6 +198,23 @@ class VectorizedEnvironment {
   };
 
  private:
+
+  void updateObservationStatisticsAndNormalize(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics) {
+    if (updateStatistics) {
+      recentMean_ = ob.colwise().mean();
+      recentVar_ = (ob.rowwise() - recentMean_.transpose()).colwise().squaredNorm() / num_envs_;
+
+      delta_ = obMean_ - recentMean_;
+      for (int i = 0; i < getObDim(); i++)
+        delta_[i] = delta_[i] * delta_[i];
+
+      float totCount = obCount_ + num_envs_;
+
+      obMean_ = obMean_ * (obCount_ / totCount) + recentMean_ * (num_envs_ / totCount);
+      obVar_ = (obVar_ * obCount_ + recentVar_ * num_envs_ + delta_ * (obCount_ * num_envs_ / totCount)) / (totCount);
+      obCount_ = totCount;
+    }
+  }
 
   inline void perAgentStep(int agentId,
                            Eigen::Ref<EigenRowMajorMat> &action,
@@ -198,9 +235,67 @@ class VectorizedEnvironment {
   std::vector<ChildEnvironment *> environments_;
 
   int num_envs_ = 1;
-  bool recordVideo_=false, render_=false;
+  bool render_=false;
   std::string resourceDir_;
   Yaml::Node cfg_;
+
+  /// observation running mean
+  bool normalizeObservation_ = true;
+  EigenVec obMean_;
+  EigenVec obVar_;
+  float obCount_ = 1e-4;
+  EigenVec recentMean_, recentVar_, delta_;
+  EigenVec epsilon;
+};
+
+class NormalDistribution {
+ public:
+  NormalDistribution() : normDist_(0.f, 1.f) {}
+
+  float sample() { return normDist_(gen_); }
+  void seed(int i) { gen_.seed(i); }
+
+ private:
+  std::normal_distribution<float> normDist_;
+  static thread_local std::mt19937 gen_;
+};
+thread_local std::mt19937 raisim::NormalDistribution::gen_;
+
+
+class NormalSampler {
+ public:
+  NormalSampler(int dim) {
+    dim_ = dim;
+    normal_.resize(THREAD_COUNT);
+    seed(0);
+  }
+
+  void seed(int seed) {
+    // this ensures that every thread gets a different seed
+#pragma omp parallel for schedule(static, 1)
+    for (int i = 0; i < THREAD_COUNT; i++)
+      normal_[0].seed(i + seed);
+  }
+
+  inline void sample(Eigen::Ref<EigenRowMajorMat> &mean,
+                     Eigen::Ref<EigenVec> &std,
+                     Eigen::Ref<EigenRowMajorMat> &samples,
+                     Eigen::Ref<EigenVec> &log_prob) {
+    int agentNumber = log_prob.rows();
+
+#pragma omp parallel for schedule(auto)
+    for (int agentId = 0; agentId < agentNumber; agentId++) {
+      log_prob(agentId) = 0;
+      for (int i = 0; i < dim_; i++) {
+        const float noise = normal_[omp_get_thread_num()].sample();
+        samples(agentId, i) = mean(agentId, i) + noise * std(i);
+        log_prob(agentId) -= noise * noise * 0.5 + std::log(std(i));
+      }
+      log_prob(agentId) -= float(dim_) * 0.9189385332f;
+    }
+  }
+  int dim_;
+  std::vector<NormalDistribution> normal_;
 };
 
 }

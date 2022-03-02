@@ -21,7 +21,6 @@ class RaisimGymVecEnv:
         self.num_obs = self.wrapper.getObDim()
         self.num_acts = self.wrapper.getActionDim()
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
-        self.obs_rms = RunningMeanStd(shape=[self.num_envs, self.num_obs])
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self.rewards = [[] for _ in range(self.num_envs)]
@@ -62,16 +61,9 @@ class RaisimGymVecEnv:
         np.savetxt(mean_file_name, self.obs_rms.mean)
         np.savetxt(var_file_name, self.obs_rms.var)
 
-    def observe(self, update_mean=True):
-        self.wrapper.observe(self._observation)
-
-        if self.normalize_ob:
-            if update_mean:
-                self.obs_rms.update(self._observation)
-
-            return self._normalize_observation(self._observation).copy()
-        else:
-            return self._observation.copy()
+    def observe(self, update_statistics=True):
+        self.wrapper.observe(self._observation, update_statistics)
+        return self._observation
 
     def reset(self):
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
@@ -124,44 +116,3 @@ class RaisimGymVecEnv:
     @property
     def num_envs(self):
         return self.wrapper.getNumOfEnvs()
-
-    @property
-    def extra_info_names(self):
-        return self._extraInfoNames
-
-
-class RunningMeanStd(object):
-    def __init__(self, epsilon=1e-4, shape=()):
-        """
-        calulates the running mean and std of a data stream
-        https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Parallel_algorithm
-
-        :param epsilon: (float) helps with arithmetic issues
-        :param shape: (tuple) the shape of the data stream's output
-        """
-        self.mean = np.zeros(shape, 'float32')
-        self.var = np.ones(shape, 'float32')
-        self.count = epsilon
-
-    def update(self, arr):
-        batch_mean = np.mean(arr, axis=0)
-        batch_var = np.var(arr, axis=0)
-        batch_count = arr.shape[0]
-        self.update_from_moments(batch_mean, batch_var, batch_count)
-
-    def update_from_moments(self, batch_mean, batch_var, batch_count):
-        delta = batch_mean - self.mean
-        tot_count = self.count + batch_count
-
-        new_mean = self.mean + delta * batch_count / tot_count
-        m_a = self.var * self.count
-        m_b = batch_var * batch_count
-        m_2 = m_a + m_b + np.square(delta) * (self.count * batch_count / (self.count + batch_count))
-        new_var = m_2 / (self.count + batch_count)
-
-        new_count = batch_count + self.count
-
-        self.mean = new_mean
-        self.var = new_var
-        self.count = new_count
-

@@ -3,7 +3,6 @@ import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from adamp import AdamP
 from torch.utils.tensorboard import SummaryWriter
 from .storage import RolloutStorage
 
@@ -23,8 +22,8 @@ class PPO:
                  entropy_coef=0.0,
                  learning_rate=5e-4,
                  max_grad_norm=0.5,
+                 learning_rate_schedule='adaptive',
                  desired_kl=0.01,
-                 schedule='adaptive',
                  use_clipped_value_loss=True,
                  log_dir='run',
                  device='cpu',
@@ -40,10 +39,7 @@ class PPO:
         else:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
-        self.learning_rate = learning_rate
-        self.optimizer = AdamP([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
-        self.schedule = schedule
-        self.desired_kl = desired_kl
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
         self.device = device
 
         # env parameters
@@ -67,50 +63,57 @@ class PPO:
         self.tot_timesteps = 0
         self.tot_time = 0
 
+        # ADAM
+        self.learning_rate = learning_rate
+        self.desired_kl = desired_kl
+        self.schedule = learning_rate_schedule
+
         # temps
         self.actions = None
         self.actions_log_prob = None
         self.actor_obs = None
 
-    def observe(self, actor_obs):
+    def act(self, actor_obs):
         self.actor_obs = actor_obs
-        self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
-        # self.actions = np.clip(self.actions.numpy(), self.env.action_space.low, self.env.action_space.high)
-        return self.actions.cpu().numpy()
+        with torch.inference_mode():
+            self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
+        return self.actions
 
     def step(self, value_obs, rews, dones):
-        values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
-        self.storage.add_transitions(self.actor_obs, value_obs, self.actions, self.actor.action_mean, self.actor.distribution.std.detach(), rews, dones, values,
+        self.storage.add_transitions(self.actor_obs, value_obs, self.actions, self.actor.action_mean, self.actor.distribution.std_np, rews, dones,
                                      self.actions_log_prob)
 
     def update(self, actor_obs, value_obs, log_this_iteration, update):
         last_values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
 
         # Learning step
-        self.storage.compute_returns(last_values.to(self.device), self.gamma, self.lam)
+        self.storage.compute_returns(last_values.to(self.device), self.critic, self.gamma, self.lam)
         mean_value_loss, mean_surrogate_loss, infos = self._train_step()
         self.storage.clear()
 
         if log_this_iteration:
             self.log({**locals(), **infos, 'it': update})
 
-    def log(self, variables, width=80, pad=28):
+    def log(self, variables):
         self.tot_timesteps += self.num_transitions_per_env * self.num_envs
         mean_std = self.actor.distribution.std.mean()
 
-        self.writer.add_scalar('Loss/value_function', variables['mean_value_loss'], variables['it'])
-        self.writer.add_scalar('Loss/surrogate', variables['mean_surrogate_loss'], variables['it'])
-        self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), variables['it'])
+        self.writer.add_scalar('PPO/value_function', variables['mean_value_loss'], variables['it'])
+        self.writer.add_scalar('PPO/surrogate', variables['mean_surrogate_loss'], variables['it'])
+        self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
+        self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
     def _train_step(self):
         mean_value_loss = 0
         mean_surrogate_loss = 0
         for epoch in range(self.num_learning_epochs):
-            for actor_obs_batch, critic_obs_batch, actions_batch, old_sigma_batch, old_mu_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
+            for actor_obs_batch, critic_obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 value_batch = self.critic.evaluate(critic_obs_batch)
+
+                # Adjusting the learning rate using KL divergence
                 mu_batch = self.actor.action_mean
                 sigma_batch = self.actor.distribution.std
 
@@ -138,7 +141,7 @@ class PPO:
 
                 # Value function loss
                 if self.use_clipped_value_loss:
-                    value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param,
+                    value_clipped = current_values_batch + (value_batch - current_values_batch).clamp(-self.clip_param,
                                                                                                     self.clip_param)
                     value_losses = (value_batch - returns_batch).pow(2)
                     value_losses_clipped = (value_clipped - returns_batch).pow(2)

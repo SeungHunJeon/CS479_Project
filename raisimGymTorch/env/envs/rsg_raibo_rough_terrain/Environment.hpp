@@ -227,8 +227,8 @@ class ENVIRONMENT {
     commandSphere_->setPosition(command_);
   }
 
-  int getObDim() { return controller_.getObDim(); }
-  int getActionDim() { return controller_.getActionDim(); }
+  static constexpr int getObDim() { return RaiboController::getObDim(); }
+  static constexpr int getActionDim() { return RaiboController::getActionDim(); }
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
     controller_.getState(gc, gv);

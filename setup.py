@@ -2,7 +2,7 @@ import os
 import sys
 import subprocess
 import platform
-import pygame
+
 
 from setuptools import Extension, find_packages
 from setuptools.command.build_ext import build_ext

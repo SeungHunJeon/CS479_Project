@@ -12,6 +12,10 @@
 namespace py = pybind11;
 using namespace raisim;
 
+namespace raisim {
+int THREAD_COUNT = 1;
+}
+
 PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
   py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, "RaisimGymRaiboRoughTerrain")
     .def(py::init<std::string, std::string>())
@@ -37,5 +41,12 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("getStepData", &VectorizedEnvironment<ENVIRONMENT>::getStepData)
     .def("setCommand", &VectorizedEnvironment<ENVIRONMENT>::setCommand)
     .def("moveControllerCursor", &VectorizedEnvironment<ENVIRONMENT>::moveControllerCursor)
-    .def("getState", &VectorizedEnvironment<ENVIRONMENT>::getState);
+    .def("getState", &VectorizedEnvironment<ENVIRONMENT>::getState)
+    .def("getObStatistics", &VectorizedEnvironment<ENVIRONMENT>::getObStatistics)
+    .def("setObStatistics", &VectorizedEnvironment<ENVIRONMENT>::setObStatistics);
+
+  py::class_<NormalSampler>(m, "NormalSampler")
+      .def(py::init<int>(), py::arg("dim"))
+      .def("seed", &NormalSampler::seed)
+      .def("sample", &NormalSampler::sample);
 }
