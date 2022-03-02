@@ -7,6 +7,8 @@
 #include "VectorizedEnvironment.hpp"
 #include <chrono>
 
+int THREAD_COUNT = 1;
+
 using namespace raisim;
 
 void print_timediff(const char *prefix, int loopCount,

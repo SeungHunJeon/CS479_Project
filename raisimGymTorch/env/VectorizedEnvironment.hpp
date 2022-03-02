@@ -10,10 +10,9 @@
 #include "Yaml.hpp"
 #include <Eigen/Core>
 #include "BasicEigenTypes.hpp"
+extern int THREAD_COUNT;
 
 namespace raisim {
-
-extern int THREAD_COUNT;
 
 template<class ChildEnvironment>
 class VectorizedEnvironment {
@@ -33,7 +32,8 @@ class VectorizedEnvironment {
   }
 
   void init() {
-    omp_set_num_threads(cfg_["num_threads"].template As<int>());
+    THREAD_COUNT = cfg_["num_threads"].template As<int>();
+    omp_set_num_threads(THREAD_COUNT);
     num_envs_ = cfg_["num_envs"].template As<int>();
     double simDt, conDt;
     READ_YAML(double, simDt, cfg_["simulation_dt"])
@@ -214,6 +214,10 @@ class VectorizedEnvironment {
       obVar_ = (obVar_ * obCount_ + recentVar_ * num_envs_ + delta_ * (obCount_ * num_envs_ / totCount)) / (totCount);
       obCount_ = totCount;
     }
+
+#pragma omp parallel for schedule(auto)
+    for(int i=0; i<num_envs_; i++)
+      ob.row(i) = (ob.row(i) - obMean_.transpose()).template cwiseQuotient((obVar_ + epsilon).cwiseSqrt().transpose());
   }
 
   inline void perAgentStep(int agentId,
@@ -294,6 +298,7 @@ class NormalSampler {
       log_prob(agentId) -= float(dim_) * 0.9189385332f;
     }
   }
+
   int dim_;
   std::vector<NormalDistribution> normal_;
 };

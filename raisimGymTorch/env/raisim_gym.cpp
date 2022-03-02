@@ -12,9 +12,7 @@
 namespace py = pybind11;
 using namespace raisim;
 
-namespace raisim {
 int THREAD_COUNT = 1;
-}
 
 PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
   py::class_<VectorizedEnvironment<ENVIRONMENT>>(m, "RaisimGymRaiboRoughTerrain")
