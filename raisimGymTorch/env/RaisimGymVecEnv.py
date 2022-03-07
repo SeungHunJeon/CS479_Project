@@ -24,6 +24,10 @@ class RaisimGymVecEnv:
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self.rewards = [[] for _ in range(self.num_envs)]
+        self.wrapper.setSeed(seed)
+        self.count = 0.0
+        self.mean = np.zeros(self.num_obs, dtype=np.float32)
+        self.var = np.zeros(self.num_obs, dtype=np.float32)
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -48,18 +52,20 @@ class RaisimGymVecEnv:
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
 
-    def load_scaling(self, dir_name, iteration, count=1e8):
+    def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
         var_file_name = dir_name + "/var" + str(iteration) + ".csv"
-        self.obs_rms.count = count
-        self.obs_rms.mean = np.loadtxt(mean_file_name, dtype=np.float32)
-        self.obs_rms.var = np.loadtxt(var_file_name, dtype=np.float32)
+        self.count = count
+        self.mean = np.loadtxt(mean_file_name, dtype=np.float32)
+        self.var = np.loadtxt(var_file_name, dtype=np.float32)
+        self.wrapper.setObStatistics(self.mean, self.var, self.count)
 
     def save_scaling(self, dir_name, iteration):
         mean_file_name = dir_name + "/mean" + iteration + ".csv"
         var_file_name = dir_name + "/var" + iteration + ".csv"
-        np.savetxt(mean_file_name, self.obs_rms.mean)
-        np.savetxt(var_file_name, self.obs_rms.var)
+        self.wrapper.getObStatistics(self.mean, self.var, self.count)
+        np.savetxt(mean_file_name, self.mean)
+        np.savetxt(var_file_name, self.var)
 
     def observe(self, update_statistics=True):
         self.wrapper.observe(self._observation, update_statistics)
@@ -68,29 +74,6 @@ class RaisimGymVecEnv:
     def reset(self):
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self.wrapper.reset()
-
-    def _normalize_observation(self, obs):
-        if self.normalize_ob:
-
-            return np.clip((obs - self.obs_rms.mean) / np.sqrt(self.obs_rms.var + 1e-8), -self.clip_obs,
-                           self.clip_obs)
-        else:
-            return obs
-
-    def reset_and_update_info(self):
-        return self.reset(), self._update_epi_info()
-
-    def _update_epi_info(self):
-        info = [{} for _ in range(self.num_envs)]
-
-        for i in range(self.num_envs):
-            eprew = sum(self.rewards[i])
-            eplen = len(self.rewards[i])
-            epinfo = {"r": eprew, "l": eplen}
-            info[i]['episode'] = epinfo
-            self.rewards[i].clear()
-
-        return info
 
     def close(self):
         self.wrapper.close()
