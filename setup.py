@@ -76,7 +76,7 @@ setup(
     description='gym for raisim using torch.',
     long_description='',
     ext_modules=[CMakeExtension('_raisim_gym')],
-    install_requires=['ruamel.yaml', 'numpy', 'torch', 'tensorboard', 'pygame'],
+    install_requires=['ruamel.yaml', 'numpy', 'torch', 'tensorboard', 'pygame', 'numba>=0.51.0'],
     cmdclass=dict(build_ext=CMakeBuild),
     include_package_data=True,
     zip_safe=False,

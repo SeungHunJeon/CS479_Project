@@ -307,7 +307,7 @@ class RaiboController {
     Eigen::Vector2d targetRel; targetRel = cm.head(2) - posXy;
     Eigen::Vector2d heading; heading << baseRot_[0], baseRot_[1];
     commandTrackingReward_ += 6. - targetRel.norm();
-    commandTrackingReward_ += 1.2 * heading.dot(targetRel) / (targetRel.norm() * heading.norm());
+    commandTrackingReward_ += 0.6 * heading.dot(targetRel) / (targetRel.norm() * heading.norm());
     commandTrackingReward_ *= commandTrackingRewardCoeff * simDt_;
 
 //    orientationReward_ += cf * orientationRewardCoeff_ * simDt_ * std::asin(baseRot_[7]) * std::asin(baseRot_[7]);

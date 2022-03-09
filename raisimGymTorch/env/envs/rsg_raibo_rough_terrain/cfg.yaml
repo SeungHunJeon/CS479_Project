@@ -21,7 +21,7 @@ environment:
     orientation_reward_coeff: -80
   curriculum:
     initial_factor: .2
-    decay_factor: 0.96
+    decay_factor: 0.94
 
 architecture:
   policy_net: [512, 400, 128]
