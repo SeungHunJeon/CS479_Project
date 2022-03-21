@@ -1,0 +1,28 @@
+record_video: no
+seed: 2
+
+environment:
+  seed: 2
+  render: False
+  num_envs: 400
+  eval_every_n: 200
+  num_threads: 30
+  simulation_dt: 0.001
+  control_dt: 0.005
+  max_time: 1.5
+  reward:
+    command_tracking_reward_coeff: 600
+    joint_velocity_reward_coeff: -10e-1
+    slip_reward_coeff: -3e-2
+    airtime_reward_coeff: 0e-1
+    smooth_reward_coeff: -2
+    con_switch_rew_coeff: -50
+    torque_reward_coeff: -10e-2
+    orientation_reward_coeff: -80
+  curriculum:
+    initial_factor: .2
+    decay_factor: 0.97
+
+architecture:
+  policy_net: [512, 400, 128]
+  value_net: [512, 400, 128]

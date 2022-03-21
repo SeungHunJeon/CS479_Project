@@ -108,6 +108,10 @@ class ENVIRONMENT {
     raisim::rotMatToQuat(rotMat, quaternion);
     gc_init_.segment(3, 4) = quaternion.e();
 
+    // body position
+    for(int i=0 ; i<2; i++)
+      gc_init_[i] = 0.5 * normDist_(gen_);
+
     // joint angles
     for(int i=0 ; i<nJoints_; i++)
       gc_init_[i+7] = nominalJointConfig_[i] + 0.3 * normDist_(gen_);
@@ -191,7 +195,6 @@ class ENVIRONMENT {
       raibo_->getState(gc_init_from_, gv_init_from_);
       gc_init_from_[0] = 0.;
       gc_init_from_[1] = 0.;
-
     }
   }
 

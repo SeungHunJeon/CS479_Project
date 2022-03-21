@@ -11,7 +11,7 @@ environment:
   control_dt: 0.005
   max_time: 1.5
   reward:
-    command_tracking_reward_coeff: 500
+    command_tracking_reward_coeff: 600
     joint_velocity_reward_coeff: -10e-1
     slip_reward_coeff: -3e-2
     airtime_reward_coeff: 0e-1
@@ -21,7 +21,7 @@ environment:
     orientation_reward_coeff: -80
   curriculum:
     initial_factor: .2
-    decay_factor: 0.94
+    decay_factor: 0.97
 
 architecture:
   policy_net: [512, 400, 128]
