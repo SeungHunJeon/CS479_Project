@@ -17,7 +17,6 @@
 #include "RaiboController.hpp"
 #include "RandomHeightMapGenerator.hpp"
 
-
 namespace raisim {
 
 class ENVIRONMENT {
@@ -29,12 +28,18 @@ class ENVIRONMENT {
     setSeed(id);
 
     /// add objects
-    raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
+    raibo_ = world_.addArticulatedSystem(resourceDir + "/raibo_arm_2/urdf/raibo_arm_2.urdf");
     raibo_->setName("robot");
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
+    /// Object spawn
+    Obj_ = world_.addBox(1, 1, 1, 10);
+    Obj_->setName("Obj_");
+    Obj_->setPosition(1, 1, 0.5);
+    Obj_->setOrientation(1, 0, 0, 0);
+
     /// create controller
-    controller_.create(&world_);
+    controller_.create(&world_, Obj_);
 
     /// indicies of the foot frame
     footFrameIndicies_[0] = raibo_->getFrameIdxByName("LF_S2F");
@@ -51,8 +56,9 @@ class ENVIRONMENT {
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
 
     /// create heightmap
-    groundType_ = (id+3) % 4;
-    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
+//    groundType_ = (id+3) % 4;
+//    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
+    world_.addGround();
 
     /// get robot data
     gcDim_ = int(raibo_->getGeneralizedCoordinateDim());
@@ -66,9 +72,9 @@ class ENVIRONMENT {
     gv_init_from_.setZero(gvDim_);
 
     /// this is nominal configuration of anymal
-    nominalJointConfig_<< 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12;
+    nominalJointConfig_<< 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12, 0.0, 1.2, 0.0, 0.0, 1.3, 0.0;
     gc_init_.head(7) << 0, 0, 0.54, 1.0, 0.0, 0.0, 0.0;
-    gc_init_.tail(12) = nominalJointConfig_;
+    gc_init_.tail(nJoints_) << nominalJointConfig_;
     gc_init_from_ = gc_init_;
     raibo_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
@@ -79,8 +85,13 @@ class ENVIRONMENT {
     if (visualizable_) {
       server_ = std::make_unique<raisim::RaisimServer>(&world_);
       server_->launchServer();
-      commandSphere_ = server_->addVisualSphere("commandSphere", 0.3, 1, 0, 0, 1);
-      controllerSphere_ = server_->addVisualSphere("controllerSphere", 0.3, 0, 1, 0, 0.1);
+      command_Obj_ = server_->addVisualBox("command_Obj_", 1, 1, 1, 1, 0, 0, 0.5);
+      tar_head_Obj_ = server_->addVisualCylinder("tar_head_Obj_", 0.03, 0.2, 1, 0, 0, 1);
+      cur_head_Obj_ = server_->addVisualCylinder("cur_head_Obj_", 0.03, 0.2, 0, 1, 0, 1);
+      command_Obj_Pos_ << 2, 2, 0.5;
+      command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
+      tar_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
+      cur_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
     }
   }
 
@@ -110,19 +121,19 @@ class ENVIRONMENT {
 
     // body position
     for(int i=0 ; i<2; i++)
-      gc_init_[i] = 0.5 * normDist_(gen_);
-
+//      gc_init_[i] = 0.5 * normDist_(gen_);
+      gc_init_[i] = 0.05 * (uniDist_(gen_)-0.5);
     // joint angles
     for(int i=0 ; i<nJoints_; i++)
       gc_init_[i+7] = nominalJointConfig_[i] + 0.3 * normDist_(gen_);
 
-    // command
+    /// command
 //    const bool standingMode = normDist_(gen_) > 1.7;
-    const bool standingMode = false;
-    controller_.setStandingMode(standingMode);
-    const double angle = 2. * (uniDist_(gen_) - 0.5) * M_PI;
-    const double heading = 2. * (uniDist_(gen_) - 0.5) * M_PI;
-    command_ << 5.0 * cos(angle), 5.0 * sin(angle), heading;
+//    const bool standingMode = false;
+//    controller_.setStandingMode(standingMode);
+//    const double angle = 2. * (uniDist_(gen_) - 0.5) * M_PI;
+//    const double heading = 2. * (uniDist_(gen_) - 0.5) * M_PI;
+//    command_ << 5.0 * cos(angle), 5.0 * sin(angle), heading;
 
     /// randomize generalized velocities
     raisim::Vec<3> bodyVel_b, bodyVel_w;
@@ -131,18 +142,18 @@ class ENVIRONMENT {
     bodyVel_b[2] = 0.3 * normDist_(gen_) * curriculumFactor_;
     raisim::matvecmul(rotMat, bodyVel_b, bodyVel_w);
 
-    // base angular velocities (just define this in the world frame since it is isometric)
+    /// base angular velocities (just define this in the world frame since it is isometric)
     raisim::Vec<3> bodyAng_w;
     for(int i=0; i<3; i++) bodyAng_w[i] = 0.4 * normDist_(gen_) * curriculumFactor_;
 
-    // joint velocities
-    Eigen::VectorXd jointVel(12);
-    for(int i=0; i<12; i++) jointVel[i] = 3. * normDist_(gen_) * curriculumFactor_;
+    /// joint velocities
+    Eigen::VectorXd jointVel(nJoints_);
+    for(int i=0; i<nJoints_; i++) jointVel[i] = 3. * normDist_(gen_) * curriculumFactor_;
 
-    // combine
+    /// combine
     gv_init_ << bodyVel_w.e(), bodyAng_w.e(), jointVel;
 
-    // randomly initialize from previous trajectories
+    /// randomly initialize from previous trajectories
     if(uniDist_(gen_) < 0.25) {
       gc_init_ = gc_init_from_;
       gv_init_ = gv_init_from_;
@@ -155,15 +166,19 @@ class ENVIRONMENT {
     double maxNecessaryShift = -1e20; /// some arbitrary high negative value
     for(auto& foot: footFrameIndicies_) {
       raibo_->getFramePosition(foot, footPosition);
-      double terrainHeightMinusFootPosition = heightMap_->getHeight(footPosition[0], footPosition[1]) - footPosition[2];
+//      double terrainHeightMinusFootPosition = heightMap_->getHeight(footPosition[0], footPosition[1]) - footPosition[2];
+      double terrainHeightMinusFootPosition = - footPosition[2];
       maxNecessaryShift = maxNecessaryShift > terrainHeightMinusFootPosition ? maxNecessaryShift : terrainHeightMinusFootPosition;
     }
     gc_init_[2] += maxNecessaryShift + 0.07;
 
+    updateObstacle();
+
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-    controller_.reset(gen_, normDist_);
+    controller_.reset(gen_, normDist_, command_Obj_Pos_);
     controller_.updateStateVariables();
+
   }
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
@@ -184,8 +199,38 @@ class ENVIRONMENT {
     return controller_.getRewardSum(visualize);
   }
 
+
+
+  void updateObstacle() {
+    double x, y, x_command, y_command;
+    double phi_;
+    phi_ = uniDist_(gen_);
+    x = 2.0*cos(phi_*2*M_PI) + 0.5*(uniDist_(gen_)-0.5);
+    y = 2.0*sin(phi_*2*M_PI) + 0.5*(uniDist_(gen_)-0.5);
+
+    x += gc_init_[0];
+    y += gc_init_[1];
+
+    Obj_->setPosition(x, y, 0.5);
+
+    double phi;
+
+    phi = uniDist_(gen_);
+
+    x_command = x + sqrt(2)*cos(phi*2*M_PI);
+    y_command = y + sqrt(2)*sin(phi*2*M_PI);
+
+    command_Obj_Pos_ << x_command, y_command, 0.5;
+
+    if(visualizable_)
+      command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
+
+  }
+
+
+
   void subStep() {
-    controller_.updateHistory();
+//    controller_.updateHistory();
     world_.integrate1();
     world_.integrate2();
     controller_.updateStateVariables();
@@ -214,11 +259,11 @@ class ENVIRONMENT {
   }
 
   void curriculumUpdate() {
-    groundType_ = (groundType_+1) % 4; /// rotate ground type for a visualization purpose
+//    groundType_ = (groundType_+1) % 4; /// rotate ground type for a visualization purpose
     curriculumFactor_ = std::pow(curriculumFactor_, curriculumDecayFactor_);
     /// create heightmap
-    world_.removeObject(heightMap_);
-    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
+//    world_.removeObject(heightMap_);
+//    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
   }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
@@ -238,7 +283,7 @@ class ENVIRONMENT {
   }
 
  protected:
-  static constexpr int nJoints_ = 12;
+  static constexpr int nJoints_ = 18;
   raisim::World world_;
   double simulation_dt_;
   double control_dt_;
@@ -259,6 +304,13 @@ class ENVIRONMENT {
 
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
+  raisim::Box* Obj_;
+  raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_;
+  Eigen::Vector3d command_Obj_Pos_;
+  Eigen::Vector3d Dist_eo_, Dist_og_;
+  raisim::Vec<3> Pos_e_;
+
+
 
   thread_local static std::mt19937 gen_;
   thread_local static std::normal_distribution<double> normDist_;

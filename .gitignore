@@ -16,3 +16,6 @@ id_rsa
 */data/*
 raisimGymTorch/env/bin/rsg*
 data/*
+raisimGymTorch/.idea/
+wandb/
+

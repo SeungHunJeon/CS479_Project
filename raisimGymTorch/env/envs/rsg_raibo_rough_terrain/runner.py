@@ -1,11 +1,11 @@
 # task specification
-task_name = "rsg_raibo_rough_terrain"
+task_name = "raibo_arm"
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import NormalSampler
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
-from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param, tensorboard_launcher
+from raisimGymTorch.helper.raisim_gym_helper import ConfigurationSaver, load_param
 import os
 import math
 import time
@@ -15,7 +15,12 @@ import torch.nn as nn
 import numpy as np
 import torch
 import argparse
+import wandb
 
+# task specification
+
+# initialize wandb
+wandb.init(group="jsh",project=task_name)
 
 # configuration
 parser = argparse.ArgumentParser()
@@ -60,7 +65,6 @@ critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.L
 
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/RaiboController.hpp"])
-tensorboard_launcher(saver.data_dir+"/..")  # press refresh (F5) after the first ppo update
 
 ppo = PPO.PPO(actor=actor,
               critic=critic,
@@ -83,6 +87,7 @@ if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
 
 for update in range(iteration_number, 1000000):
+    torch.cuda.empty_cache()
     start = time.time()
     env.reset()
     reward_ll_sum = 0
@@ -110,19 +115,16 @@ for update in range(iteration_number, 1000000):
                 obs = env.observe(False)
                 actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
                 reward, dones = env.step_visualize(actions)
-                data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
+                # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
-        data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
+        # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
-        for data_id in range(len(data_tags)):
-            ppo.writer.add_scalar(data_tags[data_id]+'/mean', data_mean[data_id], global_step=update)
-            ppo.writer.add_scalar(data_tags[data_id]+'/std', data_std[data_id], global_step=update)
-            ppo.writer.add_scalar(data_tags[data_id]+'/min', data_min[data_id], global_step=update)
-            ppo.writer.add_scalar(data_tags[data_id]+'/max', data_max[data_id], global_step=update)
+
 
         env.reset()
         env.save_scaling(saver.data_dir, str(update))
 
+    data_log = {}
     # actual training
     for step in range(n_steps):
         with torch.no_grad():
@@ -132,24 +134,32 @@ for update in range(iteration_number, 1000000):
             ppo.step(value_obs=obs, rews=reward, dones=dones)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
+            data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
+    data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
     # take st step to get value obs
     obs = env.observe(update < 10000)
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
-    actor.distribution.enforce_minimum_std((torch.ones(12)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(15)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
     actor.update()
 
     if update % 100 == 0:
         env.curriculum_callback()
 
     if update % 10 == 0:
-        ppo.writer.add_scalar('Training/average_reward', average_ll_performance, global_step=update)
-        ppo.writer.add_scalar('Training/dones', average_dones, global_step=update)
-        ppo.writer.add_scalar('Training/learning_rate', ppo.learning_rate, global_step=update)
+        data_log['Training/average_reward'] = average_ll_performance
+        data_log['Training/dones'] = average_dones
+        data_log['Training/learning_rate'] = ppo.learning_rate
+
+        for id, data_name in enumerate(data_tags):
+            data_log[data_name + '/mean'] = data_mean[id]
+            data_log[data_name + '/std'] = data_std[id]
 
     end = time.time()
+
+    wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
