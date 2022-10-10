@@ -25,6 +25,9 @@ ENDMACRO()
 set(Dependencies)
 
 add_subdirectory(thirdParty/pybind11 pybind11)
+add_subdirectory(raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo default_controller_demo)
+
+
 find_package(Eigen3 REQUIRED)
 find_package(OpenMP REQUIRED)
 

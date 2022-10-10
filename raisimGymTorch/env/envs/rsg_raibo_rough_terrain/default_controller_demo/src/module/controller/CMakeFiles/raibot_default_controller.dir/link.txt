@@ -1,0 +1,2 @@
+/usr/bin/ar qc libraibot_default_controller.a CMakeFiles/raibot_default_controller.dir/raibot_default_controller/raibot_default_controller.cpp.o
+/usr/bin/ranlib libraibot_default_controller.a

@@ -10,6 +10,8 @@
 #include "Yaml.hpp"
 #include <Eigen/Core>
 #include "BasicEigenTypes.hpp"
+#include "default_controller_demo/include/neuralNet.hpp"
+
 extern int THREAD_COUNT;
 
 namespace raisim {
@@ -38,6 +40,16 @@ class VectorizedEnvironment {
     double simDt, conDt;
     READ_YAML(double, simDt, cfg_["simulation_dt"])
     READ_YAML(double, conDt, cfg_["control_dt"])
+
+    /// For Low-level controller importing
+//    if (cfg_["hierarchical"].template As<bool>()) {
+//      std::vector<int> act_param, est_param;
+//      READ_YAML(std::vector<int>, act_param, cfg_["architecture"]["actor"]);
+//      READ_YAML(std::vector<int>, est_param, cfg_["architecture"]["estimator"]);
+//
+//
+//
+//    }
 
     for (int i = 0; i < num_envs_; i++) {
       environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0, i));

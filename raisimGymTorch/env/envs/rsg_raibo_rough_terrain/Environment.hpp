@@ -16,6 +16,7 @@
 #include "../../BasicEigenTypes.hpp"
 #include "RaiboController.hpp"
 #include "RandomHeightMapGenerator.hpp"
+#include "default_controller_demo/module/controller/raibot_default_controller/raibot_default_controller.hpp"
 
 namespace raisim {
 
@@ -26,27 +27,22 @@ class ENVIRONMENT {
   explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable, int id) :
       visualizable_(visualizable) {
     setSeed(id);
-
+    world_.addGround();
+    world_.setDefaultMaterial(1.1, 0.0, 0.01);
     /// add objects
-    raibo_ = world_.addArticulatedSystem(resourceDir + "/raibo_arm_2/urdf/raibo_arm_2.urdf");
+    raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
     raibo_->setName("robot");
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
     /// Object spawn
-    Obj_ = world_.addBox(1, 1, 1, 10);
+    Obj_ = world_.addCylinder(0.5, 0.7, 3);
     Obj_->setName("Obj_");
-    Obj_->setPosition(1, 1, 0.5);
+    Obj_->setPosition(1, 1, 0.35);
     Obj_->setOrientation(1, 0, 0, 0);
 
     /// create controller
     controller_.create(&world_, Obj_);
-
-    /// indicies of the foot frame
-    footFrameIndicies_[0] = raibo_->getFrameIdxByName("LF_S2F");
-    footFrameIndicies_[1] = raibo_->getFrameIdxByName("RF_S2F");
-    footFrameIndicies_[2] = raibo_->getFrameIdxByName("LH_S2F");
-    footFrameIndicies_[3] = raibo_->getFrameIdxByName("RH_S2F");
-    RSFATAL_IF(std::any_of(footFrameIndicies_.begin(), footFrameIndicies_.end(), [](int i){return i < 0;}), "footFrameIndicies_ not found")
+    Low_controller_.create(&world_);
 
     /// set curriculum
     simulation_dt_ = RaiboController::getSimDt();
@@ -58,7 +54,6 @@ class ENVIRONMENT {
     /// create heightmap
 //    groundType_ = (id+3) % 4;
 //    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
-    world_.addGround();
 
     /// get robot data
     gcDim_ = int(raibo_->getGeneralizedCoordinateDim());
@@ -71,9 +66,16 @@ class ENVIRONMENT {
     gc_init_from_.setZero(gcDim_);
     gv_init_from_.setZero(gvDim_);
 
+    /// set pd gains
+    jointPGain_.setZero(gvDim_);
+    jointDGain_.setZero(gvDim_);
+    jointPGain_.tail(nJoints_).setConstant(50.0);
+    jointDGain_.tail(nJoints_).setConstant(0.5);
+    raibo_->setPdGains(jointPGain_, jointDGain_);
+
     /// this is nominal configuration of anymal
-    nominalJointConfig_<< 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12, 0.0, 1.2, 0.0, 0.0, 1.3, 0.0;
-    gc_init_.head(7) << 0, 0, 0.54, 1.0, 0.0, 0.0, 0.0;
+    nominalJointConfig_<< 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12, 0, 0.56, -1.12;
+    gc_init_.head(7) << 0, 0, 0.4725, 1, 0.0, 0.0, 0.0;
     gc_init_.tail(nJoints_) << nominalJointConfig_;
     gc_init_from_ = gc_init_;
     raibo_->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
@@ -81,25 +83,32 @@ class ENVIRONMENT {
     // Reward coefficients
     controller_.setRewardConfig(cfg);
 
+
+
     // visualize if it is the first environment
     if (visualizable_) {
       server_ = std::make_unique<raisim::RaisimServer>(&world_);
       server_->launchServer();
-      command_Obj_ = server_->addVisualBox("command_Obj_", 1, 1, 1, 1, 0, 0, 0.5);
-      tar_head_Obj_ = server_->addVisualCylinder("tar_head_Obj_", 0.03, 0.2, 1, 0, 0, 1);
-      cur_head_Obj_ = server_->addVisualCylinder("cur_head_Obj_", 0.03, 0.2, 0, 1, 0, 1);
-      command_Obj_Pos_ << 2, 2, 0.5;
+      command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, 0.7, 1, 0, 0, 0.5);
+//      tar_head_Obj_ = server_->addVisualCylinder("tar_head_Obj_", 0.03, 0.2, 1, 0, 0, 1);
+//      cur_head_Obj_ = server_->addVisualCylinder("cur_head_Obj_", 0.03, 0.2, 0, 1, 0, 1);
+      command_Obj_Pos_ << 2, 2, 0.35;
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
-      tar_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
-      cur_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
+//      tar_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
+//      cur_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
     }
   }
 
   ~ENVIRONMENT() { if (server_) server_->killServer(); }
   void init () { }
   void close () { }
-  void setSimulationTimeStep(double dt) { controller_.setSimDt(dt); };
-  void setControlTimeStep(double dt) { controller_.setConDt(dt); };
+  void setSimulationTimeStep(double dt)
+  { controller_.setSimDt(dt);
+    Low_controller_.setSimDt(dt);
+  }
+  void setControlTimeStep(double dt) {
+    controller_.setConDt(dt);
+    Low_controller_.setConDt(dt);}
   void turnOffVisualization() { server_->hibernate(); }
   void turnOnVisualization() { server_->wakeup(); }
   void startRecordingVideo(const std::string& videoName ) { server_->startRecordingVideo(videoName); }
@@ -108,87 +117,34 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void reset() {
-    // orientation
-    raisim::Mat<3,3> rotMat, yawRot, pitchRollMat;
-    raisim::Vec<4> quaternion;
-    raisim::Vec<3> axis = {normDist_(gen_), normDist_(gen_), normDist_(gen_)};
-    axis /= axis.norm();
-    raisim::angleAxisToRotMat(axis, normDist_(gen_) * 0.2, pitchRollMat);
-    raisim::angleAxisToRotMat({0,0,1}, uniDist_(gen_) * 2. * M_PI, yawRot);
-    rotMat = pitchRollMat * yawRot;
-    raisim::rotMatToQuat(rotMat, quaternion);
-    gc_init_.segment(3, 4) = quaternion.e();
-
-    // body position
-    for(int i=0 ; i<2; i++)
-//      gc_init_[i] = 0.5 * normDist_(gen_);
-      gc_init_[i] = 0.05 * (uniDist_(gen_)-0.5);
-    // joint angles
-    for(int i=0 ; i<nJoints_; i++)
-      gc_init_[i+7] = nominalJointConfig_[i] + 0.3 * normDist_(gen_);
-
-    /// command
-//    const bool standingMode = normDist_(gen_) > 1.7;
-//    const bool standingMode = false;
-//    controller_.setStandingMode(standingMode);
-//    const double angle = 2. * (uniDist_(gen_) - 0.5) * M_PI;
-//    const double heading = 2. * (uniDist_(gen_) - 0.5) * M_PI;
-//    command_ << 5.0 * cos(angle), 5.0 * sin(angle), heading;
-
-    /// randomize generalized velocities
-    raisim::Vec<3> bodyVel_b, bodyVel_w;
-    bodyVel_b[0] = 0.6 * normDist_(gen_) * curriculumFactor_;
-    bodyVel_b[1] = 0.6 * normDist_(gen_) * curriculumFactor_;
-    bodyVel_b[2] = 0.3 * normDist_(gen_) * curriculumFactor_;
-    raisim::matvecmul(rotMat, bodyVel_b, bodyVel_w);
-
-    /// base angular velocities (just define this in the world frame since it is isometric)
-    raisim::Vec<3> bodyAng_w;
-    for(int i=0; i<3; i++) bodyAng_w[i] = 0.4 * normDist_(gen_) * curriculumFactor_;
-
-    /// joint velocities
-    Eigen::VectorXd jointVel(nJoints_);
-    for(int i=0; i<nJoints_; i++) jointVel[i] = 3. * normDist_(gen_) * curriculumFactor_;
-
-    /// combine
-    gv_init_ << bodyVel_w.e(), bodyAng_w.e(), jointVel;
-
-    /// randomly initialize from previous trajectories
-    if(uniDist_(gen_) < 0.25) {
-      gc_init_ = gc_init_from_;
-      gv_init_ = gv_init_from_;
-      gc_init_.head(2).setZero();
-    }
-    raibo_->setGeneralizedCoordinate(gc_init_);
-
-    // keep one foot on the terrain
-    raisim::Vec<3> footPosition;
-    double maxNecessaryShift = -1e20; /// some arbitrary high negative value
-    for(auto& foot: footFrameIndicies_) {
-      raibo_->getFramePosition(foot, footPosition);
-//      double terrainHeightMinusFootPosition = heightMap_->getHeight(footPosition[0], footPosition[1]) - footPosition[2];
-      double terrainHeightMinusFootPosition = - footPosition[2];
-      maxNecessaryShift = maxNecessaryShift > terrainHeightMinusFootPosition ? maxNecessaryShift : terrainHeightMinusFootPosition;
-    }
-    gc_init_[2] += maxNecessaryShift + 0.07;
-
-    updateObstacle();
-
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
+    updateObstacle();
+
     controller_.reset(gen_, normDist_, command_Obj_Pos_);
     controller_.updateStateVariables();
-
+    Low_controller_.reset(&world_);
+    Low_controller_.updateObservation(&world_);
   }
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
-    controller_.advance(&world_, action, curriculumFactor_);
+//    controller_.advance(&world_, action, curriculumFactor_);
+    Eigen::Vector3f command = action.cast<float>();
+    for (int i = 0; i < 3; i++) {
+      if ((command[i]) > 2)
+        command[i] = 2;
+      if (command[i] < -2)
+        command[i] = -2;
+    }
+    Low_controller_.setCommand(command);
+
 
     float dummy;
     int howManySteps;
 
     for(howManySteps = 0; howManySteps< int(control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
+
       subStep();
 
       if(isTerminalState(dummy)) {
@@ -205,13 +161,14 @@ class ENVIRONMENT {
     double x, y, x_command, y_command;
     double phi_;
     phi_ = uniDist_(gen_);
-    x = 2.0*cos(phi_*2*M_PI) + 0.5*(uniDist_(gen_)-0.5);
-    y = 2.0*sin(phi_*2*M_PI) + 0.5*(uniDist_(gen_)-0.5);
+    x = 2.0*cos(phi_*2*M_PI);
+    y = 2.0*sin(phi_*2*M_PI);
 
     x += gc_init_[0];
     y += gc_init_[1];
 
-    Obj_->setPosition(x, y, 0.5);
+    Obj_->setPosition(x, y, 0.35);
+    Obj_->setOrientation(1, 0, 0, 0);
 
     double phi;
 
@@ -220,7 +177,7 @@ class ENVIRONMENT {
     x_command = x + sqrt(2)*cos(phi*2*M_PI);
     y_command = y + sqrt(2)*sin(phi*2*M_PI);
 
-    command_Obj_Pos_ << x_command, y_command, 0.5;
+    command_Obj_Pos_ << x_command, y_command, 0.35;
 
     if(visualizable_)
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
@@ -231,16 +188,14 @@ class ENVIRONMENT {
 
   void subStep() {
 //    controller_.updateHistory();
+    Low_controller_.updateObservation(&world_);
+    Low_controller_.advance(&world_);
     world_.integrate1();
     world_.integrate2();
+
     controller_.updateStateVariables();
     controller_.accumulateRewards(curriculumFactor_, command_);
 
-    if(uniDist_(gen_) < 0.005) {
-      raibo_->getState(gc_init_from_, gv_init_from_);
-      gc_init_from_[0] = 0.;
-      gc_init_from_[1] = 0.;
-    }
   }
 
   void observe(Eigen::Ref<EigenVec> ob) {
@@ -250,7 +205,8 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float& terminalReward) {
-    return controller_.isTerminalState(terminalReward);
+//    return controller_.isTerminalState(terminalReward);
+    return false;
   }
 
   void setSeed(int seed) {
@@ -283,7 +239,7 @@ class ENVIRONMENT {
   }
 
  protected:
-  static constexpr int nJoints_ = 18;
+  static constexpr int nJoints_ = 12;
   raisim::World world_;
   double simulation_dt_;
   double control_dt_;
@@ -301,10 +257,13 @@ class ENVIRONMENT {
   int groundType_;
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_;
+  controller::raibotDefaultController Low_controller_;
+  Eigen::VectorXd jointDGain_, jointPGain_;
+
 
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
-  raisim::Box* Obj_;
+  raisim::Cylinder* Obj_;
   raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_;
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
