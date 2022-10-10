@@ -42,7 +42,7 @@ class ENVIRONMENT {
 
     /// create controller
     controller_.create(&world_, Obj_);
-    Low_controller_.create(&world_);
+//    Low_controller_.create(&world_);
 
     /// set curriculum
     simulation_dt_ = RaiboController::getSimDt();
@@ -100,6 +100,21 @@ class ENVIRONMENT {
   }
 
   ~ENVIRONMENT() { if (server_) server_->killServer(); }
+
+
+  void adapt_Low_controller (controller::raibotDefaultController controller) {
+    Low_controller_ = controller;
+  }
+
+  controller::raibotDefaultController get_Low_controller () {
+    return Low_controller_;
+  }
+
+  void Low_controller_create () {
+    Low_controller_.create(&world_);
+    Low_controller_.reset(&world_);
+  }
+
   void init () { }
   void close () { }
   void setSimulationTimeStep(double dt)
@@ -127,6 +142,8 @@ class ENVIRONMENT {
     Low_controller_.updateObservation(&world_);
   }
 
+
+
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
 //    controller_.advance(&world_, action, curriculumFactor_);
@@ -137,8 +154,11 @@ class ENVIRONMENT {
       if (command[i] < -2)
         command[i] = -2;
     }
-    Low_controller_.setCommand(command);
+    command = {2.0, 0, 0};
 
+    Low_controller_.setCommand(command);
+    Low_controller_.updateObservation(&world_);
+    Low_controller_.advance(&world_);
 
     float dummy;
     int howManySteps;
@@ -188,8 +208,7 @@ class ENVIRONMENT {
 
   void subStep() {
 //    controller_.updateHistory();
-    Low_controller_.updateObservation(&world_);
-    Low_controller_.advance(&world_);
+
     world_.integrate1();
     world_.integrate2();
 

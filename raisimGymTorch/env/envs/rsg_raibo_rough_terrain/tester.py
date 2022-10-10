@@ -29,6 +29,7 @@ cfg['environment']['num_envs'] = 1
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
 
+
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 # env.set_command(0)  # ensures that the initial command is zero
 

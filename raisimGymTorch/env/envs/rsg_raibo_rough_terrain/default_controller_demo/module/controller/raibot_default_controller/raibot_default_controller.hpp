@@ -20,7 +20,7 @@ class raibotDefaultController {
 
 
     raibotController_.create(world);
-//    raibotController_.reset(world);
+    raibotController_.reset(world);
 
     std::string current_path = std::filesystem::current_path();
 //    std::string network_path = current_path + "/../envs/rsg_raibo_rough_terrain/default_controller_demo/module/controller/raibot_default_controller/network/network_100000";

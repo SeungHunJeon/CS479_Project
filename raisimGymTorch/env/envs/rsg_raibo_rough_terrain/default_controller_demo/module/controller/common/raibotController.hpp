@@ -52,7 +52,7 @@ class raibotController {
     actionMean_ = gc_init_.tail(nJoints_);
     actionStd_.setConstant(0.3);
 
-    updateObservation(world);
+//    updateObservation(world);
 
     for (int i = 0; i < historyLength_; ++i) {
       history_[i].setZero(obDim_);
@@ -81,6 +81,9 @@ class raibotController {
     pTarget12_ = pTarget12_.cwiseProduct(actionStd_);
     pTarget12_ += actionMean_;
     pTarget_.tail(nJoints_) = pTarget12_;
+
+    std::cout << "pTarget : " << pTarget12_ << std::endl;
+
     raibot_->setPdTarget(pTarget_, vTarget_);
     return true;
   }
