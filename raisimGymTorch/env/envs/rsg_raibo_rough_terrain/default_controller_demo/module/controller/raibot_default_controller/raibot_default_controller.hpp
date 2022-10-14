@@ -121,6 +121,8 @@ class raibotDefaultController {
     actor_input << obs_, e_out;
     Eigen::VectorXf action = actor_.forward(actor_input);
 
+//    std::cout << "action : " << action << std::endl;
+
 
     return action;
   }

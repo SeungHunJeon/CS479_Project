@@ -464,8 +464,11 @@ class RaiboController {
   [[nodiscard]] static constexpr double getConDt() { return conDt_; }
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) { gc = gc_.cast<float>(); gv = gv_.cast<float>(); }
 
-  static void setSimDt(double dt) { RSFATAL_IF(fabs(dt - simDt_) > 1e-12, "sim dt is fixed to " << simDt_)};
-  static void setConDt(double dt) { RSFATAL_IF(fabs(dt - conDt_) > 1e-12, "con dt is fixed to " << conDt_)};
+  static void setSimDt(double dt) {
+    RSFATAL_IF(fabs(dt - simDt_) > 1e-12, "sim dt is fixed to " << simDt_)
+  };
+  static void setConDt(double dt) {
+    RSFATAL_IF(fabs(dt - conDt_) > 1e-12, "con dt is fixed to " << conDt_)};
 
   [[nodiscard]] inline const std::vector<std::string> &getStepDataTag() const { return stepDataTag_; }
   [[nodiscard]] inline const Eigen::VectorXd &getStepData() const { return stepData_; }
@@ -512,7 +515,7 @@ class RaiboController {
   raisim::Mat<3,3> eeRot_w_;
 
   // control variables
-  static constexpr double conDt_ = 0.01;
+  static constexpr double conDt_ = 0.1;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_, previousAction_, prevprevAction_;
   Eigen::VectorXd actionTarget_;

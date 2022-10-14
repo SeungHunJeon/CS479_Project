@@ -124,6 +124,7 @@ else:
             # env.move_controller_cursor(0, command)
             obs = env.observe(False)
             action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
+            print(action_ll)
             env.step(action_ll.cpu().detach().numpy())
             time.sleep(cfg['environment']['control_dt'])
 

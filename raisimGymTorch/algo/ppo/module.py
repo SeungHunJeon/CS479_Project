@@ -84,6 +84,10 @@ class MLP(nn.Module):
             scale.append(np.sqrt(2))
 
         modules.append(nn.Linear(shape[-1], output_size))
+
+        # For low level controller
+        modules.append(nn.Tanh())
+
         self.architecture = nn.Sequential(*modules)
         scale.append(np.sqrt(2))
 

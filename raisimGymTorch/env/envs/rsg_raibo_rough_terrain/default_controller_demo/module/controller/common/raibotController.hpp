@@ -34,6 +34,10 @@ class raibotController {
     vTarget_.setZero(gvDim_);
     pTarget12_.setZero(nJoints_);
 
+    /// this is nominal configuration of raibot
+    gc_init_ << 0, 0, 0.4725, 1, 0.0, 0.0, 0.0,
+        0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672, 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672;
+
     /// vector dimensions
     obDim_ = 33;
     estDim_ = 8;
@@ -82,7 +86,7 @@ class raibotController {
     pTarget12_ += actionMean_;
     pTarget_.tail(nJoints_) = pTarget12_;
 
-    std::cout << "pTarget : " << pTarget12_ << std::endl;
+//    std::cout << "pTarget : " << pTarget12_ << std::endl;
 
     raibot_->setPdTarget(pTarget_, vTarget_);
     return true;

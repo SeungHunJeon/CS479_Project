@@ -37,9 +37,10 @@ class VectorizedEnvironment {
     THREAD_COUNT = cfg_["num_threads"].template As<int>();
     omp_set_num_threads(THREAD_COUNT);
     num_envs_ = cfg_["num_envs"].template As<int>();
-    double simDt, conDt;
+    double simDt, conDt, low_conDt;
     READ_YAML(double, simDt, cfg_["simulation_dt"])
     READ_YAML(double, conDt, cfg_["control_dt"])
+    READ_YAML(double, low_conDt, cfg_["low_level_control_dt"])
 
     /// For Low-level controller importing
 // {
@@ -54,13 +55,13 @@ class VectorizedEnvironment {
     if (cfg_["hierarchical"].template As<bool>()) {
       environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && 0 == 0, 0));
       environments_.back()->setSimulationTimeStep(simDt);
-      environments_.back()->setControlTimeStep(conDt);
+      environments_.back()->setControlTimeStep(conDt, low_conDt);
       environments_[0]->Low_controller_create();
 
       for (int i = 1; i < num_envs_; i++) {
         environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0, i));
         environments_.back()->setSimulationTimeStep(simDt);
-        environments_.back()->setControlTimeStep(conDt);
+        environments_.back()->setControlTimeStep(conDt, low_conDt);
         environments_[i]->adapt_Low_controller(environments_[0]->get_Low_controller());
       }
     }
@@ -69,7 +70,7 @@ class VectorizedEnvironment {
       for (int i = 0; i < num_envs_; i++) {
         environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0, i));
         environments_.back()->setSimulationTimeStep(simDt);
-        environments_.back()->setControlTimeStep(conDt);
+        environments_.back()->setControlTimeStep(conDt, low_conDt);
       }
     }
 
@@ -210,9 +211,9 @@ class VectorizedEnvironment {
       env->setSimulationTimeStep(dt);
   }
 
-  void setControlTimeStep(double dt) {
+  void setControlTimeStep(double dt, double low_dt) {
     for (auto *env: environments_)
-      env->setControlTimeStep(dt);
+      env->setControlTimeStep(dt, low_dt);
   }
 
   int getObDim() { return ChildEnvironment::getObDim(); }

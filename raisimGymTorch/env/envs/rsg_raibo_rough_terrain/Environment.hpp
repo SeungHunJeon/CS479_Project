@@ -46,11 +46,11 @@ class ENVIRONMENT {
 
     /// set curriculum
     simulation_dt_ = RaiboController::getSimDt();
-    control_dt_ = RaiboController::getConDt();
+    high_level_control_dt_ = RaiboController::getConDt();
 
     READ_YAML(double, curriculumFactor_, cfg["curriculum"]["initial_factor"])
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
-
+    READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
     /// create heightmap
 //    groundType_ = (id+3) % 4;
 //    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
@@ -120,10 +120,11 @@ class ENVIRONMENT {
   void setSimulationTimeStep(double dt)
   { controller_.setSimDt(dt);
     Low_controller_.setSimDt(dt);
+    world_.setTimeStep(dt);
   }
-  void setControlTimeStep(double dt) {
+  void setControlTimeStep(double dt, double low_dt) {
     controller_.setConDt(dt);
-    Low_controller_.setConDt(dt);}
+    Low_controller_.setConDt(low_dt);}
   void turnOffVisualization() { server_->hibernate(); }
   void turnOnVisualization() { server_->wakeup(); }
   void startRecordingVideo(const std::string& videoName ) { server_->startRecordingVideo(videoName); }
@@ -149,29 +150,33 @@ class ENVIRONMENT {
 //    controller_.advance(&world_, action, curriculumFactor_);
     Eigen::Vector3f command = action.cast<float>();
     for (int i = 0; i < 3; i++) {
-      if ((command[i]) > 2)
-        command[i] = 2;
-      if (command[i] < -2)
-        command[i] = -2;
+      if ((command[i]) > 1.5)
+        command[i] = 1.5;
+      if (command[i] < -1.5)
+        command[i] = -1.5;
     }
-    command = {2.0, 0, 0};
-
+//    command = {2.0, 0, 0};
     Low_controller_.setCommand(command);
-    Low_controller_.updateObservation(&world_);
-    Low_controller_.advance(&world_);
-
     float dummy;
     int howManySteps;
+    int lowlevelSteps;
 
-    for(howManySteps = 0; howManySteps< int(control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
+    for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
-      subStep();
+      Low_controller_.updateObservation(&world_);
+      Low_controller_.advance(&world_);
 
-      if(isTerminalState(dummy)) {
-        howManySteps++;
-        break;
+      for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
+
+        subStep();
+
+//      if(isTerminalState(dummy)) {
+//        howManySteps++;
+//        break;
+//      }
       }
     }
+
     return controller_.getRewardSum(visualize);
   }
 
@@ -208,6 +213,7 @@ class ENVIRONMENT {
 
   void subStep() {
 //    controller_.updateHistory();
+
 
     world_.integrate1();
     world_.integrate2();
@@ -261,7 +267,8 @@ class ENVIRONMENT {
   static constexpr int nJoints_ = 12;
   raisim::World world_;
   double simulation_dt_;
-  double control_dt_;
+  double high_level_control_dt_;
+  double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
 
