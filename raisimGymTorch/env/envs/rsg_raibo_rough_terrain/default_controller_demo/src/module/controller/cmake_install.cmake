@@ -1,4 +1,4 @@
-# Install script for directory: /home/user/workspace/default_controller_demo/module/controller
+# Install script for directory: /home/oem/workspace/raisimGymForRaisin/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo/module/controller
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -35,10 +35,5 @@ endif()
 # Is this installation the result of a crosscompile?
 if(NOT DEFINED CMAKE_CROSSCOMPILING)
   set(CMAKE_CROSSCOMPILING "FALSE")
-endif()
-
-# Set default install directory permissions.
-if(NOT DEFINED CMAKE_OBJDUMP)
-  set(CMAKE_OBJDUMP "/usr/bin/objdump")
 endif()
 

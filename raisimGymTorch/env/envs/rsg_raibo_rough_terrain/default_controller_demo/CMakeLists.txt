@@ -11,7 +11,7 @@ find_package(Eigen3 REQUIRED)
 find_package(OpenMP REQUIRED)
 find_package(Torch REQUIRED)
 
-message("RRRRRRRRRRRR Build done .. ")
+message("ASDQWFSAD Build done .. ")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
@@ -35,6 +35,7 @@ macro(subdir_names result srcdir)
 endmacro()
 
 subdir_names(CONTROLLERS module/controller)
+
 list(REMOVE_ITEM CONTROLLERS common)
 
 add_subdirectory(module/controller)

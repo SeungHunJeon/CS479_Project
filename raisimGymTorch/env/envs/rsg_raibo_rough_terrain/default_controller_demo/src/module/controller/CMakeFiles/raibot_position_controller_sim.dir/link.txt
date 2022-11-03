@@ -1,0 +1,2 @@
+/usr/bin/ar qc libraibot_position_controller_sim.a  
+/usr/bin/ranlib libraibot_position_controller_sim.a
