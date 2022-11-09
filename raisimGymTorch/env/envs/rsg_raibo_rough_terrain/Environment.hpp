@@ -16,7 +16,7 @@
 #include "../../BasicEigenTypes.hpp"
 #include "RaiboController.hpp"
 #include "RandomHeightMapGenerator.hpp"
-#include "default_controller_demo/module/controller/raibot_default_controller/raibot_default_controller.hpp"
+#include "../../../../default_controller_demo/module/controller/raibot_position_controller_sim/raibot_position_controller_sim.hpp"
 
 namespace raisim {
 
@@ -69,7 +69,7 @@ class ENVIRONMENT {
     /// set pd gains
     jointPGain_.setZero(gvDim_);
     jointDGain_.setZero(gvDim_);
-    jointPGain_.tail(nJoints_).setConstant(50.0);
+    jointPGain_.tail(nJoints_).setConstant(60.0);
     jointDGain_.tail(nJoints_).setConstant(0.5);
     raibo_->setPdGains(jointPGain_, jointDGain_);
 
@@ -82,37 +82,40 @@ class ENVIRONMENT {
 
     // Reward coefficients
     controller_.setRewardConfig(cfg);
+    command_Obj_Pos_ << 2, 2, 0.35;
 
 
 
     // visualize if it is the first environment
     if (visualizable_) {
       server_ = std::make_unique<raisim::RaisimServer>(&world_);
-      server_->launchServer();
+      server_->launchServer(8080);
+      server_->focusOn(raibo_);
+      std::cout << "Launch Server !!" << std::endl;
       command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, 0.7, 1, 0, 0, 0.5);
-//      tar_head_Obj_ = server_->addVisualCylinder("tar_head_Obj_", 0.03, 0.2, 1, 0, 0, 1);
-//      cur_head_Obj_ = server_->addVisualCylinder("cur_head_Obj_", 0.03, 0.2, 0, 1, 0, 1);
-      command_Obj_Pos_ << 2, 2, 0.35;
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
-//      tar_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
-//      cur_head_Obj_->setOrientation(sqrt(2)/2, 0, sqrt(2)/2, 0);
     }
   }
 
   ~ENVIRONMENT() { if (server_) server_->killServer(); }
 
 
-  void adapt_Low_controller (controller::raibotDefaultController controller) {
+  void adapt_Low_controller (controller::raibotPositionController controller) {
     Low_controller_ = controller;
+    Low_controller_.init(&world_);
+    std::cout << "adapt test L " << std::endl;
+    Low_controller_.test();
   }
 
-  controller::raibotDefaultController get_Low_controller () {
+  controller::raibotPositionController get_Low_controller () {
     return Low_controller_;
   }
 
   void Low_controller_create () {
     Low_controller_.create(&world_);
-    Low_controller_.reset(&world_);
+    Low_controller_.init(&world_);
+    std::cout << "create test L " << std::endl;
+    Low_controller_.test();
   }
 
   void init () { }
@@ -140,29 +143,24 @@ class ENVIRONMENT {
     controller_.reset(gen_, normDist_, command_Obj_Pos_);
     controller_.updateStateVariables();
     Low_controller_.reset(&world_);
-    Low_controller_.updateObservation(&world_);
+    Low_controller_.updateStateVariable();
   }
 
 
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
-//    controller_.advance(&world_, action, curriculumFactor_);
-    Eigen::Vector3f command = action.cast<float>();
-    for (int i = 0; i < 3; i++) {
-      if ((command[i]) > 1.5)
-        command[i] = 1.5;
-      if (command[i] < -1.5)
-        command[i] = -1.5;
-    }
-//    command = {2.0, 0, 0};
+    controller_.advance(&world_, action, curriculumFactor_);
+    Eigen::Vector2f command;
+    command = controller_.advance(&world_, action);
+//    std::cout << "command : " << command << std::endl;
     Low_controller_.setCommand(command);
     float dummy;
     int howManySteps;
     int lowlevelSteps;
 
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
-
+      controller_.updateHistory();
       Low_controller_.updateObservation(&world_);
       Low_controller_.advance(&world_);
 
@@ -170,10 +168,10 @@ class ENVIRONMENT {
 
         subStep();
 
-//      if(isTerminalState(dummy)) {
-//        howManySteps++;
-//        break;
-//      }
+        if(isTerminalState(dummy)) {
+          howManySteps++;
+          break;
+       }
       }
     }
 
@@ -212,12 +210,13 @@ class ENVIRONMENT {
 
 
   void subStep() {
-//    controller_.updateHistory();
+    Low_controller_.updateHistory();
 
 
     world_.integrate1();
     world_.integrate2();
 
+    Low_controller_.updateStateVariable();
     controller_.updateStateVariables();
     controller_.accumulateRewards(curriculumFactor_, command_);
 
@@ -230,8 +229,8 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float& terminalReward) {
-//    return controller_.isTerminalState(terminalReward);
-    return false;
+    return controller_.isTerminalState(terminalReward);
+//    return false;
   }
 
   void setSeed(int seed) {
@@ -255,6 +254,7 @@ class ENVIRONMENT {
     command_ = controllerSphere_->getPosition();
     commandSphere_->setPosition(command_);
   }
+
 
   static constexpr int getObDim() { return RaiboController::getObDim(); }
   static constexpr int getActionDim() { return RaiboController::getActionDim(); }
@@ -283,7 +283,7 @@ class ENVIRONMENT {
   int groundType_;
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_;
-  controller::raibotDefaultController Low_controller_;
+  controller::raibotPositionController Low_controller_;
   Eigen::VectorXd jointDGain_, jointPGain_;
 
 

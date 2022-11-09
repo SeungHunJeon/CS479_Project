@@ -23,10 +23,13 @@ ENDMACRO()
 ### dependencies ###
 ####################
 set(Dependencies)
+set(low_controller_path ${CMAKE_CURRENT_SOURCE_DIR}/default_controller_demo)
 
 add_subdirectory(thirdParty/pybind11 pybind11)
-add_subdirectory(raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo default_controller_demo)
+add_subdirectory(${low_controller_path} default_controller_demo)
+#add_subdirectory(examples)
 
+message(${low_controller_path})
 
 find_package(Eigen3 REQUIRED)
 find_package(OpenMP REQUIRED)
@@ -59,10 +62,18 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}
 SUBDIRLIST(SUBDIRS ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env/envs)
 set(RAISIMGYM_ENV_DIR ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env/envs)
 
+subdir_names(CONTROLLERS ${low_controller_path}/module/controller)
+list(REMOVE_ITEM CONTROLLERS common)
+message(${CONTROLLERS})
+
 FOREACH(subdir ${SUBDIRS})
     pybind11_add_module(${subdir} raisimGymTorch/env/raisim_gym.cpp raisimGymTorch/env/Yaml.cpp)
     target_link_libraries(${subdir} PRIVATE raisim::raisim ${Dependencies})
     target_include_directories(${subdir} PUBLIC ${EIGEN3_INCLUDE_DIRS} ${RAISIMGYM_ENV_DIR}/${subdir})
+#    foreach(con ${CONTROLLERS})
+#        target_include_directories(${subdir} PUBLIC ${low_controller_path}/module/controller/${con})
+#    endforeach()
+    target_include_directories(${subdir} PUBLIC ${low_controller_path}/..)
     target_compile_options(${subdir} PRIVATE -flto -mtune=native -fPIC -O3 -march=native)
     target_compile_definitions(${subdir} PRIVATE "-DRAISIMGYM_TORCH_ENV_NAME=${subdir}")
     target_compile_definitions(${subdir} PRIVATE EIGEN_DONT_PARALLELIZE)

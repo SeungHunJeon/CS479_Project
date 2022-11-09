@@ -1,5 +1,5 @@
 # task specification
-task_name = "Hierarchical_structure"
+task_name = "Position_Deep_Loco"
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
@@ -93,16 +93,16 @@ for update in range(iteration_number, 1000000):
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.
-
+#
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
+
         torch.save({
             'actor_architecture_state_dict': actor.architecture.state_dict(),
             'actor_distribution_state_dict': actor.distribution.state_dict(),
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
-
         data_tags = env.get_step_data_tag()
         data_size = 0
         data_mean = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
@@ -120,7 +120,7 @@ for update in range(iteration_number, 1000000):
         # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
 
-
+        env.turn_off_visualization()
         env.reset()
         env.save_scaling(saver.data_dir, str(update))
 
@@ -142,7 +142,7 @@ for update in range(iteration_number, 1000000):
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
-    actor.distribution.enforce_minimum_std((torch.ones(3)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(2)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
     actor.update()
 
     if update % 100 == 0:

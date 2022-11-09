@@ -95,10 +95,11 @@ else:
     loaded_graph = ppo_module.MLP(cfg['architecture']['policy_net'], torch.nn.LeakyReLU, ob_dim, act_dim)
     loaded_graph.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
 
-    env.load_scaling(weight_dir, int(iteration_number))
+    # env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
     for i in range (200):
         env.reset()
+        time.sleep(1)
         for step in range(total_steps):
 
             # for event in pygame.event.get():  # User did something.
@@ -124,9 +125,10 @@ else:
             # env.move_controller_cursor(0, command)
             obs = env.observe(False)
             action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
+
             print(action_ll)
             env.step(action_ll.cpu().detach().numpy())
-            time.sleep(cfg['environment']['control_dt'])
+            time.sleep(0.1)
 
             # plotting
             # env.get_state(gc, gv)

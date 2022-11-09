@@ -1,0 +1,343 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="raibo2_arm">
+
+  <link name="world"/>
+
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-0.13485 -0.32615 0.3856"
+        rpy="0 0 0" />
+      <mass
+        value="0.40931" />
+      <inertia
+        ixx="0.00026395"
+        ixy="-3.5656E-05"
+        ixz="-2.5698E-05"
+        iyy="0.00040254"
+        iyz="8.0982E-05"
+        izz="0.0002946" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://raibo2_arm/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+  </link>
+
+  <joint name="kinova_joint_base" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
+  <link
+    name="link1">
+    <inertial>
+      <origin
+        xyz="0.00036261 -0.025923 0.051751"
+        rpy="0 0 0" />
+      <mass
+        value="0.42204" />
+      <inertia
+        ixx="0.00026118"
+        ixy="-2.865E-06"
+        ixz="1.6256E-08"
+        iyy="0.00046897"
+        iyz="-2.8035E-09"
+        izz="0.00025929" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://raibo2_arm/meshes/link1.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+  </link>
+  <joint
+    name="joint1"
+    type="revolute">
+    <origin
+      xyz="-0.14165 -0.39992 -0.29982"
+      rpy="-0.37519 0.40075 -2.8051" />
+    <parent
+      link="base_link" />
+    <child
+      link="link1" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="80"
+      velocity="20" />
+  </joint>
+  <link
+    name="link2">
+    <inertial>
+      <origin
+        xyz="0.065804 0.00041458 0.062261"
+        rpy="0 0 0" />
+      <mass
+        value="0.8582" />
+      <inertia
+        ixx="0.00068402"
+        ixy="0.00077444"
+        ixz="-2.0904E-05"
+        iyy="0.0060627"
+        iyz="-2.1281E-05"
+        izz="0.0065624" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://raibo2_arm/meshes/link2.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+  </link>
+  <joint
+    name="joint2"
+    type="revolute">
+    <origin
+      xyz="-5.52E-05 0.0039996 0.053"
+      rpy="-1.5708 0.97319 0.013801" />
+    <parent
+      link="link1" />
+    <child
+      link="link2" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="80"
+      velocity="20" />
+  </joint>
+  <link
+    name="link3">
+    <inertial>
+      <origin
+        xyz="0.037978 1.3805E-05 2.6943E-05"
+        rpy="0 0 0" />
+      <mass
+        value="0.34252" />
+      <inertia
+        ixx="0.00018665"
+        ixy="-1.6457E-08"
+        ixz="-1.6273E-12"
+        iyy="0.00014503"
+        iyz="1.4618E-06"
+        izz="0.00013786" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://raibo2_arm/meshes/link3.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+
+  </link>
+  <joint
+    name="joint3"
+    type="revolute">
+    <origin
+      xyz="0.31352 -0.064094 0.08565"
+      rpy="3.1416 0 -1.1678" />
+    <parent
+      link="link2" />
+    <child
+      link="link3" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-2.5"
+      upper="0.5"
+      effort="80"
+      velocity="20" />
+  </joint>
+  <link
+    name="link4">
+    <inertial>
+      <origin
+        xyz="-0.0075464 -0.001152 0.31914"
+        rpy="0 0 0" />
+      <mass
+        value="0.32249" />
+      <inertia
+        ixx="0.00056311"
+        ixy="1.1235E-05"
+        ixz="-1.589E-07"
+        iyy="0.00049116"
+        iyz="1.0411E-06"
+        izz="0.0001007" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://raibo2_arm/meshes/link4.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+  </link>
+  <joint
+    name="joint4"
+    type="revolute">
+    <origin
+      xyz="0.07 0 0"
+      rpy="1.5708 1.5397 1.5708" />
+    <parent
+      link="link3" />
+    <child
+      link="link4" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="40"
+      velocity="20" />
+  </joint>
+  <link
+    name="link5">
+    <inertial>
+      <origin
+        xyz="0.065958 0.012005 -0.025477"
+        rpy="0 0 0" />
+      <mass
+        value="0.27079" />
+      <inertia
+        ixx="0.00017554"
+        ixy="9.6149E-06"
+        ixz="1.1599E-05"
+        iyy="0.00012447"
+        iyz="1.0576E-06"
+        izz="0.00010711" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://raibo2_arm/meshes/link5.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+  </link>
+  <joint
+    name="joint5"
+    type="revolute">
+    <origin
+      xyz="-0.02768 -0.0042217 0.359"
+      rpy="1.5708 -1.3841 -1.4194" />
+    <parent
+      link="link4" />
+    <child
+      link="link5" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-2.5"
+      upper="2.5"
+      effort="40"
+      velocity="20" />
+  </joint>
+  <link
+    name="link6">
+    <inertial>
+      <origin
+        xyz="2.2204E-16 -1.1102E-16 -0.0064341"
+        rpy="0 0 0" />
+      <mass
+        value="0.026017" />
+      <inertia
+        ixx="5.8442E-06"
+        ixy="1.2176E-21"
+        ixz="-1.6941E-21"
+        iyy="5.8442E-06"
+        iyz="2.2764E-21"
+        izz="1.1225E-05" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://raibo2_arm/meshes/link6.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.89804 0.91765 0.92941 1" />
+      </material>
+    </visual>
+  </link>
+  <joint
+    name="joint6"
+    type="revolute">
+    <origin
+      xyz="0.086577 0.01576 -0.028"
+      rpy="-1.5708 -1.1675 -1.3907" />
+    <parent
+      link="link5" />
+    <child
+      link="link6" />
+    <axis
+      xyz="0 0 1" />
+    <limit
+      lower="-6.28"
+      upper="6.28"
+      effort="40"
+      velocity="10" />
+  </joint>
+</robot>

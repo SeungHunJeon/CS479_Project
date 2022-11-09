@@ -10,7 +10,7 @@
 #include "Yaml.hpp"
 #include <Eigen/Core>
 #include "BasicEigenTypes.hpp"
-#include "default_controller_demo/include/neuralNet.hpp"
+#include "../../default_controller_demo/include/neuralNet.hpp"
 
 extern int THREAD_COUNT;
 
@@ -42,16 +42,6 @@ class VectorizedEnvironment {
     READ_YAML(double, conDt, cfg_["control_dt"])
     READ_YAML(double, low_conDt, cfg_["low_level_control_dt"])
 
-    /// For Low-level controller importing
-// {
-//      std::vector<int> act_param, est_param;
-//      READ_YAML(std::vector<int>, act_param, cfg_["architecture"]["actor"]);
-//      READ_YAML(std::vector<int>, est_param, cfg_["architecture"]["estimator"]);
-//
-//
-//
-//    }
-
     if (cfg_["hierarchical"].template As<bool>()) {
       environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && 0 == 0, 0));
       environments_.back()->setSimulationTimeStep(simDt);
@@ -60,9 +50,9 @@ class VectorizedEnvironment {
 
       for (int i = 1; i < num_envs_; i++) {
         environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0, i));
+        environments_[i]->adapt_Low_controller(environments_[0]->get_Low_controller());
         environments_.back()->setSimulationTimeStep(simDt);
         environments_.back()->setControlTimeStep(conDt, low_conDt);
-        environments_[i]->adapt_Low_controller(environments_[0]->get_Low_controller());
       }
     }
 
@@ -261,6 +251,7 @@ class VectorizedEnvironment {
 
     if (done[agentId]) {
       environments_[agentId]->reset();
+//      std::cout << "agentID : " << agentId << "Done !" << std::endl;
       reward[agentId] += terminalReward;
     }
   }
