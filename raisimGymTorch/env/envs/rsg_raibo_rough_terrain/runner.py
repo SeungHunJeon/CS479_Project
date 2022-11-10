@@ -96,7 +96,7 @@ for update in range(iteration_number, 1000000):
 #
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
-
+        env.turn_off_visualization()
         torch.save({
             'actor_architecture_state_dict': actor.architecture.state_dict(),
             'actor_distribution_state_dict': actor.distribution.state_dict(),
@@ -142,7 +142,7 @@ for update in range(iteration_number, 1000000):
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
-    actor.distribution.enforce_minimum_std((torch.ones(2)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(1)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
     actor.update()
 
     if update % 100 == 0:

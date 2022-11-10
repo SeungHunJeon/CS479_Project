@@ -16,7 +16,7 @@
 #include "../../BasicEigenTypes.hpp"
 #include "RaiboController.hpp"
 #include "RandomHeightMapGenerator.hpp"
-#include "../../../../default_controller_demo/module/controller/raibot_position_controller_sim/raibot_position_controller_sim.hpp"
+#include "../../../../default_controller_demo/module/controller/raibot_position_controller_sim_2/raibot_position_controller_sim_2.hpp"
 
 namespace raisim {
 
@@ -35,7 +35,7 @@ class ENVIRONMENT {
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
     /// Object spawn
-    Obj_ = world_.addCylinder(0.5, 0.7, 3);
+    Obj_ = world_.addCylinder(0.5, 0.7, 1);
     Obj_->setName("Obj_");
     Obj_->setPosition(1, 1, 0.35);
     Obj_->setOrientation(1, 0, 0, 0);
@@ -153,7 +153,7 @@ class ENVIRONMENT {
     controller_.advance(&world_, action, curriculumFactor_);
     Eigen::Vector2f command;
     command = controller_.advance(&world_, action);
-//    std::cout << "command : " << command << std::endl;
+    std::cout << "command : " << command << std::endl;
     Low_controller_.setCommand(command);
     float dummy;
     int howManySteps;
@@ -229,8 +229,8 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float& terminalReward) {
-    return controller_.isTerminalState(terminalReward);
-//    return false;
+//    return controller_.isTerminalState(terminalReward);
+    return false;
   }
 
   void setSeed(int seed) {

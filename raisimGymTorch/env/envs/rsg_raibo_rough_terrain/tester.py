@@ -126,7 +126,8 @@ else:
             obs = env.observe(False)
             action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
 
-            print(action_ll)
+            # print(action_ll.cpu().detach().numpy())
+            action_ll = torch.Tensor([0]).unsqueeze(0)
             env.step(action_ll.cpu().detach().numpy())
             time.sleep(0.1)
 
