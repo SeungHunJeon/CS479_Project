@@ -84,6 +84,10 @@ class ENVIRONMENT {
     controller_.setRewardConfig(cfg);
     command_Obj_Pos_ << 2, 2, 0.35;
 
+    command_set.push_back({1.5,0});
+    command_set.push_back({-1.5, 0});
+    command_set.push_back({0, 1.5});
+    command_set.push_back({0, -1.5});
 
 
     // visualize if it is the first environment
@@ -150,10 +154,15 @@ class ENVIRONMENT {
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
+
+
     controller_.advance(&world_, action, curriculumFactor_);
     Eigen::Vector2f command;
     command = controller_.advance(&world_, action);
+
+    command = command_set[command_order%4];
     std::cout << "command : " << command << std::endl;
+    command_order += 1;
     Low_controller_.setCommand(command);
     float dummy;
     int howManySteps;
@@ -294,7 +303,8 @@ class ENVIRONMENT {
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
   raisim::Vec<3> Pos_e_;
-
+  std::vector<Eigen::Vector2f> command_set;
+  int command_order = 0;
 
 
   thread_local static std::mt19937 gen_;

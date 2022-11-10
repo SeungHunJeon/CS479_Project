@@ -127,9 +127,9 @@ else:
             action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
 
             # print(action_ll.cpu().detach().numpy())
-            action_ll = torch.Tensor([0]).unsqueeze(0)
+            # action_ll = torch.Tensor([0]).unsqueeze(0)
             env.step(action_ll.cpu().detach().numpy())
-            time.sleep(0.1)
+            time.sleep(0.05)
 
             # plotting
             # env.get_state(gc, gv)

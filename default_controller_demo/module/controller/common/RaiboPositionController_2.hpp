@@ -237,7 +237,8 @@ class RaiboPositionController {
     Eigen::Vector3d posXyz; posXyz << gc_[0], gc_[1], gc_[2];
 //    Eigen::Vector3d target; target << command[0], command[1], map->getHeight(command[0], command[1])+0.56;
     Eigen::Vector3d target; target << command_[0], command_[1], 0.56;
-    Eigen::Vector3d targetRel = target - posXyz;
+//    Eigen::Vector3d targetRel = (target + pos_0) - posXyz;
+    Eigen::Vector3d targetRel = (target + pos_0) - posXyz;
     Eigen::Vector3d targetRelBody = baseRot_.e().transpose() * targetRel;
     const double dist = targetRelBody.norm();
     targetRelBody *= 1./targetRelBody.head<2>().norm();
@@ -249,7 +250,8 @@ class RaiboPositionController {
 
   void setCommand(const Eigen::Ref<EigenVec>& command) {
       command_ = command.cast<double>();
-
+      pos_0 = raibo_->getBasePosition().e();
+      pos_0(2) = 0;
 //      // project to centrifugal accel. vxy * wz = 0.3 * g
 //      if (std::abs(command_(2)) - 2.943 / (command_.head(2).norm() + 1e-8) > 0) {
 //          command_(2) = std::copysign(2.943 / (command_.head(2).norm() + 1e-8), command_(2));
@@ -300,6 +302,7 @@ class RaiboPositionController {
   std::array<bool, 4> footContactState_;
   raisim::Mat<3, 3> baseRot_;
   Eigen::Vector2d command_;
+  Eigen::Vector3d pos_0;
 
   // robot observation variables
 //  std::vector<raisim::VecDyn> heightScan_;
