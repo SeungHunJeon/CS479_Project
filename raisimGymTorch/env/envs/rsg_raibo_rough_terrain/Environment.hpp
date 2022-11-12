@@ -35,7 +35,7 @@ class ENVIRONMENT {
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
     /// Object spawn
-    Obj_ = world_.addCylinder(0.5, 0.7, 1);
+    Obj_ = world_.addCylinder(0.5, 0.7, 0.1);
     Obj_->setName("Obj_");
     Obj_->setPosition(1, 1, 0.35);
     Obj_->setOrientation(1, 0, 0, 0);

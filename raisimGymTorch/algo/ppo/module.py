@@ -71,7 +71,7 @@ class Critic:
 
 
 class MLP(nn.Module):
-    def __init__(self, shape, actionvation_fn, input_size, output_size):
+    def __init__(self, shape, actionvation_fn, input_size, output_size, actor=True):
         super(MLP, self).__init__()
         self.activation_fn = actionvation_fn
 
@@ -85,8 +85,9 @@ class MLP(nn.Module):
 
         modules.append(nn.Linear(shape[-1], output_size))
 
-        # # For low level controller
-        # modules.append(nn.Tanh())
+        # For low level controller
+        if actor:
+            modules.append(nn.Sigmoid())
 
         self.architecture = nn.Sequential(*modules)
         scale.append(np.sqrt(2))

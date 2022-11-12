@@ -80,10 +80,10 @@ class RaiboController {
     previousAction_.setZero(actionDim_);
     prevprevAction_.setZero(actionDim_);
 
-    actionMean_ << Eigen::VectorXd::Zero(actionDim_); /// joint target
+    actionMean_ << Eigen::VectorXd::Constant(actionDim_, -M_PI); /// joint target
 //    actionMean_.segment(nJoints_ - 6, 6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; /// task space position & orientation residuals
 //    actionMean_.tail(nVargain_) << 50, 0.5, 50, 0.5; /// positional jacobian p, d gain && orientation jacobian p, d gain
-    actionStd_<< Eigen::VectorXd::Constant(actionDim_, M_PI); /// joint target
+    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 2*M_PI); /// joint target
 //    actionStd_.segment(nJoints_ - 3, 3) << Eigen::VectorXd::Constant(3, 0.1); /// orientation residual
 //    actionStd_.tail(nVargain_) << 0.25, 0.25, 0.25, 0.25; /// positional jacobian p, d gain && orientation jacobian p, d gain
 
@@ -93,7 +93,7 @@ class RaiboController {
 
     objectInfoHistory_.setZero(historyLength_ * 12);
     stateInfoHistory_.setZero(historyLength_ * 9);
-
+    Obj_Info_.setZero(12);
 
     /// observation
 //    obMean_ << 0.47, /// average height
@@ -133,10 +133,13 @@ class RaiboController {
         0.0, 0.0, 1.4, /// gravity axis 3
         Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
 
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0),
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
 
         0.0, 0.0, 1.4, /// gravity axis 3
         Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
@@ -147,20 +150,29 @@ class RaiboController {
         0.0, 0.0, 1.4, /// gravity axis 3
         Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
 
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0),
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
 
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0),
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
 
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0),
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
 
         Eigen::VectorXd::Constant(actionDim_, 0.0),
         Eigen::VectorXd::Constant(actionDim_, 0.0); /// object velocity
@@ -171,10 +183,13 @@ class RaiboController {
         Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
         Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
 
-        Eigen::VectorXd::Constant(3, 0.2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, 0.2), /// object to target distance
-        Eigen::VectorXd::Constant(3, 0.2),
-        Eigen::VectorXd::Constant(3, 0.2),
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
 
         Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
         Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
@@ -188,20 +203,29 @@ class RaiboController {
         Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
         Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
 
-        Eigen::VectorXd::Constant(3, 0.2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, 0.2), /// object to target distance
-        Eigen::VectorXd::Constant(3, 0.2),
-        Eigen::VectorXd::Constant(3, 0.2),
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
 
-        Eigen::VectorXd::Constant(3, 0.2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, 0.2), /// object to target distance
-        Eigen::VectorXd::Constant(3, 0.2),
-        Eigen::VectorXd::Constant(3, 0.2),
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
 
-        Eigen::VectorXd::Constant(3, 0.2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(3, 0.2), /// object to target distance
-        Eigen::VectorXd::Constant(3, 0.2),
-        Eigen::VectorXd::Constant(3, 0.2),
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
         Eigen::VectorXd::Constant(actionDim_, M_PI),
         Eigen::VectorXd::Constant(actionDim_, M_PI); /// object velocity
 //        Eigen::VectorXd::Constant(nJoints_ * (4 - 1), 0.6), /// joint position error history
@@ -338,7 +362,7 @@ class RaiboController {
 //    ee_Avel_ = baseRot_.e().transpose() * ee_Avel_w_.e();
 //
     /// Object info
-    Obj_Info_.setZero(12);
+
     Obj_->getPosition(Obj_Pos_);
 //
     Obj_->getVelocity(Obj_->getIndexInWorld(), Obj_Vel_);
@@ -347,13 +371,32 @@ class RaiboController {
 //
     //TODO
 
-    Obj_Info_ << baseRot_.e().transpose() * (Obj_Pos_.e()-ee_Pos_w_.e()),
-        baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e()),
-        baseRot_.e().transpose() * (command_Obj_Pos_ - ee_Pos_w_.e()),
-//        LOG(Obj_Rot_.e().transpose() * Tar_Rot_.e()),
-        baseRot_.e().transpose() * Obj_Vel_.e();
+    Eigen::Vector3d ee_to_obj = baseRot_.e().transpose() * (Obj_Pos_.e()-ee_Pos_w_.e());
+    Eigen::Vector3d obj_to_target = baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e());
+    Eigen::Vector3d ee_to_target = baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e());
 
+    Eigen::Vector2d pos_temp_;
+    double dist_temp_;
 
+    dist_temp_ = ee_to_obj.head(2).norm();
+    pos_temp_ = ee_to_obj.head(2) * (1./dist_temp_);
+
+    Obj_Info_.segment(0, 2) << pos_temp_;
+    Obj_Info_.segment(2, 1) << std::min(4., dist_temp_);
+
+    dist_temp_ = obj_to_target.head(2).norm();
+    pos_temp_ = obj_to_target.head(2) * (1./dist_temp_);
+
+    Obj_Info_.segment(3, 2) << pos_temp_;
+    Obj_Info_.segment(5, 1) << std::min(4., dist_temp_);
+
+    dist_temp_ = ee_to_target.head(2).norm();
+    pos_temp_ = ee_to_target.head(2) * (1./dist_temp_);
+
+    Obj_Info_.segment(6, 2) << pos_temp_;
+    Obj_Info_.segment(8, 1) << std::min(4., dist_temp_);
+
+    Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
 
 //        baseRot_.e().transpose() * Obj_AVel_.e();
 
