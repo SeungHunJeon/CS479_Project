@@ -382,7 +382,7 @@ class RaiboController {
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
     Eigen::VectorXf angle = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
     angle += actionMean_.cast<float>();
-    command_ = {1.5*std::cos(angle(0)), 1.5*sin(angle(0))};
+    command_ = {1.5*std::cos(angle(0)), 1.5*sin(angle(0)), 0};
     return command_;
   }
 
@@ -550,7 +550,7 @@ class RaiboController {
   inline void accumulateRewards(double cf, const Eigen::Vector3d &cm) {
     /// move towards the object
     double toward_o = ((baseRot_.e().transpose() * (Obj_Pos_.e() - ee_Pos_w_.e()))
-        / ((baseRot_.e().transpose() * (Obj_Pos_.e() - ee_Pos_w_.e())).norm() + 1e-8)).dot(baseRot_.e().transpose() * ee_Vel_w_.e()) - 0.5;
+        / (((Obj_Pos_.e() - ee_Pos_w_.e())).squaredNorm() + 1e-8)).dot(baseRot_.e().transpose() * ee_Vel_w_.e()) - 0.5;
     towardObjectReward_ += cf * towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
 
     /// stay close to the object
@@ -558,7 +558,8 @@ class RaiboController {
     stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
 
     /// move the object towards the target
-    double toward_t = ((baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e())) / ((command_Obj_Pos_ - Obj_Pos_.e()).norm() + 1e-8)).dot(baseRot_.e().transpose() * Obj_Vel_.e()) - 0.5;
+    double toward_t = ((baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e()))
+        / ((command_Obj_Pos_ - Obj_Pos_.e()).squaredNorm() + 1e-8)).dot(baseRot_.e().transpose() * Obj_Vel_.e()) - 0.5;
     towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
 
     /// keep the object close to the target
@@ -640,7 +641,7 @@ class RaiboController {
   Eigen::VectorXd historyTempMemory_2;
   std::array<bool, 4> footContactState_;
   raisim::Mat<3, 3> baseRot_;
-  Eigen::Vector2f command_;
+  Eigen::Vector3f command_;
 
   // robot observation variables
   std::vector<raisim::VecDyn> heightScan_;

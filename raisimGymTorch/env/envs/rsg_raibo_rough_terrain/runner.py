@@ -152,6 +152,9 @@ for update in range(iteration_number, 1000000):
         data_log['Training/average_reward'] = average_ll_performance
         data_log['Training/dones'] = average_dones
         data_log['Training/learning_rate'] = ppo.learning_rate
+        data_log['PPO/value_function'] = ppo.mean_value_loss
+        data_log['PPO/surrogate'] = ppo.mean_surrogate_loss
+        data_log['PPO/mean_noise_std'] = ppo.mean_noise_std
 
         for id, data_name in enumerate(data_tags):
             data_log[data_name + '/mean'] = data_mean[id]

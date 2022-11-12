@@ -129,6 +129,10 @@ class raibotPositionController {
     raibotController_.setCommand(command);
   }
 
+  Eigen::VectorXd getTargetPosition() {
+    return raibotController_.getTargetPosition();
+  }
+
   void updateHistory() {
     raibotController_.updateHistory();
   }

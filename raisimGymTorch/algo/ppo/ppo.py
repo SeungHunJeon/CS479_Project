@@ -62,6 +62,9 @@ class PPO:
         self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         self.tot_timesteps = 0
         self.tot_time = 0
+        self.mean_value_loss = None
+        self.mean_surrogate_loss = None
+        self.mean_noise_std = None
 
         # ADAM
         self.learning_rate = learning_rate
@@ -72,6 +75,8 @@ class PPO:
         self.actions = None
         self.actions_log_prob = None
         self.actor_obs = None
+
+
 
     def act(self, actor_obs):
         self.actor_obs = actor_obs
@@ -89,6 +94,9 @@ class PPO:
         # Learning step
         self.storage.compute_returns(last_values.to(self.device), self.critic, self.gamma, self.lam)
         mean_value_loss, mean_surrogate_loss, infos = self._train_step(log_this_iteration)
+        self.mean_value_loss = infos['mean_value_loss']
+        self.mean_surrogate_loss = infos['mean_surrogate_loss']
+        self.mean_noise_std = self.actor.distribution.std.mean()
         self.storage.clear()
 
         if log_this_iteration:
