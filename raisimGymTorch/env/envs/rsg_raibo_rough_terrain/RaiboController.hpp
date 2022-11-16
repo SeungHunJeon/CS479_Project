@@ -80,10 +80,10 @@ class RaiboController {
     previousAction_.setZero(actionDim_);
     prevprevAction_.setZero(actionDim_);
 
-    actionMean_ << Eigen::VectorXd::Constant(actionDim_, -M_PI); /// joint target
+    actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
 //    actionMean_.segment(nJoints_ - 6, 6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; /// task space position & orientation residuals
 //    actionMean_.tail(nVargain_) << 50, 0.5, 50, 0.5; /// positional jacobian p, d gain && orientation jacobian p, d gain
-    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 2*M_PI); /// joint target
+    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 0.5); /// joint target
 //    actionStd_.segment(nJoints_ - 3, 3) << Eigen::VectorXd::Constant(3, 0.1); /// orientation residual
 //    actionStd_.tail(nVargain_) << 0.25, 0.25, 0.25, 0.25; /// positional jacobian p, d gain && orientation jacobian p, d gain
 
@@ -226,8 +226,8 @@ class RaiboController {
         Eigen::VectorXd::Constant(2, 0.5),
         Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
         Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-        Eigen::VectorXd::Constant(actionDim_, M_PI),
-        Eigen::VectorXd::Constant(actionDim_, M_PI); /// object velocity
+        Eigen::VectorXd::Constant(actionDim_, 0.5),
+        Eigen::VectorXd::Constant(actionDim_, 0.5); /// object velocity
 //        Eigen::VectorXd::Constant(nJoints_ * (4 - 1), 0.6), /// joint position error history
 //        Eigen::VectorXd::Constant(nJoints_ * 4, 10.0), /// joint velocities
 //        actionStd_ * 1.5, /// previous action
@@ -371,9 +371,15 @@ class RaiboController {
 //
     //TODO
 
-    Eigen::Vector3d ee_to_obj = baseRot_.e().transpose() * (Obj_Pos_.e()-ee_Pos_w_.e());
-    Eigen::Vector3d obj_to_target = baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e());
-    Eigen::Vector3d ee_to_target = baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e());
+    Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
+    Eigen::Vector3d obj_to_target (command_Obj_Pos_ - Obj_Pos_.e());
+    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+    ee_to_obj(2) = 0;
+    obj_to_target(2) = 0;
+    ee_to_target(2) = 0;
+    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
+    obj_to_target = baseRot_.e().transpose() * obj_to_target;
+    ee_to_target = baseRot_.e().transpose() * ee_to_target;
 
     Eigen::Vector2d pos_temp_;
     double dist_temp_;
@@ -423,9 +429,9 @@ class RaiboController {
   }
 
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
-    Eigen::VectorXf angle = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
-    angle += actionMean_.cast<float>();
-    command_ = {1.5*std::cos(angle(0)), 1.5*sin(angle(0)), 0};
+    Eigen::VectorXf position = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
+    position += actionMean_.cast<float>();
+    command_ = {position(0), position(1), 0};
     return command_;
   }
 
@@ -483,12 +489,14 @@ class RaiboController {
     stepData_[2] = towardTargetReward_;
     stepData_[3] = stayTargetReward_;
     stepData_[4] = commandReward_;
+    stepData_[5] = torqueReward_;
 
     towardObjectReward_ = 0.;
     stayObjectReward_ = 0.;
     towardTargetReward_ = 0.;
     stayTargetReward_ = 0.;
     commandReward_ = 0.;
+    torqueReward_ = 0.;
 
     return float(stepData_.sum());
   }
@@ -544,7 +552,7 @@ class RaiboController {
 
     /// action history
     obDouble_.segment(84, actionDim_) = previousAction_;
-    obDouble_.segment(85, actionDim_) = prevprevAction_;
+    obDouble_.segment(86, actionDim_) = prevprevAction_;
 //    for (int i=0; i < nPosHist_; i++)
 //      obDouble_.segment(10+nJoints_*(i+1), nJoints_) = jointPositionHistory_.segment((historyLength_ - 1 - (6-2*i)) * nJoints_, nJoints_);
 //
@@ -587,30 +595,41 @@ class RaiboController {
     READ_YAML(double, towardTargetRewardCoeff_, cfg["reward"]["towardTargetRewardCoeff_"])
     READ_YAML(double, stayTargetRewardCoeff_, cfg["reward"]["stayTargetRewardCoeff_"])
     READ_YAML(double, commandRewardCoeff_, cfg["reward"]["commandRewardCoeff_"])
-
+    READ_YAML(double, torqueRewardCoeff_, cfg["reward"]["torque_reward_coeff"])
   }
 
   inline void accumulateRewards(double cf, const Eigen::Vector3d &cm) {
     /// move towards the object
-    double toward_o = ((baseRot_.e().transpose() * (Obj_Pos_.e() - ee_Pos_w_.e()))
-        / (((Obj_Pos_.e() - ee_Pos_w_.e())).squaredNorm() + 1e-8)).dot(baseRot_.e().transpose() * ee_Vel_w_.e()) - 0.5;
+
+    Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
+    Eigen::Vector3d obj_to_target (command_Obj_Pos_ - Obj_Pos_.e());
+    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+    ee_to_obj(2) = 0;
+    obj_to_target(2) = 0;
+    ee_to_target(2) = 0;
+    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
+    obj_to_target = baseRot_.e().transpose() * obj_to_target;
+    ee_to_target = baseRot_.e().transpose() * ee_to_target;
+
+    double toward_o = (ee_to_obj * (1. / (ee_to_obj.squaredNorm() + 1e-8))).transpose()*(baseRot_.e().transpose() * ee_Vel_w_.e()) - 1.8;
     towardObjectReward_ += cf * towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
 
     /// stay close to the object
-    double stay_o = (Obj_Pos_.e() - ee_Pos_w_.e()).dot(Obj_Pos_.e() - ee_Pos_w_.e());
+    double stay_o = ee_to_obj.norm();
     stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
 
     /// move the object towards the target
-    double toward_t = ((baseRot_.e().transpose() * (command_Obj_Pos_ - Obj_Pos_.e()))
-        / ((command_Obj_Pos_ - Obj_Pos_.e()).squaredNorm() + 1e-8)).dot(baseRot_.e().transpose() * Obj_Vel_.e()) - 0.5;
+    double toward_t = (obj_to_target * (1. / (obj_to_target.squaredNorm() + 1e-8))).transpose()*(baseRot_.e().transpose() * Obj_Vel_.e()) - 1.8;
     towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
 
     /// keep the object close to the target
-    double stay_t = (command_Obj_Pos_ - Obj_Pos_.e()).dot(command_Obj_Pos_ - Obj_Pos_.e());
+    double stay_t = obj_to_target.norm();
     stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
 
     double commandReward_tmp = std::max(5., static_cast<double>(command_.squaredNorm()));
     commandReward_ += cf * commandRewardCoeff_ * simDt_ * commandReward_tmp;
+
+    torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().squaredNorm();
 
   }
 
@@ -658,9 +677,9 @@ class RaiboController {
   raisim::ArticulatedSystem *raibo_;
   std::vector<size_t> footIndices_, footFrameIndicies_, armIndices_;
   Eigen::VectorXd nominalConfig_;
-  static constexpr int actionDim_ = 1; /// output dim : joint action 12 + task space action 6 + gain dim 4
+  static constexpr int actionDim_ = 2; /// output dim : joint action 12 + task space action 6 + gain dim 4
   static constexpr size_t historyLength_ = 14;
-  static constexpr size_t obDim_ = 86;
+  static constexpr size_t obDim_ = 88;
   static constexpr double simDt_ = .001;
   static constexpr int gcDim_ = 19;
   static constexpr int gvDim_ = 18;
@@ -714,6 +733,7 @@ class RaiboController {
   double stayTargetRewardCoeff_ = 0., stayTargetReward_ = 0.;
   double terminalRewardCoeff_ = 0.0;
   double commandRewardCoeff_ = 0., commandReward_ = 0.;
+  double torqueRewardCoeff_ = 0., torqueReward_ = 0.;
 
   // exported data
   Eigen::VectorXd stepData_;

@@ -297,7 +297,7 @@ class RaiboPositionController {
   static constexpr size_t historyLength_ = 14;
 //  static constexpr size_t obDim_ = 333;
   static constexpr size_t obDim_ = 133;
-  static constexpr double simDt_ = 0.00025;
+  static constexpr double simDt_ = 0.001;
   static constexpr int gcDim_ = 19;
   static constexpr int gvDim_ = 18;
 
@@ -325,7 +325,7 @@ class RaiboPositionController {
 //  Eigen::MatrixXd scanCos_;
 
   // control variables
-  static constexpr double conDt_ = 0.00125;
+  static constexpr double conDt_ = 0.005;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_, previousAction_, prevprevAction_;
   Eigen::VectorXd pTarget_, vTarget_; // full robot gc dim

@@ -16,6 +16,7 @@ import numpy as np
 import torch
 import argparse
 import wandb
+import datetime
 
 # task specification
 
@@ -74,7 +75,7 @@ ppo = PPO.PPO(actor=actor,
               gamma=0.995,
               lam=0.95,
               num_mini_batches=4,
-              learning_rate=2e-4,
+              learning_rate=5e-5,
               device=device,
               log_dir=saver.data_dir,
               shuffle_batch=False,
@@ -96,7 +97,7 @@ for update in range(iteration_number, 1000000):
 #
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
-        env.turn_off_visualization()
+
         torch.save({
             'actor_architecture_state_dict': actor.architecture.state_dict(),
             'actor_distribution_state_dict': actor.distribution.state_dict(),
@@ -110,6 +111,9 @@ for update in range(iteration_number, 1000000):
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
+        env.turn_on_visualization()
+        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
+
         for step in range(n_steps):
             with torch.no_grad():
                 obs = env.observe(False)
@@ -119,7 +123,7 @@ for update in range(iteration_number, 1000000):
 
         # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
-
+        env.stop_video_recording()
         env.turn_off_visualization()
         env.reset()
         env.save_scaling(saver.data_dir, str(update))
@@ -142,7 +146,8 @@ for update in range(iteration_number, 1000000):
     ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
-    actor.distribution.enforce_minimum_std((torch.ones(1)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(2)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
+    # actor.distribution.enforce_minimum_std((torch.ones(1)*(0.06*math.exp(-0.0002*update) + 0.04)).to(device))
     actor.update()
 
     if update % 100 == 0:

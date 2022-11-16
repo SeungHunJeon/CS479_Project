@@ -35,7 +35,7 @@ class ENVIRONMENT {
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
     /// Object spawn
-    Obj_ = world_.addCylinder(0.5, 0.7, 0.1);
+    Obj_ = world_.addCylinder(0.5, 0.7, 1.5);
     Obj_->setName("Obj_");
     Obj_->setPosition(1, 1, 0.35);
     Obj_->setOrientation(1, 0, 0, 0);
@@ -182,6 +182,8 @@ class ENVIRONMENT {
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
         subStep();
+        if(visualize)
+          sleep(simulation_dt_);
 
         if(isTerminalState(dummy)) {
           howManySteps++;

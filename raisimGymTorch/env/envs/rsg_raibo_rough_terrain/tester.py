@@ -3,6 +3,7 @@ import time
 import numpy as np
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_raibo_rough_terrain
+from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import NormalSampler
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.ppo.module as ppo_module
 import os
@@ -11,7 +12,7 @@ import torch
 import argparse
 import collections
 
-
+device = torch.device('cpu')
 # configuration
 parser = argparse.ArgumentParser()
 parser.add_argument('-w', '--weight', help='trained weight path', type=str, default='')
@@ -92,16 +93,22 @@ else:
     start_step_id = 0
 
     print("Visualizing and evaluating the policy: ", weight_path)
-    loaded_graph = ppo_module.MLP(cfg['architecture']['policy_net'], torch.nn.LeakyReLU, ob_dim, act_dim)
-    loaded_graph.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
+    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], torch.nn.LeakyReLU, ob_dim, act_dim, actor=True),
+                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
+                                                                               env.num_envs,
+                                                                               1.0,
+                                                                               NormalSampler(act_dim),
+                                                                               cfg['seed']), device)
+    actor.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
+    actor.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
 
-    # env.load_scaling(weight_dir, int(iteration_number))
+    env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
     for i in range (200):
         env.reset()
         time.sleep(1)
         for step in range(total_steps):
-
+            with torch.no_grad():
             # for event in pygame.event.get():  # User did something.
             #
             #     if event.type == pygame.JOYBUTTONDOWN:  # If user clicked close.
@@ -123,12 +130,12 @@ else:
             #         command.flat[1] = command.flat[1] + joysticks[0].get_axis(1)*-0.1
             #
             # env.move_controller_cursor(0, command)
-            obs = env.observe(False)
-            action_ll = loaded_graph.architecture(torch.from_numpy(obs).cpu())
+                obs = env.observe(False)
+                action_ll, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
 
-            print(action_ll.cpu().detach().numpy())
-            # action_ll = torch.Tensor([0]).unsqueeze(0)
-            env.step(action_ll.cpu().detach().numpy())
+                print(action_ll)
+                # action_ll = torch.Tensor([0]).unsqueeze(0)
+                env.step_visualize(action_ll)
             # time.sleep(0.5)
 
             # plotting

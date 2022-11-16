@@ -4,7 +4,7 @@ seed: 2
 environment:
   seed: 2
   render: True
-  num_envs: 300
+  num_envs: 500
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.001
@@ -22,9 +22,9 @@ environment:
     torque_reward_coeff: -5e-2
     orientation_reward_coeff: -800
     towardObjectRewardCoeff_: 1
-    stayObjectRewardCoeff_: 10
-    towardTargetRewardCoeff_: 2
-    stayTargetRewardCoeff_: 20
+    stayObjectRewardCoeff_: 2
+    towardTargetRewardCoeff_: 1
+    stayTargetRewardCoeff_: 2
   curriculum:
     initial_factor: .2
     decay_factor: 0.97
@@ -36,5 +36,5 @@ environment:
 
 
 architecture:
-  policy_net: [256, 128]
-  value_net: [256, 128]
+  policy_net: [128, 64]
+  value_net: [128, 64]

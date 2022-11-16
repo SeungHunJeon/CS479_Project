@@ -155,8 +155,8 @@ class raibotPositionController {
   raisim::nn::Linear<float, 133, 12, raisim::nn::ActivationType::leaky_relu> actor_{{512, 400, 128}};
 
   int clk_ = 0;
-  double control_dt_{0.000125};
-  double communication_dt_{0.00025};
+  double control_dt_{0.005};
+  double communication_dt_{0.001};
 };
 
 } // namespace raisim
