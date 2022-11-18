@@ -35,9 +35,9 @@ class ENVIRONMENT {
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
     /// Object spawn
-    Obj_ = world_.addCylinder(0.5, 0.7, 1.5);
+    Obj_ = world_.addCylinder(0.5, object_height, 4.0);
     Obj_->setName("Obj_");
-    Obj_->setPosition(1, 1, 0.35);
+    Obj_->setPosition(1, 1, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
 
     /// create controller
@@ -82,7 +82,7 @@ class ENVIRONMENT {
 
     // Reward coefficients
     controller_.setRewardConfig(cfg);
-    command_Obj_Pos_ << 2, 2, 0.35;
+    command_Obj_Pos_ << 2, 2, object_height/2;
 
     command_set.push_back({1.5,0});
     command_set.push_back({-1.5, 0});
@@ -96,7 +96,7 @@ class ENVIRONMENT {
       server_->launchServer(8080);
       server_->focusOn(raibo_);
       std::cout << "Launch Server !!" << std::endl;
-      command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, 0.7, 1, 0, 0, 0.5);
+      command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, object_height, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
     }
@@ -201,23 +201,27 @@ class ENVIRONMENT {
     double x, y, x_command, y_command;
     double phi_;
     phi_ = uniDist_(gen_);
-    x = 2.0*cos(phi_*2*M_PI);
-    y = 2.0*sin(phi_*2*M_PI);
+
+    while (true)
+    {
+      x = 2.0*cos(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
+      y = 2.0*sin(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
+      if(sqrt(std::pow(x,2) + std::pow(y,2)) > 1.8)
+        break;
+    }
 
     x += gc_init_[0];
     y += gc_init_[1];
 
-    Obj_->setPosition(x, y, 0.35);
+    Obj_->setPosition(x, y, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
 
-    double phi;
+    phi_ = uniDist_(gen_);
 
-    phi = uniDist_(gen_);
+    x_command = x + sqrt(2)*cos(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
+    y_command = y + sqrt(2)*sin(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
 
-    x_command = x + sqrt(2)*cos(phi*2*M_PI);
-    y_command = y + sqrt(2)*sin(phi*2*M_PI);
-
-    command_Obj_Pos_ << x_command, y_command, 0.35;
+    command_Obj_Pos_ << x_command, y_command, object_height/2;
 
     if(visualizable_)
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
@@ -313,6 +317,7 @@ class ENVIRONMENT {
   raisim::Vec<3> Pos_e_;
   std::vector<Eigen::Vector2f> command_set;
   int command_order = 0;
+  double object_height = 0.55;
 
 
   thread_local static std::mt19937 gen_;

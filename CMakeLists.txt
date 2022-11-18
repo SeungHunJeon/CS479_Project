@@ -80,7 +80,7 @@ FOREACH(subdir ${SUBDIRS})
     target_compile_definitions(${subdir} PRIVATE "$<$<CONFIG:RELEASE>:EIGEN_NO_DEBUG>")
 
     message("[RAISIM_GYM] BUILDING THE DEBUG APP for ${subdir}")
-    add_executable(${subdir}_debug_app raisimGymTorch/env/debug_app.cpp raisimGymTorch/env/Yaml.cpp)
+    add_executable(${subdir}_debug_app raisimGymTorch/env/debug_app.cpp raisimGymTorch/env/Yaml.cpp raisimGymTorch/env/envs/rsg_raibo_rough_terrain/RandomObjectGenerator.hpp)
     target_link_libraries(${subdir}_debug_app PRIVATE raisim::raisim)
     target_include_directories(${subdir}_debug_app PUBLIC raisimGymTorch/env/envs/${subdir} ${EIGEN3_INCLUDE_DIRS})
     if(WIN32)

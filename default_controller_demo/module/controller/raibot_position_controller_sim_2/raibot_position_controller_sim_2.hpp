@@ -16,7 +16,10 @@ class raibotPositionController {
  public:
   bool create(raisim::World *world) {
 
-    std::string current_path = std::filesystem::current_path();
+    char tmp[256];
+    getcwd(tmp, 256);
+
+    std::string current_path = tmp;
 
     std::cout << current_path << std::endl;
 

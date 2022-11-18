@@ -6,6 +6,8 @@
 #define _RAISIM_GYM_RAIBO_CONTROLLER_HPP
 
 #include "unsupported/Eigen/MatrixFunctions"
+#include "raisim/RaisimServer.hpp"
+
 
 Eigen::Matrix3d hat(const Eigen::Vector3d R3) {
   Eigen::Matrix3d so3;
@@ -246,7 +248,9 @@ class RaiboController {
                     "stayObject_rew",
                     "towardTarget_rew",
                     "stayTarget_rew",
-                    "command_rew"};
+                    "command_rew",
+                    "torque_rew",
+                    "stayObject_heading_rew"};
     stepData_.resize(stepDataTag_.size());
 
     /// Object info
@@ -388,19 +392,19 @@ class RaiboController {
     pos_temp_ = ee_to_obj.head(2) * (1./dist_temp_);
 
     Obj_Info_.segment(0, 2) << pos_temp_;
-    Obj_Info_.segment(2, 1) << std::min(4., dist_temp_);
+    Obj_Info_.segment(2, 1) << std::min(2., dist_temp_);
 
     dist_temp_ = obj_to_target.head(2).norm();
     pos_temp_ = obj_to_target.head(2) * (1./dist_temp_);
 
     Obj_Info_.segment(3, 2) << pos_temp_;
-    Obj_Info_.segment(5, 1) << std::min(4., dist_temp_);
+    Obj_Info_.segment(5, 1) << std::min(2., dist_temp_);
 
     dist_temp_ = ee_to_target.head(2).norm();
     pos_temp_ = ee_to_target.head(2) * (1./dist_temp_);
 
     Obj_Info_.segment(6, 2) << pos_temp_;
-    Obj_Info_.segment(8, 1) << std::min(4., dist_temp_);
+    Obj_Info_.segment(8, 1) << std::min(2., dist_temp_);
 
     Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
 
@@ -490,6 +494,7 @@ class RaiboController {
     stepData_[3] = stayTargetReward_;
     stepData_[4] = commandReward_;
     stepData_[5] = torqueReward_;
+    stepData_[6] = stayObjectHeadingReward_;
 
     towardObjectReward_ = 0.;
     stayObjectReward_ = 0.;
@@ -497,6 +502,7 @@ class RaiboController {
     stayTargetReward_ = 0.;
     commandReward_ = 0.;
     torqueReward_ = 0.;
+    stayObjectHeadingReward_ = 0.;
 
     return float(stepData_.sum());
   }
@@ -509,7 +515,14 @@ class RaiboController {
       if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end() || contact.isSelfCollision())
         return true;
 
+
     terminalReward = 0.f;
+//    Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+//    if (obj_to_target.norm() < 0.03)
+//      terminalReward = 0.1;
+
+
+
     return false;
   }
 
@@ -596,6 +609,8 @@ class RaiboController {
     READ_YAML(double, stayTargetRewardCoeff_, cfg["reward"]["stayTargetRewardCoeff_"])
     READ_YAML(double, commandRewardCoeff_, cfg["reward"]["commandRewardCoeff_"])
     READ_YAML(double, torqueRewardCoeff_, cfg["reward"]["torque_reward_coeff"])
+    READ_YAML(double, stayObjectHeadingRewardCoeff_, cfg["reward"]["stayObjectHeadingRewardCoeff_"])
+
   }
 
   inline void accumulateRewards(double cf, const Eigen::Vector3d &cm) {
@@ -607,29 +622,34 @@ class RaiboController {
     ee_to_obj(2) = 0;
     obj_to_target(2) = 0;
     ee_to_target(2) = 0;
-    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
-    obj_to_target = baseRot_.e().transpose() * obj_to_target;
-    ee_to_target = baseRot_.e().transpose() * ee_to_target;
+//    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
+//    obj_to_target = baseRot_.e().transpose() * obj_to_target;
+//    ee_to_target = baseRot_.e().transpose() * ee_to_target;
 
-    double toward_o = (ee_to_obj * (1. / (ee_to_obj.squaredNorm() + 1e-8))).transpose()*(baseRot_.e().transpose() * ee_Vel_w_.e()) - 1.8;
+    double toward_o = (ee_to_obj * (1. / (ee_to_obj.norm() + 1e-8))).transpose()*(ee_Vel_w_.e() * (1. / (ee_Vel_w_.e().norm() + 1e-8))) - 1;
     towardObjectReward_ += cf * towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
 
+    Eigen::Vector3d heading; heading << baseRot_[0], baseRot_[1], 0;
+
     /// stay close to the object
-    double stay_o = ee_to_obj.norm();
+    double stay_o = ee_to_obj.norm(); /// max : inf, min : 0
+    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 1, min : 0
     stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
+    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
+
 
     /// move the object towards the target
-    double toward_t = (obj_to_target * (1. / (obj_to_target.squaredNorm() + 1e-8))).transpose()*(baseRot_.e().transpose() * Obj_Vel_.e()) - 1.8;
+    double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;
     towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
 
     /// keep the object close to the target
     double stay_t = obj_to_target.norm();
     stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
 
-    double commandReward_tmp = std::max(5., static_cast<double>(command_.squaredNorm()));
+    double commandReward_tmp = std::max(5., static_cast<double>(command_.norm()));
     commandReward_ += cf * commandRewardCoeff_ * simDt_ * commandReward_tmp;
 
-    torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().squaredNorm();
+    torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
 
   }
 
@@ -719,7 +739,7 @@ class RaiboController {
   raisim::Mat<3,3> eeRot_w_;
 
   // control variables
-  static constexpr double conDt_ = 0.5;
+  static constexpr double conDt_ = 0.25;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_, previousAction_, prevprevAction_;
   Eigen::VectorXd actionTarget_;
@@ -734,6 +754,7 @@ class RaiboController {
   double terminalRewardCoeff_ = 0.0;
   double commandRewardCoeff_ = 0., commandReward_ = 0.;
   double torqueRewardCoeff_ = 0., torqueReward_ = 0.;
+  double stayObjectHeadingReward_ = 0., stayObjectHeadingRewardCoeff_ = 0.;
 
   // exported data
   Eigen::VectorXd stepData_;
