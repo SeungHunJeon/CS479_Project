@@ -57,7 +57,7 @@ namespace raisim {
 
 class RaiboController {
  public:
-  inline bool create(raisim::World *world, raisim::Cylinder *box) {
+  inline bool create(raisim::World *world, raisim::SingleBodyObject *box) {
     raibo_ = reinterpret_cast<raisim::ArticulatedSystem *>(world->getObject("robot"));
     gc_.resize(raibo_->getGeneralizedCoordinateDim());
     gv_.resize(raibo_->getDOF());
@@ -636,7 +636,6 @@ class RaiboController {
     double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 1, min : 0
     stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
     stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
-
 
     /// move the object towards the target
     double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;

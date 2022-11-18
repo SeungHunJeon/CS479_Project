@@ -17,6 +17,7 @@
 #include "RaiboController.hpp"
 #include "RandomHeightMapGenerator.hpp"
 #include "../../../../default_controller_demo/module/controller/raibot_position_controller_sim_2/raibot_position_controller_sim_2.hpp"
+#include "RandomObjectGenerator.hpp"
 
 namespace raisim {
 
@@ -198,6 +199,11 @@ class ENVIRONMENT {
 
 
   void updateObstacle() {
+
+    world_.removeObject(Obj_);
+    Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
+                                           normDist_, bound_ratio, 3.0, 0.5, 0.5, 0.5, 0.5);
+
     double x, y, x_command, y_command;
     double phi_;
     phi_ = uniDist_(gen_);
@@ -260,11 +266,12 @@ class ENVIRONMENT {
   }
 
   void curriculumUpdate() {
-//    groundType_ = (groundType_+1) % 4; /// rotate ground type for a visualization purpose
+    object_type = (object_type+1) % 4; /// rotate ground type for a visualization purpose
     curriculumFactor_ = std::pow(curriculumFactor_, curriculumDecayFactor_);
     /// create heightmap
-//    world_.removeObject(heightMap_);
-//    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);
+    world_.removeObject(Obj_);
+    Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
+                                           normDist_, bound_ratio, 3.0, 0.5, 0.5, 0.5, 0.5);
   }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
@@ -292,7 +299,7 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-
+  double bound_ratio = 0.2;
   raisim::ArticulatedSystem* raibo_;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;
@@ -301,16 +308,16 @@ class ENVIRONMENT {
   Eigen::VectorXd obScaled_;
   Eigen::Vector3d command_;
   bool visualizable_ = false;
-  int groundType_;
+  int object_type = 0;
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_;
   controller::raibotPositionController Low_controller_;
   Eigen::VectorXd jointDGain_, jointPGain_;
-
+  RandomObjectGenerator objectGenerator_;
 
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
-  raisim::Cylinder* Obj_;
+  raisim::SingleBodyObject* Obj_;
   raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_;
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
