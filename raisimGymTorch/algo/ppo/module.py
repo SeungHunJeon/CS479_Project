@@ -70,6 +70,25 @@ class Critic:
         return self.architecture.input_shape
 
 
+class Encoder:
+    def __init__(self, architecture, device='cpu'):
+        super(Encoder, self).__init__()
+        self.architecture = architecture
+        self.architecture.to(device)
+    def predict(self, obs):
+        return self.architecture.architecture(obs).detach()
+
+    def evaluate(self, obs):
+        return self.architecture.architecture(obs)
+
+    def parameters(self):
+        return [*self.architecture.parameters()]
+
+    @property
+    def obs_shape(self):
+        return self.architecture.input_shape
+
+
 class MLP(nn.Module):
     def __init__(self, shape, actionvation_fn, input_size, output_size, actor=True):
         super(MLP, self).__init__()

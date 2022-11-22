@@ -1,5 +1,5 @@
 # task specification
-task_name = "Position_Deep_Loco"
+task_name = "Random_Object_encoded"
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
@@ -10,7 +10,7 @@ import os
 import math
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
-import raisimGymTorch.algo.ppo.ppo as PPO
+import raisimGymTorch.algo.ppo.ppo_encoding as PPO_Encod
 import torch.nn as nn
 import numpy as np
 import torch
@@ -50,26 +50,66 @@ env = VecEnv(RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environmen
 ob_dim = env.num_obs
 act_dim = env.num_acts
 
+# Encoding
+historyNum = cfg['environment']['dimension']['historyNum_']
+actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
+pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
+ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
+
+pro_latent_dim = cfg['encoder']['proprioceptivelatentDim_']
+ext_latent_dim = cfg['encoder']['exteroceptivelatentDim_']
+act_latent_dim = cfg['encoder']['actionlatentDim_']
+
+obs_pro_dim = pro_dim*(historyNum)
+obs_ext_dim = ext_dim*(historyNum)
+obs_act_dim = act_dim*(actionhistoryNum)
+
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
+
 total_steps = n_steps * env.num_envs
 
-actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, ob_dim, act_dim, actor=True),
+pro_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['pro_encoder_net'],
+                                                nn.LeakyReLU,
+                                                obs_pro_dim,
+                                                pro_latent_dim,
+                                                actor=False),
+                                 device)
+
+ext_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['ext_encoder_net'],
+                                                nn.LeakyReLU,
+                                                obs_ext_dim,
+                                                ext_latent_dim,
+                                                actor=False),
+                                 device)
+
+act_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['act_encoder_net'],
+                                                nn.LeakyReLU,
+                                                obs_act_dim,
+                                                act_latent_dim,
+                                                actor=False),
+                                 device)
+
+encoders = [pro_encoder, ext_encoder, act_encoder]
+
+actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, act_dim, actor=True),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                            env.num_envs,
                                                                            1.0,
                                                                            NormalSampler(act_dim),
                                                                            cfg['seed']),
                          device)
-critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, ob_dim, 1, actor=False),
+critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, 1, actor=False),
                            device)
 
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/RaiboController.hpp"])
 
-ppo = PPO.PPO(actor=actor,
+ppo = PPO_Encod.PPO(actor=actor,
               critic=critic,
+              encoder=encoders,
               num_envs=cfg['environment']['num_envs'],
+              obs_shape=[env.num_obs],
               num_transitions_per_env=n_steps,
               num_learning_epochs=4,
               gamma=0.995,
@@ -94,7 +134,7 @@ for update in range(iteration_number, 1000000):
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.
-    #
+#
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
 
@@ -102,6 +142,9 @@ for update in range(iteration_number, 1000000):
             'actor_architecture_state_dict': actor.architecture.state_dict(),
             'actor_distribution_state_dict': actor.distribution.state_dict(),
             'critic_architecture_state_dict': critic.architecture.state_dict(),
+            'pro_encoder_state_dict' : pro_encoder.architecture.state_dict(),
+            'ext_encoder_state_dict' : ext_encoder.architecture.state_dict(),
+            'act_encoder_state_dict' : act_encoder.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
@@ -111,20 +154,31 @@ for update in range(iteration_number, 1000000):
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
-        env.turn_on_visualization()
+        # env.turn_on_visualization()
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
         for step in range(n_steps):
             with torch.no_grad():
                 obs = env.observe(False)
-                actions, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
+
+                obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
+                obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
+                obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
+
+                pro_latent = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
+                ext_latent = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
+                act_latent = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
+
+                obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+
+                actions, actions_log_prob = actor.sample(obs_concat)
                 reward, dones = env.step_visualize(actions)
                 # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
         # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
         env.stop_video_recording()
-        env.turn_off_visualization()
+        # env.turn_off_visualization()
         env.reset()
         env.save_scaling(saver.data_dir, str(update))
 
@@ -133,9 +187,26 @@ for update in range(iteration_number, 1000000):
     for step in range(n_steps):
         with torch.no_grad():
             obs = env.observe(update < 10000)
-            action = ppo.act(obs)
+
+            obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
+            obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
+            obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
+            ## decouple the observation into proprioceptive information, object information
+            # // Variable : Number of history length, number of proprioceptive info legnth, observation length
+
+            ## Add the encoding module for each time step
+            # // Variable : Number of history length, number of proprioceptive info legnth, observation length
+            pro_latent = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
+            ext_latent = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
+            act_latent = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
+
+            obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+            obs_concat = obs_concat.detach().cpu().numpy()
+
+            action = ppo.act(obs_concat)
+
             reward, dones = env.step(action)
-            ppo.step(value_obs=obs, rews=reward, dones=dones)
+            ppo.step(value_obs=obs_concat, obs=obs, rews=reward, dones=dones)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
             data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
@@ -143,7 +214,23 @@ for update in range(iteration_number, 1000000):
     data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
     # take st step to get value obs
     obs = env.observe(update < 10000)
-    ppo.update(actor_obs=obs, value_obs=obs, log_this_iteration=update % 10 == 0, update=update)
+
+    obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
+    obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
+    obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
+    ## decouple the observation into proprioceptive information, object information
+    # // Variable : Number of history length, number of proprioceptive info legnth, observation length
+
+    ## Add the encoding module for each time step
+    # // Variable : Number of history length, number of proprioceptive info legnth, observation length
+    pro_latent = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
+    ext_latent = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
+    act_latent = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
+
+    obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+    obs_concat = obs_concat.detach().cpu().numpy()
+
+    ppo.update(actor_obs=obs_concat, value_obs=obs_concat, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
     actor.distribution.enforce_minimum_std((torch.ones(2)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))

@@ -35,11 +35,19 @@ class ENVIRONMENT {
     raibo_->setName("robot");
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
+    raibo_->getCollisionBody("base/0").setCollisionGroup(raisim::COLLISION(1));
+    raibo_->getCollisionBody("base/0").setCollisionMask(raisim::COLLISION(1));
+//    raibo_->ignoreCollisionBetween(raibo_->getBodyIdx("base"), )
+
     /// Object spawn
-    Obj_ = world_.addCylinder(0.5, object_height, 4.0);
-    Obj_->setName("Obj_");
-    Obj_->setPosition(1, 1, object_height/2);
+    Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
+                                           normDist_, bound_ratio, 2.0, 0.5, 0.5, 1.0, 1.0);
+    object_height = objectGenerator_.get_height();
+    Obj_->setPosition(2, 2, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
+
+//    Manipulate_ = world_.addCylinder(0.1, 0.5, 1, "default", raisim::COLLISION(2), raisim::COLLISION(1)|raisim::COLLISION(2));
+
 
     /// create controller
     controller_.create(&world_, Obj_);
@@ -142,9 +150,10 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void reset() {
+    updateObstacle();
+    objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-    updateObstacle();
 
     controller_.reset(gen_, normDist_, command_Obj_Pos_);
     controller_.updateStateVariables();
@@ -183,8 +192,8 @@ class ENVIRONMENT {
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
         subStep();
-        if(visualize)
-          sleep(simulation_dt_);
+//        if(visualize)
+//          sleep(simulation_dt_);
 
         if(isTerminalState(dummy)) {
           howManySteps++;
@@ -198,11 +207,13 @@ class ENVIRONMENT {
 
 
 
-  void updateObstacle() {
+  void updateObstacle(bool curriculum_Update = false) {
 
     world_.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, 3.0, 0.5, 0.5, 0.5, 0.5);
+    controller_.updateObject(Obj_);
+    object_height = objectGenerator_.get_height();
 
     double x, y, x_command, y_command;
     double phi_;
@@ -221,6 +232,7 @@ class ENVIRONMENT {
 
     Obj_->setPosition(x, y, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
+    Obj_->setVelocity(0,0,0,0,0,0);
 
     phi_ = uniDist_(gen_);
 
@@ -269,9 +281,7 @@ class ENVIRONMENT {
     object_type = (object_type+1) % 4; /// rotate ground type for a visualization purpose
     curriculumFactor_ = std::pow(curriculumFactor_, curriculumDecayFactor_);
     /// create heightmap
-    world_.removeObject(Obj_);
-    Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, 3.0, 0.5, 0.5, 0.5, 0.5);
+    updateObstacle(true);
   }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
@@ -317,7 +327,7 @@ class ENVIRONMENT {
 
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
-  raisim::SingleBodyObject* Obj_;
+  raisim::SingleBodyObject *Obj_, *Manipulate_;
   raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_;
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
