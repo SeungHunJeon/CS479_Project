@@ -20,7 +20,9 @@ class RandomObjectGenerator {
     Capsule = 3
   };
 
-  RandomObjectGenerator() = default;
+  RandomObjectGenerator() {
+    classify_vector.setZero(4);
+  }
 
   void setSeed(int seed) {
     object_seed_ = seed;
@@ -28,6 +30,10 @@ class RandomObjectGenerator {
 
   double get_height () {
     return object_height;
+  }
+
+  Eigen::VectorXd get_classify_vector () {
+    return classify_vector;
   }
 
   void Inertial_Randomize(raisim::SingleBodyObject* object, double bound_ratio, double curriculumFactor, std::mt19937& gen, std::uniform_real_distribution<double>& uniDist, std::normal_distribution<double>& normDist) {
@@ -66,39 +72,43 @@ class RandomObjectGenerator {
                                  const double &width1,
                                  const double &width2) {
     switch (object_shape) {
-      case ObjectShape::BALL:
+      case ObjectShape::BALL: /// 0
       {
         double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
         object_height = 2*radius_;
+        classify_vector << 1, 0, 0, 0;
         return world->addSphere(radius_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
 
-      case ObjectShape::Cylinder:
+      case ObjectShape::Cylinder: /// 1
       {
         double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
         double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
         object_height = height;
+        classify_vector << 0, 1, 0, 0;
         return world->addCylinder(radius_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
 
-      case ObjectShape::BOX:
+      case ObjectShape::BOX: /// 2
       {
-        double width1_ = 2 * width1 * (1 + curriculumFactor * bound_ratio * normDist(gen));
-        double width2_ = 2 * width2 * (1 + curriculumFactor * bound_ratio * normDist(gen));
+        double width1_ = width1 * (1 + curriculumFactor * bound_ratio * normDist(gen));
+        double width2_ = width2 * (1 + curriculumFactor * bound_ratio * normDist(gen));
         double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
         object_height = height_;
+        classify_vector << 0, 0, 1, 0;
         return world->addBox(width1_, width2_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
 
 
-      case ObjectShape::Capsule:
+      case ObjectShape::Capsule: /// 3
       {
         double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
         double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
-        object_height = height_;
+        object_height = 2 * radius_ + height_;
+        classify_vector << 0, 0, 0, 1;
         return world->addCapsule(radius_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
@@ -109,6 +119,7 @@ class RandomObjectGenerator {
  private:
   int object_seed_;
   double object_height;
+  Eigen::VectorXd classify_vector;
 };
 
 }

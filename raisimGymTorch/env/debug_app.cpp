@@ -73,5 +73,26 @@ int main(int argc, char *argv[]) {
   vecEnv.reset();
   vecEnv.step(action_ref, reward_ref, dones_ref);
   vecEnv.observe(ob_ref);
+
+  vecEnv.curriculumUpdate();
+  vecEnv.reset();
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  vecEnv.observe(ob_ref);
+
+  vecEnv.curriculumUpdate();
+  vecEnv.reset();
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  vecEnv.observe(ob_ref);
+
+  vecEnv.curriculumUpdate();
+  vecEnv.reset();
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  vecEnv.observe(ob_ref);
+
+  vecEnv.curriculumUpdate();
+  vecEnv.reset();
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  vecEnv.observe(ob_ref);
+
   return 0;
 }

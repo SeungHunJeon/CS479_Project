@@ -41,7 +41,7 @@ class ENVIRONMENT {
 
     /// Object spawn
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, 2.0, 0.5, 0.5, 1.0, 1.0);
+                                           normDist_, bound_ratio, 3.0, 0.5, 0.55, 1.0, 1.0);
     object_height = objectGenerator_.get_height();
     Obj_->setPosition(2, 2, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
@@ -211,7 +211,7 @@ class ENVIRONMENT {
 
     world_.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, 3.0, 0.5, 0.5, 0.5, 0.5);
+                                           normDist_, bound_ratio, 3.0, 0.5, 0.55, 1.0, 1.0);
     controller_.updateObject(Obj_);
     object_height = objectGenerator_.get_height();
 
@@ -233,6 +233,8 @@ class ENVIRONMENT {
     Obj_->setPosition(x, y, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
     Obj_->setVelocity(0,0,0,0,0,0);
+    Obj_->setAngularDamping({0.5,0.5,0.5});
+    Obj_->setLinearDamping(0.2);
 
     phi_ = uniDist_(gen_);
 
@@ -278,10 +280,12 @@ class ENVIRONMENT {
   }
 
   void curriculumUpdate() {
-    object_type = (object_type+1) % 4; /// rotate ground type for a visualization purpose
+    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
     curriculumFactor_ = std::pow(curriculumFactor_, curriculumDecayFactor_);
     /// create heightmap
     updateObstacle(true);
+    Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
+    controller_.updateClassifyvector(temp);
   }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {

@@ -21,13 +21,13 @@ class raibotPositionController {
 
     std::string current_path = tmp;
 
-    std::cout << current_path << std::endl;
+//    std::cout << current_path << std::endl;
 
 //    std::string network_path = current_path + "/../../../s/rsg_raibo_rough_terrain/default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
     std::string network_path = current_path + "/../../../../default_controller_demo/module/controller/raibot_position_controller_sim_2/network/network_100000";
     actor_.readParamFromTxt(network_path + "/full_12800.txt");
 
-    std::cout << network_path << std::endl;
+//    std::cout << network_path << std::endl;
 
 //    std::cout << "Fuck" << std::endl;
 
@@ -48,7 +48,7 @@ class raibotPositionController {
       }
     }
 
-    std::cout << "obs Mean : " <<  obsMean_ << std::endl;
+//    std::cout << "obs Mean : " <<  obsMean_ << std::endl;
 
     if (obsVariance_file.is_open()) {
       for (int i = 0; i < obsVariance_.size(); ++i) {
@@ -145,7 +145,7 @@ class raibotPositionController {
     actor_input.setOnes();
     Eigen::VectorXf action = actor_.forward(actor_input);
 
-    std::cout << "test L " << action << std::endl;
+//    std::cout << "test L " << action << std::endl;
   }
 
  private:

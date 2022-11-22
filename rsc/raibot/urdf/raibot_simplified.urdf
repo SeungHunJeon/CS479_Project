@@ -126,12 +126,12 @@
           rgba="0.89804 0.91765 0.92941 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="1.57079632679 0 0" xyz="0 0 -0.240"/>
       <geometry>
         <cylinder length="0.053" radius="0.0265"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="LF_HFE"
@@ -183,12 +183,12 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="0 1.57100577 0" xyz="0.0103 0 -0.1544"/>
       <geometry>
         <box size="0.1711 0.020 0.0253"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="LF_KFE"
@@ -341,12 +341,12 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="1.57079632679 0 0" xyz="0 0 -0.240"/>
       <geometry>
         <cylinder length="0.053" radius="0.0265"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="RF_HFE"
@@ -398,12 +398,12 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="0 1.57100577 0" xyz="0.0103 0 -0.1544"/>
       <geometry>
         <box size="0.1711 0.020 0.0253"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="RF_KFE"
@@ -556,12 +556,12 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="1.57079632679 0 0" xyz="0 0 -0.240"/>
       <geometry>
         <cylinder length="0.053" radius="0.0265"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="LH_HFE"
@@ -613,12 +613,12 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="0 1.57100577 0" xyz="0.0103 0 -0.1544"/>
       <geometry>
         <box size="0.1711 0.020 0.0253"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="LH_KFE"
@@ -771,12 +771,12 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="1.57079632679 0 0" xyz="0 0 -0.240"/>
       <geometry>
         <cylinder length="0.053" radius="0.0265"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="RH_HFE"
@@ -828,12 +828,12 @@
           rgba="0.898039215686275 0.917647058823529 0.929411764705882 1" />
       </material>
     </visual>
-    <!-- <collision>
+    <collision>
       <origin rpy="0 1.57100577 0" xyz="0.0103 0 -0.1544"/>
       <geometry>
         <box size="0.1711 0.020 0.0253"/>
       </geometry>
-    </collision> -->
+    </collision>
   </link>
   <joint
     name="RH_KFE"

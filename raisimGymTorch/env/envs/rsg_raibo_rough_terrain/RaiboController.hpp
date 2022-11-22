@@ -84,10 +84,10 @@ class RaiboController {
     prev3Action_.setZero(actionDim_);
     prev4Action_.setZero(actionDim_);
 
-    actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
+    actionMean_ << Eigen::VectorXd::Constant(actionDim_, -1); /// joint target
 //    actionMean_.segment(nJoints_ - 6, 6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; /// task space position & orientation residuals
 //    actionMean_.tail(nVargain_) << 50, 0.5, 50, 0.5; /// positional jacobian p, d gain && orientation jacobian p, d gain
-    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 0.5); /// joint target
+    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 2); /// joint target
 //    actionStd_.segment(nJoints_ - 3, 3) << Eigen::VectorXd::Constant(3, 0.1); /// orientation residual
 //    actionStd_.tail(nVargain_) << 0.25, 0.25, 0.25, 0.25; /// positional jacobian p, d gain && orientation jacobian p, d gain
 
@@ -96,9 +96,9 @@ class RaiboController {
     obDouble_.setZero(obDim_);
 
 
-    Obj_Info_.setZero(25);
-    objectInfoHistory_.setZero(historyLength_ * Obj_Info_.size());
-    stateInfoHistory_.setZero(historyLength_ * 9);
+    Obj_Info_.setZero(exteroceptiveDim_);
+    objectInfoHistory_.setZero(historyLength_ * exteroceptiveDim_);
+    stateInfoHistory_.setZero(historyLength_ * proprioceptiveDim_);
 
 
     /// observation
@@ -135,141 +135,180 @@ class RaiboController {
 ////        actionStd_ * 1.5; /// previous action
 ////        .5, 0.3, 0.6; /// command
 
-    obMean_ <<
-        0.0, 0.0, 1.4, /// gravity axis 3
-        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+    for (int i=0; i<historyNum_ ; i++) {
+      obMean_.segment(proprioceptiveDim_*i, proprioceptiveDim_) << 0.0, 0.0, 1.4, /// gravity axis 3
+          Eigen::VectorXd::Constant(6, 0.0); /// body lin/ang vel 6
 
-        0.0, 0.0, 1.4, /// gravity axis 3
-        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+      obMean_.segment(proprioceptiveDim_*historyNum_ + exteroceptiveDim_*i, exteroceptiveDim_) <<
+          Eigen::VectorXd::Constant(2, 0),
+          Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+          Eigen::VectorXd::Constant(2, 0),
+          Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+          Eigen::VectorXd::Constant(2, 0),
+          Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+          Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
+          Eigen::VectorXd::Constant(1, 2), /// mass
+          Eigen::VectorXd::Constant(3, 0), /// COM
+          Eigen::VectorXd::Constant(9, 0), /// Inertia
+          0.0, 0.0, 1.4, /// Orientation
+          Eigen::VectorXd::Constant(4,0.5); /// one hot vector
 
-        0.0, 0.0, 1.4, /// gravity axis 3
-        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+      obMean_.segment(proprioceptiveDim_*historyNum_ + exteroceptiveDim_*historyNum_ + actionDim_ * i, actionDim_) <<
+          Eigen::VectorXd::Constant(actionDim_, 0.0);
+    }
+//
+//
+//    obMean_ <<
+//        0.0, 0.0, 1.4, /// gravity axis 3
+//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+//
+//        0.0, 0.0, 1.4, /// gravity axis 3
+//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+//
+//        0.0, 0.0, 1.4, /// gravity axis 3
+//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+//
+//        0.0, 0.0, 1.4, /// gravity axis 3
+//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+//
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 2),
+//        Eigen::VectorXd::Constant(3, 0),
+//        Eigen::VectorXd::Constant(9, 0),
+//
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 2),
+//        Eigen::VectorXd::Constant(3, 0),
+//        Eigen::VectorXd::Constant(9, 0),
+//
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 2),
+//        Eigen::VectorXd::Constant(3, 0),
+//        Eigen::VectorXd::Constant(9, 0),
+//
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0),
+//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 2),
+//        Eigen::VectorXd::Constant(3, 0),
+//        Eigen::VectorXd::Constant(9, 0),
+//
+//        Eigen::VectorXd::Constant(actionDim_, 0.0),
+//        Eigen::VectorXd::Constant(actionDim_, 0.0),
+//        Eigen::VectorXd::Constant(actionDim_, 0.0),
+//        Eigen::VectorXd::Constant(actionDim_, 0.0); /// object velocity
 
-        0.0, 0.0, 1.4, /// gravity axis 3
-        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
+    for (int i=0; i<historyNum_ ; i++) {
+      obStd_.segment(proprioceptiveDim_*i, proprioceptiveDim_) <<
+          Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
+          Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
+          Eigen::VectorXd::Constant(3, 1.0); /// angular velocities
 
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 2),
-        Eigen::VectorXd::Constant(3, 0),
-        Eigen::VectorXd::Constant(9, 0),
+      obStd_.segment(proprioceptiveDim_*historyNum_ + exteroceptiveDim_*i, exteroceptiveDim_) <<
+          Eigen::VectorXd::Constant(2, 0.5),
+          Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+          Eigen::VectorXd::Constant(2, 0.5),
+          Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+          Eigen::VectorXd::Constant(2, 0.5),
+          Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+          Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
+          Eigen::VectorXd::Constant(1, 0.2),
+          Eigen::VectorXd::Constant(3, 0.1),
+          Eigen::VectorXd::Constant(9, 0.1),
+          Eigen::VectorXd::Constant(3,0.3), /// Orientation
+          Eigen::VectorXd::Constant(4,0.2); /// one hot vector
 
+      obStd_.segment(proprioceptiveDim_*historyNum_ + exteroceptiveDim_*historyNum_ + actionDim_ * i, actionDim_) <<
+          Eigen::VectorXd::Constant(actionDim_, 0.5);
+    }
 
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 2),
-        Eigen::VectorXd::Constant(3, 0),
-        Eigen::VectorXd::Constant(9, 0),
-
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 2),
-        Eigen::VectorXd::Constant(3, 0),
-        Eigen::VectorXd::Constant(9, 0),
-
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 2),
-        Eigen::VectorXd::Constant(3, 0),
-        Eigen::VectorXd::Constant(9, 0),
-
-        Eigen::VectorXd::Constant(actionDim_, 0.0),
-        Eigen::VectorXd::Constant(actionDim_, 0.0),
-        Eigen::VectorXd::Constant(actionDim_, 0.0),
-        Eigen::VectorXd::Constant(actionDim_, 0.0); /// object velocity
-
-
-    obStd_ <<
-        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-
-        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-
-        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-
-        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 0.2),
-        Eigen::VectorXd::Constant(3, 0.1),
-        Eigen::VectorXd::Constant(9, 0.05),
-
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 0.2),
-        Eigen::VectorXd::Constant(3, 0.1),
-        Eigen::VectorXd::Constant(9, 0.05),
-
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 0.2),
-        Eigen::VectorXd::Constant(3, 0.1),
-        Eigen::VectorXd::Constant(9, 0.05),
-
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-        Eigen::VectorXd::Constant(1, 0.2),
-        Eigen::VectorXd::Constant(3, 0.1),
-        Eigen::VectorXd::Constant(9, 0.05),
-
-        Eigen::VectorXd::Constant(actionDim_, 0.5),
-        Eigen::VectorXd::Constant(actionDim_, 0.5),
-        Eigen::VectorXd::Constant(actionDim_, 0.5),
-        Eigen::VectorXd::Constant(actionDim_, 0.5); /// object velocity
-//        Eigen::VectorXd::Constant(nJoints_ * (4 - 1), 0.6), /// joint position error history
-//        Eigen::VectorXd::Constant(nJoints_ * 4, 10.0), /// joint velocities
-//        actionStd_ * 1.5, /// previous action
-//        actionStd_ * 1.5; /// previous action
-//        .5, 0.3, 0.6; /// command
-
+//    obStd_ <<
+//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
+//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
+//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
+//
+//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
+//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
+//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
+//
+//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
+//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
+//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
+//
+//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
+//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
+//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
+//
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 0.2),
+//        Eigen::VectorXd::Constant(3, 0.1),
+//        Eigen::VectorXd::Constant(9, 0.05),
+//
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 0.2),
+//        Eigen::VectorXd::Constant(3, 0.1),
+//        Eigen::VectorXd::Constant(9, 0.05),
+//
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 0.2),
+//        Eigen::VectorXd::Constant(3, 0.1),
+//        Eigen::VectorXd::Constant(9, 0.05),
+//
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
+//        Eigen::VectorXd::Constant(2, 0.5),
+//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
+//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
+//        Eigen::VectorXd::Constant(1, 0.2),
+//        Eigen::VectorXd::Constant(3, 0.1),
+//        Eigen::VectorXd::Constant(9, 0.05),
+//
+//        Eigen::VectorXd::Constant(actionDim_, 0.5),
+//        Eigen::VectorXd::Constant(actionDim_, 0.5),
+//        Eigen::VectorXd::Constant(actionDim_, 0.5),
+//        Eigen::VectorXd::Constant(actionDim_, 0.5); /// object velocity
 
     footIndices_.push_back(raibo_->getBodyIdx("LF_SHANK"));
     footIndices_.push_back(raibo_->getBodyIdx("RF_SHANK"));
@@ -286,6 +325,10 @@ class RaiboController {
                     "torque_rew",
                     "stayObject_heading_rew"};
     stepData_.resize(stepDataTag_.size());
+
+
+    classify_vector_.setZero(4);
+    classify_vector_ << 1, 0, 0, 0;
 
     /// Object info
 //    Obj_ = dynamic_cast<Box *>(world->getObject("Obj_"));
@@ -321,20 +364,20 @@ class RaiboController {
     /// joint angles
 
   historyTempMemory_ = objectInfoHistory_;
-    objectInfoHistory_.head((historyLength_ - 1) * Obj_Info_.size()) =
-        historyTempMemory_.tail((historyLength_ - 1) * Obj_Info_.size());
-    objectInfoHistory_.tail(Obj_Info_.size()) = Obj_Info_;
+    objectInfoHistory_.head((historyLength_ - 1) * exteroceptiveDim_) =
+        historyTempMemory_.tail((historyLength_ - 1) * exteroceptiveDim_);
+    objectInfoHistory_.tail(exteroceptiveDim_) = Obj_Info_;
 
 
     historyTempMemory_2 = stateInfoHistory_;
-    stateInfoHistory_.head((historyLength_ - 1) * 9) =
-        historyTempMemory_2.tail((historyLength_ - 1) * 9);
+    stateInfoHistory_.head((historyLength_ - 1) * proprioceptiveDim_) =
+        historyTempMemory_2.tail((historyLength_ - 1) * proprioceptiveDim_);
     Eigen::VectorXd stateInfo;
-    stateInfo.setZero(9);
+    stateInfo.setZero(proprioceptiveDim_);
     stateInfo.head(3) = baseRot_.e().row(2);
     stateInfo.segment(3,3) = bodyLinVel_;
     stateInfo.segment(6,3) = bodyAngVel_;
-    stateInfoHistory_.tail(9) = stateInfo;
+    stateInfoHistory_.tail(proprioceptiveDim_) = stateInfo;
     //
 //    /// joint velocities
 //    historyTempMemory_ = jointVelocityHistory_;
@@ -454,6 +497,9 @@ class RaiboController {
 
     Obj_Info_.segment(22,3) = Obj_->getInertiaMatrix_B().row(2);
 
+    Obj_Info_.segment(25,3) = Obj_->getOrientation().e().row(2);
+
+    Obj_Info_.segment(28,4) = classify_vector_;
 //        baseRot_.e().transpose() * Obj_AVel_.e();
 
     /// height map
@@ -530,7 +576,7 @@ class RaiboController {
     command_Obj_Pos_ = command_obj_pos_;
 
     // history
-    for (int i = 0; i < Obj_Info_.size() * historyLength_; i++)
+    for (int i = 0; i < exteroceptiveDim_ * historyLength_; i++)
       objectInfoHistory_[i] = normDist_(gen_) * .1;
 //
     for (int i = 0; i < 9 * historyLength_; i++)
@@ -592,9 +638,10 @@ class RaiboController {
 //    /// body velocities
     obDouble_.segment(3, 3) = bodyLinVel_;
     obDouble_.segment(6, 3) = bodyAngVel_;
-    obDouble_.segment(9, 9) = stateInfoHistory_.segment((historyLength_ -1 - 6) * 9, 9);
-    obDouble_.segment(18, 9) = stateInfoHistory_.segment((historyLength_ -1 - 4) * 9, 9);
-    obDouble_.segment(27, 9) = stateInfoHistory_.segment((historyLength_ -1 - 2) * 9, 9);
+    obDouble_.segment(9, 9) =
+        stateInfoHistory_.segment((historyLength_ -1 - 6) * proprioceptiveDim_, proprioceptiveDim_);
+    obDouble_.segment(18, 9) = stateInfoHistory_.segment((historyLength_ -1 - 4) * proprioceptiveDim_, proprioceptiveDim_);
+    obDouble_.segment(27, 9) = stateInfoHistory_.segment((historyLength_ -1 - 2) * proprioceptiveDim_, proprioceptiveDim_);
 
 //    /// except the first joints, the joint history stores target-position
 //    obDouble_.segment(10, nJoints_) = gc_.tail(nJoints_);
@@ -603,23 +650,26 @@ class RaiboController {
 //    obDouble_.segment(22, nJoints_) = gv_.tail(nJoints_);
 
     /// Object information
-    obDouble_.segment(36, Obj_Info_.size()) = Obj_Info_;
+    obDouble_.segment(36, exteroceptiveDim_) = Obj_Info_;
 
 
     /// proprioceptive information history
 
 
     /// object information history
-    obDouble_.segment(36+Obj_Info_.size(), Obj_Info_.size()) = objectInfoHistory_.segment((historyLength_ -1 - 6) * Obj_Info_.size(), Obj_Info_.size());
-    obDouble_.segment(36+2*Obj_Info_.size(), Obj_Info_.size()) = objectInfoHistory_.segment((historyLength_ -1 - 4) * Obj_Info_.size(), Obj_Info_.size());
-    obDouble_.segment(36+3*Obj_Info_.size(), Obj_Info_.size()) = objectInfoHistory_.segment((historyLength_ -1 - 2) * Obj_Info_.size(), Obj_Info_.size());
+    obDouble_.segment(36+exteroceptiveDim_, exteroceptiveDim_) =
+        objectInfoHistory_.segment((historyLength_ -1 - 6) * exteroceptiveDim_, exteroceptiveDim_);
+    obDouble_.segment(36+2*exteroceptiveDim_, exteroceptiveDim_) =
+        objectInfoHistory_.segment((historyLength_ -1 - 4) * exteroceptiveDim_, exteroceptiveDim_);
+    obDouble_.segment(36+3*exteroceptiveDim_, exteroceptiveDim_) =
+        objectInfoHistory_.segment((historyLength_ -1 - 2) * exteroceptiveDim_, exteroceptiveDim_);
 
 
     /// action history
-    obDouble_.segment(36+4*Obj_Info_.size(), actionDim_) = previousAction_;
-    obDouble_.segment(36+4*Obj_Info_.size() + actionDim_, actionDim_) = prev2Action_;
-    obDouble_.segment(36+4*Obj_Info_.size() + 2*actionDim_, actionDim_) = prev3Action_;
-    obDouble_.segment(36+4*Obj_Info_.size() + 3*actionDim_, actionDim_) = prev4Action_;
+    obDouble_.segment(36+4*exteroceptiveDim_, actionDim_) = previousAction_;
+    obDouble_.segment(36+4*exteroceptiveDim_ + actionDim_, actionDim_) = prev2Action_;
+    obDouble_.segment(36+4*exteroceptiveDim_ + 2*actionDim_, actionDim_) = prev3Action_;
+    obDouble_.segment(36+4*exteroceptiveDim_ + 3*actionDim_, actionDim_) = prev4Action_;
 
 
 
@@ -678,6 +728,10 @@ class RaiboController {
 
   void updateObject(raisim::SingleBodyObject* obj) {
     Obj_ = obj;
+  }
+
+  void updateClassifyvector(Eigen::VectorXd &classify) {
+    classify_vector_ = classify;
   }
 
   inline void accumulateRewards(double cf, const Eigen::Vector3d &cm) {
@@ -772,11 +826,11 @@ class RaiboController {
   static constexpr size_t historyLength_ = 14;
 
   int proprioceptiveDim_ = 9;
-  int exteroceptiveDim_ = 25;
+  int exteroceptiveDim_ = 32;
   int historyNum_ = 4;
   int actionNum_ = 4;
 
-  static constexpr size_t obDim_ = 144;
+  static constexpr size_t obDim_ = 172;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
@@ -824,6 +878,7 @@ class RaiboController {
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_, previousAction_, prev2Action_, prev3Action_, prev4Action_;
   Eigen::VectorXd actionTarget_;
   Eigen::Vector3d command_Obj_Pos_;
+  Eigen::VectorXd classify_vector_;
 
 
   // reward variables

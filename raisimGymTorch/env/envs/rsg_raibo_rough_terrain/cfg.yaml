@@ -10,7 +10,7 @@ environment:
   simulation_dt: 0.001
   control_dt: 0.25
   low_level_control_dt: 0.005
-  max_time: 8.0
+  max_time: 6.0
   reward:
 #    commandRewardCoeff_: -5e-5
     commandRewardCoeff_: 0
@@ -27,7 +27,7 @@ environment:
   hierarchical: True
   dimension:
     proprioceptiveDim_: 9
-    exteroceptiveDim_: 25
+    exteroceptiveDim_: 32
     historyNum_: 4
     actionhistoryNum_: 4
     actionDim_: 2

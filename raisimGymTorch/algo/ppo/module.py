@@ -105,8 +105,8 @@ class MLP(nn.Module):
         modules.append(nn.Linear(shape[-1], output_size))
 
         # For low level controller
-        # if actor:
-        #     modules.append(nn.Sigmoid())
+        if actor:
+            modules.append(nn.Sigmoid())
 
         self.architecture = nn.Sequential(*modules)
         scale.append(np.sqrt(2))
