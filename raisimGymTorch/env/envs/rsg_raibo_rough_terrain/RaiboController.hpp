@@ -84,10 +84,10 @@ class RaiboController {
     prev3Action_.setZero(actionDim_);
     prev4Action_.setZero(actionDim_);
 
-    actionMean_ << Eigen::VectorXd::Constant(actionDim_, -1); /// joint target
+    actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
 //    actionMean_.segment(nJoints_ - 6, 6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; /// task space position & orientation residuals
 //    actionMean_.tail(nVargain_) << 50, 0.5, 50, 0.5; /// positional jacobian p, d gain && orientation jacobian p, d gain
-    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 2); /// joint target
+    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 0.5); /// joint target
 //    actionStd_.segment(nJoints_ - 3, 3) << Eigen::VectorXd::Constant(3, 0.1); /// orientation residual
 //    actionStd_.tail(nVargain_) << 0.25, 0.25, 0.25, 0.25; /// positional jacobian p, d gain && orientation jacobian p, d gain
 

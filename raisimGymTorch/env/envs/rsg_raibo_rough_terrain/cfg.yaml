@@ -10,7 +10,7 @@ environment:
   simulation_dt: 0.001
   control_dt: 0.25
   low_level_control_dt: 0.005
-  max_time: 6.0
+  max_time: 8.0
   reward:
 #    commandRewardCoeff_: -5e-5
     commandRewardCoeff_: 0
