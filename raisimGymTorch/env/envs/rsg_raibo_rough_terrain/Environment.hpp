@@ -35,8 +35,8 @@ class ENVIRONMENT {
     raibo_->setName("robot");
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
-    raibo_->getCollisionBody("base/0").setCollisionGroup(raisim::COLLISION(1));
-    raibo_->getCollisionBody("base/0").setCollisionMask(raisim::COLLISION(1));
+    raibo_->getCollisionBody("arm_link/0").setCollisionGroup(raisim::COLLISION(1));
+    raibo_->getCollisionBody("arm_link/0").setCollisionMask(raisim::COLLISION(1));
 //    raibo_->ignoreCollisionBetween(raibo_->getBodyIdx("base"), )
 
     /// Object spawn
@@ -155,7 +155,7 @@ class ENVIRONMENT {
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
 
-    controller_.reset(gen_, normDist_, command_Obj_Pos_);
+    controller_.reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry());
     controller_.updateStateVariables();
     Low_controller_.reset(&world_);
     Low_controller_.updateStateVariable();
@@ -233,8 +233,8 @@ class ENVIRONMENT {
     Obj_->setPosition(x, y, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
     Obj_->setVelocity(0,0,0,0,0,0);
-    Obj_->setAngularDamping({0.5,0.5,0.5});
-    Obj_->setLinearDamping(0.2);
+    Obj_->setAngularDamping({1.0,1.0,1.0});
+    Obj_->setLinearDamping(0.5);
 
     phi_ = uniDist_(gen_);
 

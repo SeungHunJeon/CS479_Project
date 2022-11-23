@@ -27,7 +27,7 @@ environment:
   hierarchical: True
   dimension:
     proprioceptiveDim_: 9
-    exteroceptiveDim_: 32
+    exteroceptiveDim_: 35
     historyNum_: 4
     actionhistoryNum_: 4
     actionDim_: 2
@@ -35,11 +35,15 @@ environment:
 encoder:
   proprioceptivelatentDim_: 16
   exteroceptivelatentDim_: 32
-  actionlatentDim_: 8
+  actionlatentDim_: 4
 
 architecture:
-  policy_net: [128, 64]
-  value_net: [128, 64]
-  pro_encoder_net: [128, 64] # 9 x 4
-  ext_encoder_net: [256, 128] # 25 x 4
-  act_encoder_net: [32, 32] # 2 x 4
+  policy_net: [256, 128, 64]
+  value_net: [256, 128, 64]
+
+  encoding:
+    policy_net: [ 128, 64 ]
+    value_net: [ 128, 64 ]
+    pro_encoder_net: [256, 128] # 9 x 4
+    ext_encoder_net: [512, 256, 128] # 25 x 4
+    act_encoder_net: [32, 32] # 2 x 4

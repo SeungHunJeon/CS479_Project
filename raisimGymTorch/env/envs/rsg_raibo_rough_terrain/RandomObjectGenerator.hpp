@@ -22,6 +22,7 @@ class RandomObjectGenerator {
 
   RandomObjectGenerator() {
     classify_vector.setZero(4);
+    geometry.setZero(3);
   }
 
   void setSeed(int seed) {
@@ -30,6 +31,10 @@ class RandomObjectGenerator {
 
   double get_height () {
     return object_height;
+  }
+
+  Eigen::VectorXd get_geometry () {
+    return geometry;
   }
 
   Eigen::VectorXd get_classify_vector () {
@@ -77,6 +82,7 @@ class RandomObjectGenerator {
         double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
         object_height = 2*radius_;
         classify_vector << 1, 0, 0, 0;
+        geometry << 2*radius_, 2*radius_, 2*radius_;
         return world->addSphere(radius_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
@@ -87,6 +93,7 @@ class RandomObjectGenerator {
         double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
         object_height = height;
         classify_vector << 0, 1, 0, 0;
+        geometry << 2*radius_, 2*radius_, height_;
         return world->addCylinder(radius_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
@@ -98,6 +105,7 @@ class RandomObjectGenerator {
         double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
         object_height = height_;
         classify_vector << 0, 0, 1, 0;
+        geometry << width1_, width2_, height_;
         return world->addBox(width1_, width2_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
@@ -109,6 +117,7 @@ class RandomObjectGenerator {
         double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
         object_height = 2 * radius_ + height_;
         classify_vector << 0, 0, 0, 1;
+        geometry << 2*radius_, 2*radius_, height_+2*radius_;
         return world->addCapsule(radius_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
@@ -120,6 +129,7 @@ class RandomObjectGenerator {
   int object_seed_;
   double object_height;
   Eigen::VectorXd classify_vector;
+  Eigen::VectorXd geometry; // width, width, height
 };
 
 }

@@ -69,21 +69,21 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 
 total_steps = n_steps * env.num_envs
 
-pro_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['pro_encoder_net'],
+pro_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['encoding']['pro_encoder_net'],
                                                 nn.LeakyReLU,
                                                 obs_pro_dim,
                                                 pro_latent_dim,
                                                 actor=False),
                                  device)
 
-ext_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['ext_encoder_net'],
+ext_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['encoding']['ext_encoder_net'],
                                                 nn.LeakyReLU,
                                                 obs_ext_dim,
                                                 ext_latent_dim,
                                                 actor=False),
                                  device)
 
-act_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['act_encoder_net'],
+act_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['encoding']['act_encoder_net'],
                                                 nn.LeakyReLU,
                                                 obs_act_dim,
                                                 act_latent_dim,
@@ -92,14 +92,14 @@ act_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['act_encoder
 
 encoders = [pro_encoder, ext_encoder, act_encoder]
 
-actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, act_dim, actor=True),
+actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, act_dim, actor=True),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                            env.num_envs,
                                                                            1.0,
                                                                            NormalSampler(act_dim),
                                                                            cfg['seed']),
                          device)
-critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['value_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, 1, actor=False),
+critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, 1, actor=False),
                            device)
 
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
