@@ -44,6 +44,6 @@ architecture:
   encoding:
     policy_net: [ 128, 64 ]
     value_net: [ 128, 64 ]
-    pro_encoder_net: [256, 128] # 9 x 4
-    ext_encoder_net: [512, 256, 128] # 25 x 4
+    pro_encoder_net: [128, 64] # 9 x 4
+    ext_encoder_net: [256, 128, 64] # 25 x 4
     act_encoder_net: [32, 32] # 2 x 4

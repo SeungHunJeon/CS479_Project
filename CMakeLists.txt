@@ -36,7 +36,7 @@ find_package(OpenMP REQUIRED)
 
 if (UNIX AND NOT APPLE AND NOT ANDROID AND NOT WEBGL AND NOT WIN32)
     set(RAISIM_OS linux)
-    list(APPEND CMAKE_PREFIX_PATH ../raisim/${RAISIM_OS})
+    list(APPEND CMAKE_PREFIX_PATH ../raisimLib/raisim/${RAISIM_OS})
 elseif(APPLE)
     set(RAISIM_OS mac)
     list(APPEND CMAKE_PREFIX_PATH ../raisim/${RAISIM_OS})

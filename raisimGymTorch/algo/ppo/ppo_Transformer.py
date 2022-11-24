@@ -42,10 +42,7 @@ class PPO:
         else:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
-        encode_param = []
-        for i, key in enumerate(self.encoder):
-            encode_param += [*key.parameters()]
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()] + encode_param, lr=learning_rate)
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
         self.device = device
 
         # env parameters
@@ -83,12 +80,17 @@ class PPO:
         self.actor_obs = None
 
     def encode(self, obs):
+        # obs_set = []
         j = int(0)
+        # for i, key in enumerate(self.encoder):
+        #     obs_set.append(obs[:,j:j+key.architecture.input_shape[0]])
+        #     j += key.architecture.input_shape[0]
         obs_concat=[]
         for i, key in enumerate(self.encoder):
+            # obs_concat.append(key.evaluate(obs_set[i]))
             obs_concat.append(key.evaluate(obs[:,j:j+key.architecture.input_shape[0]]))
             j += key.architecture.input_shape[0]
-        output = torch.cat(obs_concat, dim=-1)
+        output = torch.cat(obs_concat, 1)
         return output
 
     def act(self, actor_obs):
@@ -149,7 +151,6 @@ class PPO:
                 """
                 obs_concat = self.encode(obs_batch)
 
-
                 # actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(obs_concat, actions_batch)
                 # value_batch = self.critic.evaluate(critic_obs_batch)
@@ -198,10 +199,10 @@ class PPO:
                 self.optimizer.zero_grad()
                 loss.backward()
 
-
                 encode_param = []
                 for i, key in enumerate(self.encoder):
                     encode_param += [*key.parameters()]
+
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()] + encode_param, self.max_grad_norm)
                 self.optimizer.step()
 

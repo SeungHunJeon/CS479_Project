@@ -117,7 +117,6 @@ class ENVIRONMENT {
   void adapt_Low_controller (controller::raibotPositionController controller) {
     Low_controller_ = controller;
     Low_controller_.init(&world_);
-    std::cout << "adapt test L " << std::endl;
     Low_controller_.test();
   }
 
