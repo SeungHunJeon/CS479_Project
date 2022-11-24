@@ -1,5 +1,5 @@
 # task specification
-task_name = "Random_Object_encoded"
+task_name = "Random_Object_encod_prob"
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
@@ -69,25 +69,23 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 
 total_steps = n_steps * env.num_envs
 
-pro_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['encoding']['pro_encoder_net'],
+pro_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['pro_encoder_net'],
                                                 nn.LeakyReLU,
                                                 obs_pro_dim,
-                                                pro_latent_dim,
-                                                actor=False),
+                                                pro_latent_dim
+                                                ),
                                  device)
 
-ext_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['encoding']['ext_encoder_net'],
+ext_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['ext_encoder_net'],
                                                 nn.LeakyReLU,
                                                 obs_ext_dim,
-                                                ext_latent_dim,
-                                                actor=False),
+                                                ext_latent_dim),
                                  device)
 
-act_encoder = ppo_module.Encoder(ppo_module.MLP(cfg['architecture']['encoding']['act_encoder_net'],
+act_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['act_encoder_net'],
                                                 nn.LeakyReLU,
                                                 obs_act_dim,
-                                                act_latent_dim,
-                                                actor=False),
+                                                act_latent_dim),
                                  device)
 
 encoders = [pro_encoder, ext_encoder, act_encoder]
@@ -108,7 +106,7 @@ saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name
 ppo = PPO_Encod.PPO(actor=actor,
               critic=critic,
               encoder=encoders,
-              encoder_deterministic=True,
+              encoder_deterministic=False,
               num_envs=cfg['environment']['num_envs'],
               obs_shape=[env.num_obs],
               num_transitions_per_env=n_steps,
@@ -124,6 +122,19 @@ ppo = PPO_Encod.PPO(actor=actor,
               )
 
 iteration_number = 0
+
+@staticmethod
+def latent_concat(obs):
+    obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
+    obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
+    obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
+
+    pro_latent, pro_mu, pro_logvar = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
+    ext_latent, ext_mu, ext_logvar = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
+    act_latent, act_mu, act_logvar = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
+
+    obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+    return obs_concat
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -162,15 +173,7 @@ for update in range(iteration_number, 1000000):
             with torch.no_grad():
                 obs = env.observe(False)
 
-                obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
-                obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
-                obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
-
-                pro_latent = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
-                ext_latent = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
-                act_latent = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
-
-                obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+                obs_concat = latent_concat(obs)
 
                 actions, actions_log_prob = actor.sample(obs_concat)
                 reward, dones = env.step_visualize(actions)
@@ -189,19 +192,7 @@ for update in range(iteration_number, 1000000):
         with torch.no_grad():
             obs = env.observe(update < 10000)
 
-            obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
-            obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
-            obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
-            ## decouple the observation into proprioceptive information, object information
-            # // Variable : Number of history length, number of proprioceptive info legnth, observation length
-
-            ## Add the encoding module for each time step
-            # // Variable : Number of history length, number of proprioceptive info legnth, observation length
-            pro_latent = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
-            ext_latent = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
-            act_latent = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
-
-            obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+            obs_concat = latent_concat(obs)
             obs_concat = obs_concat.detach().cpu().numpy()
 
             action = ppo.act(obs_concat)
@@ -216,19 +207,7 @@ for update in range(iteration_number, 1000000):
     # take st step to get value obs
     obs = env.observe(update < 10000)
 
-    obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
-    obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
-    obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
-    ## decouple the observation into proprioceptive information, object information
-    # // Variable : Number of history length, number of proprioceptive info legnth, observation length
-
-    ## Add the encoding module for each time step
-    # // Variable : Number of history length, number of proprioceptive info legnth, observation length
-    pro_latent = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
-    ext_latent = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
-    act_latent = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
-
-    obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+    obs_concat = latent_concat(obs)
     obs_concat = obs_concat.detach().cpu().numpy()
 
     ppo.update(actor_obs=obs_concat, value_obs=obs_concat, log_this_iteration=update % 10 == 0, update=update)

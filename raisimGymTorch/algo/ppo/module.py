@@ -76,10 +76,10 @@ class Encoder:
         self.architecture = architecture
         self.architecture.to(device)
     def predict(self, obs):
-        return self.architecture.architecture(obs).detach()
+        return self.architecture(obs).detach()
 
     def evaluate(self, obs):
-        return self.architecture.architecture(obs)
+        return self.architecture(obs)
 
     def parameters(self):
         return [*self.architecture.parameters()]
@@ -87,6 +87,45 @@ class Encoder:
     @property
     def obs_shape(self):
         return self.architecture.input_shape
+
+class MLP_Prob(nn.Module):
+    def __init__(self, shape, actionvation_fn, input_size, output_size):
+        super(MLP_Prob, self).__init__()
+        self.activation_fn = actionvation_fn
+        modules = [nn.Linear(input_size, shape[0]), self.activation_fn()]
+        scale = [np.sqrt(2)]
+
+        for idx in range(len(shape)-1):
+            modules.append(nn.Linear(shape[idx], shape[idx+1]))
+            modules.append(self.activation_fn())
+            scale.append(np.sqrt(2))
+
+        modules.append(nn.Linear(shape[-1], output_size*2))
+
+        self.architecture = nn.Sequential(*modules)
+        scale.append(np.sqrt(2))
+
+        self.init_weights(self.architecture, scale)
+        self.input_shape = [input_size]
+        self.output_shape = [output_size]
+
+    @staticmethod
+    def init_weights(sequential, scales):
+        [torch.nn.init.orthogonal_(module.weight, gain=scales[idx]) for idx, module in
+         enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
+
+    def forward(self, x):
+        output = self.architecture(x)
+
+        z_mu, z_logvar = torch.chunk(output, 2, dim=-1)
+
+        # reparametrization
+        _std = (torch.randn_like(z_mu)
+                * torch.exp(0.5*z_logvar))
+
+        z = z_mu + _std
+
+        return z, z_mu, z_logvar
 
 
 class MLP(nn.Module):
@@ -114,6 +153,10 @@ class MLP(nn.Module):
         self.init_weights(self.architecture, scale)
         self.input_shape = [input_size]
         self.output_shape = [output_size]
+
+    def forward(self, x):
+        output = self.architecture(x)
+        return output
 
     @staticmethod
     def init_weights(sequential, scales):
