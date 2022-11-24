@@ -2,14 +2,14 @@ cmake_minimum_required(VERSION 3.10)
 project(_compliant_gym_tester LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 
-list(APPEND CMAKE_PREFIX_PATH "~/workspace/raisim_build")
+list(APPEND CMAKE_PREFIX_PATH $LOCAL_INSTALL)
 list(APPEND CMAKE_PREFIX_PATH "~/workspace/raisin_ws/src/raisin/raisin_torch/pytorch/libtorch")
 list(APPEND CMAKE_PREFIX_PATH "~/workspace/Libraries/libtorch_cpu/libtorch")
 
 find_package(raisim CONFIG REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(OpenMP REQUIRED)
-find_package(Torch REQUIRED)
+#find_package(Torch REQUIRED)
 
 message("ASDQWFSAD Build done .. ")
 

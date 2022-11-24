@@ -4,7 +4,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 find_package(raisim CONFIG REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Torch REQUIRED)
+#find_package(Torch REQUIRED)
 
 list(APPEND CMAKE_PREFIX_PATH "~/workspace/raisin_ws/src/raisin/raisin_torch/pytorch/libtorch")
 list(APPEND CMAKE_PREFIX_PATH "~/workspace/Libraries/libtorch_cpu/libtorch")

@@ -80,14 +80,16 @@ class PPO:
         self.actor_obs = None
 
     def encode(self, obs):
-        obs_set = []
+        # obs_set = []
         j = int(0)
-        for i, key in enumerate(self.encoder):
-            obs_set.append(obs[:,j:j+key.architecture.input_shape[0]])
-            j += key.architecture.input_shape[0]
+        # for i, key in enumerate(self.encoder):
+        #     obs_set.append(obs[:,j:j+key.architecture.input_shape[0]])
+        #     j += key.architecture.input_shape[0]
         obs_concat=[]
         for i, key in enumerate(self.encoder):
-            obs_concat.append(key.predict(obs_set[i]))
+            # obs_concat.append(key.evaluate(obs_set[i]))
+            obs_concat.append(key.evaluate(obs[:,j:j+key.architecture.input_shape[0]]))
+            j += key.architecture.input_shape[0]
         output = torch.cat(obs_concat, 1)
         return output
 

@@ -27,7 +27,7 @@ environment:
   hierarchical: True
   dimension:
     proprioceptiveDim_: 9
-    exteroceptiveDim_: 35
+    exteroceptiveDim_: 38
     historyNum_: 4
     actionhistoryNum_: 4
     actionDim_: 2

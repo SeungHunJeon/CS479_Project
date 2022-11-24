@@ -67,10 +67,6 @@ class RaiboController {
 
     Obj_ = obj;
     /// foot scan config
-//    scanConfig_.setZero(5);
-//    scanConfig_ << 6, 8, 10, 12, 14;
-//    scanPoint_.resize(4, std::vector<raisim::Vec<2>>(scanConfig_.sum()));
-//    heightScan_.resize(4, raisim::VecDyn(scanConfig_.sum()));
 
     /// Observation
     actionTarget_.setZero(actionDim_);
@@ -85,11 +81,7 @@ class RaiboController {
     prev4Action_.setZero(actionDim_);
 
     actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
-//    actionMean_.segment(nJoints_ - 6, 6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0; /// task space position & orientation residuals
-//    actionMean_.tail(nVargain_) << 50, 0.5, 50, 0.5; /// positional jacobian p, d gain && orientation jacobian p, d gain
     actionStd_<< Eigen::VectorXd::Constant(actionDim_, 0.5); /// joint target
-//    actionStd_.segment(nJoints_ - 3, 3) << Eigen::VectorXd::Constant(3, 0.1); /// orientation residual
-//    actionStd_.tail(nVargain_) << 0.25, 0.25, 0.25, 0.25; /// positional jacobian p, d gain && orientation jacobian p, d gain
 
     obMean_.setZero(obDim_);
     obStd_.setZero(obDim_);
@@ -100,40 +92,6 @@ class RaiboController {
     objectInfoHistory_.setZero(historyLength_ * exteroceptiveDim_);
     stateInfoHistory_.setZero(historyLength_ * proprioceptiveDim_);
 
-
-    /// observation
-//    obMean_ << 0.47, /// average height
-//        0.0, 0.0, 1.4, /// gravity axis 3
-//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
-//        nominalConfig_, /// joint pos
-//        Eigen::VectorXd::Constant(nJoints_, 0.0), /// joint velocity
-//        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(3, sqrt(2)), /// object to target distance
-//        Eigen::VectorXd::Constant(3, 2.0), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.0); /// object velocity
-//
-////        Eigen::VectorXd::Constant(nJoints_ * (4 - 1), 0.0), /// joint position error history
-////        Eigen::VectorXd::Constant(nJoints_ * 4, 0.0), /// joint vel history
-////        nominalConfig_, /// previous action
-////        nominalConfig_; /// preprev action
-////        Eigen::VectorXd::Constant(3, 0.0); /// command
-//
-//    obStd_ << 0.05, /// height
-//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-//        Eigen::VectorXd::Constant(nJoints_, 1.), /// joint angles
-//        Eigen::VectorXd::Constant(nJoints_, 10.0), /// joint velocities
-//        Eigen::VectorXd::Constant(3, 0.2), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(3, 0.2), /// object to target distance
-//        Eigen::VectorXd::Constant(3, 0.2),
-////        Eigen::VectorXd::Constant(3, 0.2), /// object to target orientation
-//        Eigen::VectorXd::Constant(3, 0.2); /// object velocity
-////        Eigen::VectorXd::Constant(nJoints_ * (4 - 1), 0.6), /// joint position error history
-////        Eigen::VectorXd::Constant(nJoints_ * 4, 10.0), /// joint velocities
-////        actionStd_ * 1.5, /// previous action
-////        actionStd_ * 1.5; /// previous action
-////        .5, 0.3, 0.6; /// command
 
     for (int i=0; i<historyNum_ ; i++) {
       obMean_.segment(proprioceptiveDim_*i, proprioceptiveDim_) << 0.0, 0.0, 1.4, /// gravity axis 3
@@ -158,69 +116,6 @@ class RaiboController {
       obMean_.segment(proprioceptiveDim_*historyNum_ + exteroceptiveDim_*historyNum_ + actionDim_ * i, actionDim_) <<
           Eigen::VectorXd::Constant(actionDim_, 0.0);
     }
-//
-//
-//    obMean_ <<
-//        0.0, 0.0, 1.4, /// gravity axis 3
-//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
-//
-//        0.0, 0.0, 1.4, /// gravity axis 3
-//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
-//
-//        0.0, 0.0, 1.4, /// gravity axis 3
-//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
-//
-//        0.0, 0.0, 1.4, /// gravity axis 3
-//        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
-//
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 2),
-//        Eigen::VectorXd::Constant(3, 0),
-//        Eigen::VectorXd::Constant(9, 0),
-//
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 2),
-//        Eigen::VectorXd::Constant(3, 0),
-//        Eigen::VectorXd::Constant(9, 0),
-//
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 2),
-//        Eigen::VectorXd::Constant(3, 0),
-//        Eigen::VectorXd::Constant(9, 0),
-//
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0),
-//        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 2),
-//        Eigen::VectorXd::Constant(3, 0),
-//        Eigen::VectorXd::Constant(9, 0),
-//
-//        Eigen::VectorXd::Constant(actionDim_, 0.0),
-//        Eigen::VectorXd::Constant(actionDim_, 0.0),
-//        Eigen::VectorXd::Constant(actionDim_, 0.0),
-//        Eigen::VectorXd::Constant(actionDim_, 0.0); /// object velocity
 
     for (int i=0; i<historyNum_ ; i++) {
       obStd_.segment(proprioceptiveDim_*i, proprioceptiveDim_) <<
@@ -248,72 +143,6 @@ class RaiboController {
           Eigen::VectorXd::Constant(actionDim_, 0.5);
     }
 
-//    obStd_ <<
-//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-//
-//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-//
-//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-//
-//        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-//        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-//        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-//
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 0.2),
-//        Eigen::VectorXd::Constant(3, 0.1),
-//        Eigen::VectorXd::Constant(9, 0.05),
-//
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 0.2),
-//        Eigen::VectorXd::Constant(3, 0.1),
-//        Eigen::VectorXd::Constant(9, 0.05),
-//
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 0.2),
-//        Eigen::VectorXd::Constant(3, 0.1),
-//        Eigen::VectorXd::Constant(9, 0.05),
-//
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-//        Eigen::VectorXd::Constant(2, 0.5),
-//        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-//        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-//        Eigen::VectorXd::Constant(1, 0.2),
-//        Eigen::VectorXd::Constant(3, 0.1),
-//        Eigen::VectorXd::Constant(9, 0.05),
-//
-//        Eigen::VectorXd::Constant(actionDim_, 0.5),
-//        Eigen::VectorXd::Constant(actionDim_, 0.5),
-//        Eigen::VectorXd::Constant(actionDim_, 0.5),
-//        Eigen::VectorXd::Constant(actionDim_, 0.5); /// object velocity
-
     footIndices_.push_back(raibo_->getBodyIdx("LF_SHANK"));
     footIndices_.push_back(raibo_->getBodyIdx("RF_SHANK"));
     footIndices_.push_back(raibo_->getBodyIdx("LH_SHANK"));
@@ -333,33 +162,6 @@ class RaiboController {
 
     classify_vector_.setZero(4);
     classify_vector_ << 1, 0, 0, 0;
-
-    /// Object info
-//    Obj_ = dynamic_cast<Box *>(world->getObject("Obj_"));
-//    std::cout << Obj_->getPosition() << std::endl;
-    /// Jacobian from EE
-
-    /// heightmap
-//    scanCos_.resize(scanConfig_.size(), scanConfig_.maxCoeff());
-//    scanSin_.resize(scanConfig_.size(), scanConfig_.maxCoeff());
-    /// precompute sin and cos because they take very long time
-//    for (int k = 0; k < scanConfig_.size(); k++) {
-//      for (int j = 0; j < scanConfig_[k]; j++) {
-//        const double angle = 2.0 * M_PI * double(j) / scanConfig_[k];
-//        scanCos_(k,j) = cos(angle);
-//        scanSin_(k,j) = sin(angle);
-//      }
-//    }
-
-
-    /// Initialize
-//    Gen_Force_.setZero(raibo_->getDOF());
-//    Jb_a_.setZero(3, raibo_->getDOF());
-//    Jr_a_.setZero(3, raibo_->getDOF());
-//    dJb_a_.setZero(3, raibo_->getDOF());
-//    dJr_a_.setZero(3, raibo_->getDOF());
-//
-//    pos_des_ << 0.7, 0, 0.2;
 
     return true;
   };
@@ -382,12 +184,6 @@ class RaiboController {
     stateInfo.segment(3,3) = bodyLinVel_;
     stateInfo.segment(6,3) = bodyAngVel_;
     stateInfoHistory_.tail(proprioceptiveDim_) = stateInfo;
-    //
-//    /// joint velocities
-//    historyTempMemory_ = jointVelocityHistory_;
-//    jointVelocityHistory_.head((historyLength_ - 1) * nJoints_) =
-//        historyTempMemory_.tail((historyLength_ - 1) * nJoints_);
-//    jointVelocityHistory_.tail(nJoints_) = gv_.tail(nJoints_);
   }
 
   void updateStateVariables() {
@@ -403,67 +199,14 @@ class RaiboController {
     bodyLinVel_ = baseRot_.e().transpose() * gv_.segment(0, 3);
     bodyAngVel_ = baseRot_.e().transpose() * gv_.segment(3, 3);
 
-//    /// foot info
-//    for (size_t i = 0; i < 4; i++) {
-//      raibo_->getFramePosition(footFrameIndicies_[i], footPos_[i]);
-//      raibo_->getFrameVelocity(footFrameIndicies_[i], footVel_[i]);
-//    }
-    /// End effector info
-
-//    for (int i = 0; i < 3; i++) {
-////      ee_Pos_w_[i] = gc_[i];
-////      ee_Vel_w_[i] = gv_[i];
-//
-//      ///TODO
-//
-//    }
     raibo_->getFramePosition(raibo_->getFrameIdxByLinkName("arm_link"), ee_Pos_w_);
     raibo_->getFrameVelocity(raibo_->getFrameIdxByLinkName("arm_link"), ee_Vel_w_);
 
-
-//    switch (is_foot_contact_) {
-//      case 1:
-//        ee_Pos_w_ = footPos_[0];
-//        ee_Vel_w_ = footVel_[0];
-//        break;
-//
-//      case 0:
-//        for (int i = 0; i < 3; i++) {
-//          ee_Pos_w_[i] = gc_[i];
-//          ee_Vel_w_[i] = gv_[i];
-//
-//        }
-//          break;
-//
-//    }
-    // Get EE position
-
-//    ee_Pos_ = baseRot_.e().transpose() * (ee_Pos_w_.e() - gc_.head(3)); // World frame into robot frame
-//
-//    // Get EE orientation
-//    raibo_->getBodyOrientation(armIndices_[0], eeRot_w_);
-//    eeRot_ = baseRot_.e().transpose() * eeRot_w_.e(); // World frame into robot frame
-//
-    // Get EE velocity
-
-//    ee_Vel_ = baseRot_.e().transpose() * ee_Vel_w_.e();
-//
-//    // Get EE angular velocity
-//    raibo_->getAngularVelocity(armIndices_[0], ee_Avel_w_);
-//    ee_Avel_ = baseRot_.e().transpose() * ee_Avel_w_.e();
-//
     /// Object info
 
     Obj_->getPosition(Obj_Pos_);
-//
     Obj_->getLinearVelocity(Obj_Vel_);
-
-
-
-//    RSINFO(Obj_Vel_.e())
     Obj_->getAngularVelocity(Obj_AVel_);
-//    Obj_->getOrientation(Obj_->getIndexInWorld(), Obj_Rot_);
-//
     //TODO
 
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
@@ -516,7 +259,6 @@ class RaiboController {
     Obj_Info_.segment(31,4) = classify_vector_;
 
     Obj_Info_.segment(35,3) = obj_geometry_;
-//        baseRot_.e().transpose() * Obj_AVel_.e();
 
     /// height map
     controlFrameX_ =
@@ -525,19 +267,10 @@ class RaiboController {
     raisim::cross(zAxis_, controlFrameX_, controlFrameY_);
 
     /// check if the feet are in contact with the ground
-
-//    for (auto &fs: footContactState_) fs = false;
-//    for (auto &contact: raibo_->getContacts()) {
-//      auto it = std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex());
-//      size_t index = it - footIndices_.begin();
-//      if (index < 4 && !contact.isSelfCollision())
-//        footContactState_[index] = true;
-//    }
   }
 
   void getObservation(Eigen::VectorXd &observation) {
     observation = (obDouble_ - obMean_).cwiseQuotient(obStd_);
-//    std::cout << "Observation : " << observation << std::endl;
   }
 
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
@@ -574,8 +307,6 @@ class RaiboController {
 //    posDgain_ = PDgainTarget_[1];
 //    oriPgain_ = PDgainTarget_[2];
 //    oriDgain_ = PDgainTarget_[3];
-
-
 
 //    smoothReward_ = curriculumFactor * smoothRewardCoeff_ * (prevprevAction_ + jointTarget_ - 2 * previousAction_).squaredNorm();
     return true;
@@ -645,11 +376,8 @@ class RaiboController {
                          const raisim::HeightMap *map,
                          std::mt19937 &gen_,
                          std::normal_distribution<double> &normDist_) {
-//    updateHeightScan(map, gen_, normDist_);
 
     /// height of the origin of the body frame
-//    obDouble_[0] = gc_[2] - map->getHeight(gc_[0], gc_[1]);
-//    obDouble_[0] = gc_[2];
 //    /// body orientation
     obDouble_.segment(0, 3) = baseRot_.e().row(2);
 
@@ -661,18 +389,10 @@ class RaiboController {
     obDouble_.segment(18, 9) = stateInfoHistory_.segment((historyLength_ -1 - 4) * proprioceptiveDim_, proprioceptiveDim_);
     obDouble_.segment(27, 9) = stateInfoHistory_.segment((historyLength_ -1 - 2) * proprioceptiveDim_, proprioceptiveDim_);
 
-//    /// except the first joints, the joint history stores target-position
-//    obDouble_.segment(10, nJoints_) = gc_.tail(nJoints_);
-//
-//    /// base joint velocity
-//    obDouble_.segment(22, nJoints_) = gv_.tail(nJoints_);
-
     /// Object information
     obDouble_.segment(36, exteroceptiveDim_) = Obj_Info_;
 
-
     /// proprioceptive information history
-
 
     /// object information history
     obDouble_.segment(36+exteroceptiveDim_, exteroceptiveDim_) =
@@ -689,42 +409,6 @@ class RaiboController {
     obDouble_.segment(36+4*exteroceptiveDim_ + 2*actionDim_, actionDim_) = prev3Action_;
     obDouble_.segment(36+4*exteroceptiveDim_ + 3*actionDim_, actionDim_) = prev4Action_;
 
-
-
-//    for (int i=0; i < nPosHist_; i++)
-//      obDouble_.segment(10+nJoints_*(i+1), nJoints_) = jointPositionHistory_.segment((historyLength_ - 1 - (6-2*i)) * nJoints_, nJoints_);
-//
-//    for (int i=0; i < nVelHist_; i++)
-//      obDouble_.segment(10+nJoints_*(nPosHist_) + nJoints_*(i+1), nJoints_) = jointVelocityHistory_.segment((historyLength_ - 1 - (6-2*i)) * nJoints_, nJoints_);
-
-//    obDouble_.segment(22, nJoints_) = jointPositionHistory_.segment((historyLength_ - 1 - 6) * nJoints_, nJoints_);
-//    obDouble_.segment(34, nJoints_) = jointPositionHistory_.segment((historyLength_ - 1 - 4) * nJoints_, nJoints_);
-//    obDouble_.segment(46, nJoints_) = jointPositionHistory_.segment((historyLength_ - 1 - 2) * nJoints_, nJoints_);
-//
-//    obDouble_.segment(58, nJoints_) = jointVelocityHistory_.segment((historyLength_ - 1 - 6) * nJoints_, nJoints_);
-//    obDouble_.segment(70, nJoints_) = jointVelocityHistory_.segment((historyLength_ - 1 - 4) * nJoints_, nJoints_);
-//    obDouble_.segment(82, nJoints_) = jointVelocityHistory_.segment((historyLength_ - 1 - 2) * nJoints_, nJoints_);
-//    obDouble_.segment(94, nJoints_) = jointVelocityHistory_.segment((historyLength_ - 1) * nJoints_, nJoints_);
-
-    /// height scan
-//    for (int i = 0; i < 4; i++)
-//      for (int j = 0; j < scanConfig_.sum(); j++)
-//        obDouble_[10 + 2 * nJoints_ * 4 + i * scanConfig_.sum() + j] = heightScan_[i][j];
-
-    /// previous action
-//    obDouble_.segment(10 + nJoints_*nPosHist_ + nJoints_*nVelHist_ + nJoints_, nJoints_) = previousAction_;
-//    obDouble_.segment(10 + nJoints_*nPosHist_ + nJoints_*nVelHist_ + nJoints_*2, nJoints_) = prevprevAction_;
-
-//    Eigen::Vector3d posXyz; posXyz << gc_[0], gc_[1], gc_[2];
-//    Eigen::Vector3d target; target << command[0], command[1], map->getHeight(command[0], command[1])+0.56;
-//    Eigen::Vector3d targetRel = target - posXyz;
-//    Eigen::Vector3d targetRelBody = baseRot_.e().transpose() * targetRel;
-//    const double dist = targetRelBody.norm();
-//    targetRelBody *= 1./targetRelBody.head<2>().norm();
-
-    /// command
-//    obDouble_.segment(34 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum(), 2) << targetRelBody[0], targetRelBody[1];
-//    obDouble_[34 + 2 * nJoints_ * 4 + 4 * scanConfig_.sum() + 2] = std::min(3., dist);
   }
 
   inline void checkConfig(const Yaml::Node &cfg) {
@@ -779,11 +463,7 @@ class RaiboController {
 
     /// move the object towards the target
     double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;
-//    std::cout << "Obj_Vel_ : " << Obj_Vel_.e() << std::endl;
-    Eigen::Vector3d Obj_Vel_n = Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8));
-//    std::cout << "Obj_Vel_ normalized : " << Obj_Vel_n << std::endl;
     towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
-//    std::cout << "towardTargetReward : " << towardTargetReward_ << std::endl;
 
     /// keep the object close to the target
     double stay_t = obj_to_target.norm();
@@ -795,26 +475,6 @@ class RaiboController {
     torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
 
   }
-
-//  void updateHeightScan(const raisim::HeightMap *map,
-//                        std::mt19937 &gen_,
-//                        std::normal_distribution<double> &normDist_) {
-//    /// heightmap
-//    for (int k = 0; k < scanConfig_.size(); k++) {
-//      for (int j = 0; j < scanConfig_[k]; j++) {
-//        const double distance = 0.07 * (k + 1);
-//        for (int i = 0; i < 4; i++) {
-//          scanPoint_[i][scanConfig_.head(k).sum() + j][0] =
-//              footPos_[i][0] + controlFrameX_[0] * distance * scanCos_(k,j) + controlFrameY_[0] * distance * scanSin_(k,j);
-//          scanPoint_[i][scanConfig_.head(k).sum() + j][1] =
-//              footPos_[i][1] + controlFrameX_[1] * distance * scanCos_(k,j) + controlFrameY_[1] * distance * scanSin_(k,j);
-//          heightScan_[i][scanConfig_.head(k).sum() + j] =
-//              map->getHeight(scanPoint_[i][scanConfig_.head(k).sum() + j][0],
-//                             scanPoint_[i][scanConfig_.head(k).sum() + j][1]) - footPos_[i][2] + normDist_(gen_) * 0.025;
-//        }
-//      }
-//    }
-//  }
 
   inline void setStandingMode(bool mode) { standingMode_ = mode; }
 
