@@ -60,9 +60,9 @@ pro_latent_dim = cfg['encoder']['proprioceptivelatentDim_']
 ext_latent_dim = cfg['encoder']['exteroceptivelatentDim_']
 act_latent_dim = cfg['encoder']['actionlatentDim_']
 
-obs_pro_dim = pro_dim*(historyNum)
-obs_ext_dim = ext_dim*(historyNum)
-obs_act_dim = act_dim*(actionhistoryNum)
+obs_pro_dim = pro_dim
+obs_ext_dim = ext_dim
+obs_act_dim = act_dim
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
@@ -82,13 +82,15 @@ ext_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encodi
                                                 ext_latent_dim),
                                  device)
 
-act_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['act_encoder_net'],
-                                                nn.LeakyReLU,
-                                                obs_act_dim,
-                                                act_latent_dim),
-                                 device)
+# act_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['act_encoder_net'],
+#                                                 nn.LeakyReLU,
+#                                                 obs_act_dim,
+#                                                 act_latent_dim),
+#                                  device)
 
-encoders = [pro_encoder, ext_encoder, act_encoder]
+# encoders = [pro_encoder, ext_encoder, act_encoder]
+
+encoders = [pro_encoder, ext_encoder]
 
 actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, act_dim, actor=True),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
@@ -125,16 +127,17 @@ iteration_number = 0
 
 @staticmethod
 def latent_concat(obs):
-    with torch.no_grad():
-        obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
-        obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
-        obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
+    obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
+    obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
+    # obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
 
-        pro_latent, pro_mu, pro_logvar = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
-        ext_latent, ext_mu, ext_logvar = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
-        act_latent, act_mu, act_logvar = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
+    pro_latent, pro_mu, pro_logvar = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
+    ext_latent, ext_mu, ext_logvar = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
+    # act_latent, act_mu, act_logvar = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
 
-        obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+    # obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+
+    obs_concat = torch.cat((pro_latent, ext_latent), dim=-1)
     return obs_concat
 
 if mode == 'retrain':

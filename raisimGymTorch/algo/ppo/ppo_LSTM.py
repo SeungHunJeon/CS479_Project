@@ -29,7 +29,8 @@ class PPO:
                  use_clipped_value_loss=True,
                  log_dir='run',
                  device='cpu',
-                 shuffle_batch=True):
+                 shuffle_batch=True,
+                 encoder_deterministic=True):
 
         # PPO components
         self.actor = actor
@@ -42,7 +43,10 @@ class PPO:
         else:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()], lr=learning_rate)
+        encode_param = []
+        for i, key in enumerate(self.encoder):
+            encode_param += [*key.parameters()]
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()] + encode_param, lr=learning_rate)
         self.device = device
 
         # env parameters
@@ -79,19 +83,32 @@ class PPO:
         self.actions_log_prob = None
         self.actor_obs = None
 
-    def encode(self, obs):
-        # obs_set = []
-        j = int(0)
-        # for i, key in enumerate(self.encoder):
-        #     obs_set.append(obs[:,j:j+key.architecture.input_shape[0]])
-        #     j += key.architecture.input_shape[0]
-        obs_concat=[]
-        for i, key in enumerate(self.encoder):
-            # obs_concat.append(key.evaluate(obs_set[i]))
-            obs_concat.append(key.evaluate(obs[:,j:j+key.architecture.input_shape[0]]))
-            j += key.architecture.input_shape[0]
-        output = torch.cat(obs_concat, 1)
-        return output
+        # Encoder param
+        self.encoder_deterministic = encoder_deterministic
+
+    def encode(self, obs, deterministic):
+
+        kl = 0
+
+        if(deterministic): # Deterministic model
+            j = int(0)
+            obs_concat=[]
+            for i, key in enumerate(self.encoder):
+                obs_concat.append(key.evaluate(obs[:,j:j+key.architecture.input_shape[0]]))
+                j += key.architecture.input_shape[0]
+            output = torch.cat(obs_concat, dim=-1)
+
+        else: # Probabilistic model
+            j = int(0)
+            obs_concat=[]
+            for i, key in enumerate(self.encoder):
+                z, z_mu, z_logvar = key.evaluate(obs[:,j:j+key.architecture.input_shape[0]])
+                obs_concat.append(z)
+                kl += -0.5 * torch.sum(1 + z_logvar - z_mu.pow(2) - z_logvar.exp())
+                j += key.architecture.input_shape[0]
+            output = torch.cat(obs_concat, dim=-1)
+
+        return output, kl
 
     def act(self, actor_obs):
         self.actor_obs = actor_obs
@@ -149,7 +166,8 @@ class PPO:
                 critic_obs_batch = obs_batch
                 
                 """
-                obs_concat = self.encode(obs_batch)
+                obs_concat, encode_kl = self.encode(obs_batch, self.encoder_deterministic)
+
 
                 # actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(obs_concat, actions_batch)
@@ -192,17 +210,17 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() + encode_kl
                 # Add kl divergence term to normalize the latent vector
 
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
 
+
                 encode_param = []
                 for i, key in enumerate(self.encoder):
                     encode_param += [*key.parameters()]
-
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()] + encode_param, self.max_grad_norm)
                 self.optimizer.step()
 

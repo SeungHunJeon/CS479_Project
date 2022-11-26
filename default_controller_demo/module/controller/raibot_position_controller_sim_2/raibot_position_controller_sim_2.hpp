@@ -27,7 +27,7 @@ class raibotPositionController {
     std::string network_path = current_path + "/../../../../default_controller_demo/module/controller/raibot_position_controller_sim_2/network/network_100000";
     actor_.readParamFromTxt(network_path + "/full_12800.txt");
 
-//    std::cout << network_path << std::endl;
+    std::cout << network_path << std::endl;
 
 //    std::cout << "Fuck" << std::endl;
 
