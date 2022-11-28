@@ -89,7 +89,7 @@ critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/RaiboController.hpp"])
 
-num_learning_epochs = 1
+num_learning_epochs = 32
 num_mini_batches = 1
 
 ppo = PPO_Encod.PPO(actor=actor,

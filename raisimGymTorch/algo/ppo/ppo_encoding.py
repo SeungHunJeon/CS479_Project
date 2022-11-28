@@ -144,6 +144,7 @@ class PPO:
                 if(self.isLSTM):
                     obs_concat.append(key.evaluate_update(obs))
                 else:
+                    ## TODO
                     obs_concat.append(key.evaluate(obs[:,j::int(self.encoder_input_dim/self.num_history_batch)]))
                 j += key.architecture.input_shape[0]
             output = torch.cat(obs_concat, dim=-1)
@@ -152,6 +153,7 @@ class PPO:
             j = int(0)
             obs_concat=[]
             for i, key in enumerate(self.encoder):
+                ## TODO
                 z, z_mu, z_logvar = key.evaluate(obs[:,j::int(self.encoder_input_dim/self.num_history_batch)])
                 obs_concat.append(z)
                 kl += -0.5 * torch.sum(1 + z_logvar - z_mu.pow(2) - z_logvar.exp())
@@ -164,8 +166,16 @@ class PPO:
         mean_value_loss = 0
         mean_surrogate_loss = 0
         for epoch in range(self.num_learning_epochs):
-            for actor_obs_batch, critic_obs_batch, obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
+            for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
+
+                obs_batch.detach().to(self.device)
+                actions_batch.detach().to(self.device)
+                old_mu_batch.detach().to(self.device)
+                current_values_batch.detach().to(self.device)
+                advantages_batch.detach().to(self.device)
+                returns_batch.detach().to(self.device)
+                old_actions_log_prob_batch.detach().to(self.device)
 
                 obs_concat, encode_kl = self.encode(obs_batch, self.encoder_deterministic)
 
@@ -224,6 +234,8 @@ class PPO:
                     encode_param += [*key.parameters()]
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()] + encode_param, self.max_grad_norm)
                 self.optimizer.step()
+
+                self.encoder[0].architecture.reset()
 
                 if log_this_iteration:
                     mean_value_loss += value_loss.item()
