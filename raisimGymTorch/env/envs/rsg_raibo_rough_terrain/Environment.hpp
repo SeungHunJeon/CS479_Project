@@ -184,15 +184,16 @@ class ENVIRONMENT {
 
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 //      sleep(0.01);
-      controller_.updateHistory();
+      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.historyNum_))
+        controller_.updateHistory();
       Low_controller_.updateObservation(&world_);
       Low_controller_.advance(&world_);
 
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
         subStep();
-//        if(visualize)
-//          sleep(simulation_dt_);
+        if(visualize)
+          sleep(simulation_dt_);
 
         if(isTerminalState(dummy)) {
           howManySteps++;

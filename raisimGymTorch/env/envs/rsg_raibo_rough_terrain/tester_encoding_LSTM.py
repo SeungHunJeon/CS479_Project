@@ -80,13 +80,13 @@ else:
     start_step_id = 0
 
     print("Visualizing and evaluating the policy: ", weight_path)
-    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['policy_net'], torch.nn.LeakyReLU, ob_dim, act_dim),
+    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], torch.nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                                env.num_envs,
                                                                                1.0,
                                                                                NormalSampler(act_dim),
-                                                                               cfg['seed']), device)
-
+                                                                               cfg['seed']),
+                             device)
     pro_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['pro_encoder_net'],
                                                          torch.nn.LeakyReLU,
                                                          obs_pro_dim,
@@ -123,10 +123,10 @@ else:
                 obs = env.observe(False)
 
                 obs_concat = latent_concat(obs)
-
+                print(obs_concat)
                 action_ll, actions_log_prob = actor.sample(obs_concat)
 
-                print(action_ll)
+                # print(action_ll)
                 env.step_visualize(action_ll)
 
     env.turn_off_visualization()

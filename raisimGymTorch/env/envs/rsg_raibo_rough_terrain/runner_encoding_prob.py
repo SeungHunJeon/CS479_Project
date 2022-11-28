@@ -126,15 +126,10 @@ iteration_number = 0
 @staticmethod
 def latent_concat(obs):
     with torch.no_grad():
-        obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
-        obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
-        obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
-
-        pro_latent, pro_mu, pro_logvar = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
-        ext_latent, ext_mu, ext_logvar = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
-        act_latent, act_mu, act_logvar = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
-
-        obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
+        pro_latent, _, _ = pro_encoder.evaluate(torch.from_numpy(obs[:, :pro_dim*(historyNum)]).to(device))
+        ext_latent, _, _ = ext_encoder.evaluate(torch.from_numpy(obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]).to(device))
+        act_latent, _, _ = act_encoder.evaluate(torch.from_numpy(obs[:, (pro_dim+ext_dim)*(historyNum):]).to(device))
+        obs_concat = torch.cat((pro_latent,ext_latent,act_latent), dim=-1)
     return obs_concat
 
 if mode == 'retrain':

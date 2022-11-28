@@ -1,5 +1,5 @@
 # task specification
-task_name = "Random_Object_encod_prob"
+task_name = "Random_Object_encod_LSTM"
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
@@ -56,89 +56,63 @@ actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 
-pro_latent_dim = cfg['encoder']['proprioceptivelatentDim_']
-ext_latent_dim = cfg['encoder']['exteroceptivelatentDim_']
-act_latent_dim = cfg['encoder']['actionlatentDim_']
-
 obs_pro_dim = pro_dim
 obs_ext_dim = ext_dim
 obs_act_dim = act_dim
+
+hidden_dim = cfg['LSTM']['hiddendim_']
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 
 total_steps = n_steps * env.num_envs
 
-pro_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['pro_encoder_net'],
-                                                nn.LeakyReLU,
-                                                obs_pro_dim,
-                                                pro_latent_dim
-                                                ),
-                                 device)
+Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ob_dim/historyNum),
+                          hidden_dim=hidden_dim,
+                          ext_dim=ext_dim,
+                          pro_dim=pro_dim,
+                          act_dim=act_dim,
+                          hist_num=historyNum,
+                          device=device,
+                          num_env=env.num_envs), device=device)
 
-ext_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['ext_encoder_net'],
-                                                nn.LeakyReLU,
-                                                obs_ext_dim,
-                                                ext_latent_dim),
-                                 device)
-
-# act_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['act_encoder_net'],
-#                                                 nn.LeakyReLU,
-#                                                 obs_act_dim,
-#                                                 act_latent_dim),
-#                                  device)
-
-# encoders = [pro_encoder, ext_encoder, act_encoder]
-
-encoders = [pro_encoder, ext_encoder]
-
-actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, act_dim, actor=True),
+actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                            env.num_envs,
                                                                            1.0,
                                                                            NormalSampler(act_dim),
                                                                            cfg['seed']),
                          device)
-critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value_net'], nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, 1, actor=False),
+critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value_net'], nn.LeakyReLU, hidden_dim, 1, actor=False),
                            device)
 
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/RaiboController.hpp"])
 
+num_learning_epochs = 1
+num_mini_batches = 1
+
 ppo = PPO_Encod.PPO(actor=actor,
               critic=critic,
-              encoder=encoders,
-              encoder_deterministic=False,
+              encoder=[Encoder],
+              encoder_deterministic=True,
               num_envs=cfg['environment']['num_envs'],
               obs_shape=[env.num_obs],
               num_transitions_per_env=n_steps,
-              num_learning_epochs=4,
+              num_learning_epochs=num_learning_epochs,
               gamma=0.995,
               lam=0.95,
-              num_mini_batches=4,
+              num_mini_batches=num_mini_batches,
               learning_rate=5e-5,
               device=device,
               log_dir=saver.data_dir,
               shuffle_batch=False,
               desired_kl=0.006,
+              isLSTM=True,
+              num_history_batch=historyNum
               )
 
 iteration_number = 0
-
-@staticmethod
-def latent_concat(obs):
-    obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
-    obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
-    # obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
-
-    pro_latent, pro_mu, pro_logvar = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
-    ext_latent, ext_mu, ext_logvar = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
-    # act_latent, act_mu, act_logvar = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
-
-    # obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
-
-    obs_concat = torch.cat((pro_latent, ext_latent), dim=-1)
-    return obs_concat
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -147,6 +121,7 @@ for update in range(iteration_number, 1000000):
     torch.cuda.empty_cache()
     start = time.time()
     env.reset()
+    Encoder.architecture.reset()
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.
@@ -158,9 +133,7 @@ for update in range(iteration_number, 1000000):
             'actor_architecture_state_dict': actor.architecture.state_dict(),
             'actor_distribution_state_dict': actor.distribution.state_dict(),
             'critic_architecture_state_dict': critic.architecture.state_dict(),
-            'pro_encoder_state_dict' : pro_encoder.architecture.state_dict(),
-            'ext_encoder_state_dict' : ext_encoder.architecture.state_dict(),
-            'act_encoder_state_dict' : act_encoder.architecture.state_dict(),
+            'LSTM_state_dict' : Encoder.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
@@ -170,24 +143,25 @@ for update in range(iteration_number, 1000000):
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
-        # env.turn_on_visualization()
+        env.turn_on_visualization()
         env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
         for step in range(n_steps):
             with torch.no_grad():
                 obs = env.observe(False)
-
-                obs_concat = latent_concat(obs)
-
-                actions, actions_log_prob = actor.sample(obs_concat)
+                latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+                # print(latent)
+                # print(latent.shape)
+                actions, actions_log_prob = actor.sample(latent)
                 reward, dones = env.step_visualize(actions)
                 # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
         # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
 
         env.stop_video_recording()
-        # env.turn_off_visualization()
+        env.turn_off_visualization()
         env.reset()
+        Encoder.architecture.reset()
         env.save_scaling(saver.data_dir, str(update))
 
     data_log = {}
@@ -196,13 +170,13 @@ for update in range(iteration_number, 1000000):
         with torch.no_grad():
             obs = env.observe(update < 10000)
 
-            obs_concat = latent_concat(obs)
-            obs_concat = obs_concat.detach().cpu().numpy()
+            latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+            latent = latent.detach().cpu().numpy()
 
-            action = ppo.act(obs_concat)
+            action = ppo.act(latent)
 
             reward, dones = env.step(action)
-            ppo.step(value_obs=obs_concat, obs=obs, rews=reward, dones=dones)
+            ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
             data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
@@ -210,11 +184,12 @@ for update in range(iteration_number, 1000000):
     data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
     # take st step to get value obs
     obs = env.observe(update < 10000)
+    with torch.no_grad():
+        latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+        latent = latent.detach().cpu().numpy()
 
-    obs_concat = latent_concat(obs)
-    obs_concat = obs_concat.detach().cpu().numpy()
-
-    ppo.update(actor_obs=obs_concat, value_obs=obs_concat, log_this_iteration=update % 10 == 0, update=update)
+    Encoder.architecture.reset()
+    ppo.update(actor_obs=latent, value_obs=latent, log_this_iteration=update % 10 == 0, update=update)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
     actor.distribution.enforce_minimum_std((torch.ones(2)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))

@@ -30,13 +30,15 @@ class PPO:
                  log_dir='run',
                  device='cpu',
                  shuffle_batch=True,
-                 encoder_deterministic=True):
+                 encoder_deterministic=True,
+                 isLSTM = False,
+                 num_history_batch = 4):
 
         # PPO components
         self.actor = actor
         self.critic = critic
         self.encoder = encoder
-        self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape, obs_shape, actor.action_shape, device)
+        self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape, obs_shape, actor.action_shape, device, isLSTM=isLSTM)
 
         if shuffle_batch:
             self.batch_sampler = self.storage.mini_batch_generator_shuffle
@@ -44,8 +46,10 @@ class PPO:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
         encode_param = []
+        self.encoder_input_dim = 0
         for i, key in enumerate(self.encoder):
             encode_param += [*key.parameters()]
+            self.encoder_input_dim += key.architecture.input_shape[0]
         self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()] + encode_param, lr=learning_rate)
         self.device = device
 
@@ -85,30 +89,11 @@ class PPO:
 
         # Encoder param
         self.encoder_deterministic = encoder_deterministic
+        self.num_history_batch = num_history_batch
 
-    def encode(self, obs, deterministic):
+        # LSTM param
+        self.isLSTM = isLSTM
 
-        kl = 0
-
-        if(deterministic): # Deterministic model
-            j = int(0)
-            obs_concat=[]
-            for i, key in enumerate(self.encoder):
-                obs_concat.append(key.evaluate(obs[:,j:j+key.architecture.input_shape[0]]))
-                j += key.architecture.input_shape[0]
-            output = torch.cat(obs_concat, dim=-1)
-
-        else: # Probabilistic model
-            j = int(0)
-            obs_concat=[]
-            for i, key in enumerate(self.encoder):
-                z, z_mu, z_logvar = key.evaluate(obs[:,j:j+key.architecture.input_shape[0]])
-                obs_concat.append(z)
-                kl += -0.5 * torch.sum(1 + z_logvar - z_mu.pow(2) - z_logvar.exp())
-                j += key.architecture.input_shape[0]
-            output = torch.cat(obs_concat, dim=-1)
-
-        return output, kl
 
     def act(self, actor_obs):
         self.actor_obs = actor_obs
@@ -149,6 +134,32 @@ class PPO:
         self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
         self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
+    def encode(self, obs, deterministic):
+
+        kl = 0
+        if(deterministic): # Deterministic model
+            j = int(0)
+            obs_concat=[]
+            for i, key in enumerate(self.encoder):
+                if(self.isLSTM):
+                    obs_concat.append(key.evaluate_update(obs))
+                else:
+                    obs_concat.append(key.evaluate(obs[:,j::int(self.encoder_input_dim/self.num_history_batch)]))
+                j += key.architecture.input_shape[0]
+            output = torch.cat(obs_concat, dim=-1)
+
+        else: # Probabilistic model
+            j = int(0)
+            obs_concat=[]
+            for i, key in enumerate(self.encoder):
+                z, z_mu, z_logvar = key.evaluate(obs[:,j::int(self.encoder_input_dim/self.num_history_batch)])
+                obs_concat.append(z)
+                kl += -0.5 * torch.sum(1 + z_logvar - z_mu.pow(2) - z_logvar.exp())
+                j += key.architecture.input_shape[0]
+            output = torch.cat(obs_concat, dim=-1)
+
+        return output, kl
+
     def _train_step(self, log_this_iteration):
         mean_value_loss = 0
         mean_surrogate_loss = 0
@@ -156,16 +167,6 @@ class PPO:
             for actor_obs_batch, critic_obs_batch, obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
-                """
-                Add Encoding
-                obs_batch = []
-                for i, key in enumerate(self.encoders):
-                    obs_batch += key.evaluate(obs_batch[i])
-                
-                actor_obs_batch = obs_batch
-                critic_obs_batch = obs_batch
-                
-                """
                 obs_concat, encode_kl = self.encode(obs_batch, self.encoder_deterministic)
 
 
