@@ -20,6 +20,9 @@ import datetime
 
 # task specification
 
+os.environ["WANDB_API_KEY"] = '3bdcf6389f74ce8110d7914041ec50f6771bbee8'
+os.environ["WANDB_MODE"] = "dryrun"
+
 # initialize wandb
 wandb.init(group="jsh",project=task_name)
 
@@ -188,8 +191,13 @@ for update in range(iteration_number, 1000000):
         latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
         latent = latent.detach().cpu().numpy()
 
-    Encoder.architecture.reset()
     ppo.update(actor_obs=latent, value_obs=latent, log_this_iteration=update % 10 == 0, update=update)
+
+
+    ### For logging encoder (LSTM)
+    wandb.watch(Encoder.architecture)
+
+
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
     actor.distribution.enforce_minimum_std((torch.ones(2)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))

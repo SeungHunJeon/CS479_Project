@@ -169,16 +169,17 @@ class PPO:
             for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
-                obs_batch.detach().to(self.device)
-                actions_batch.detach().to(self.device)
-                old_mu_batch.detach().to(self.device)
-                current_values_batch.detach().to(self.device)
-                advantages_batch.detach().to(self.device)
-                returns_batch.detach().to(self.device)
-                old_actions_log_prob_batch.detach().to(self.device)
+                self.encoder[0].architecture.reset()
+
+                obs_batch = obs_batch.detach().requires_grad_(True).to(self.device)
+                actions_batch = actions_batch.detach().requires_grad_(True).to(self.device)
+                old_mu_batch = old_mu_batch.detach().requires_grad_(True).to(self.device)
+                current_values_batch = current_values_batch.detach().requires_grad_(True).to(self.device)
+                advantages_batch = advantages_batch.detach().requires_grad_(True).to(self.device)
+                returns_batch = returns_batch.detach().requires_grad_(True).to(self.device)
+                old_actions_log_prob_batch = old_actions_log_prob_batch.detach().requires_grad_(True).to(self.device)
 
                 obs_concat, encode_kl = self.encode(obs_batch, self.encoder_deterministic)
-
 
                 # actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(obs_concat, actions_batch)
@@ -235,7 +236,7 @@ class PPO:
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()] + encode_param, self.max_grad_norm)
                 self.optimizer.step()
 
-                self.encoder[0].architecture.reset()
+
 
                 if log_this_iteration:
                     mean_value_loss += value_loss.item()
