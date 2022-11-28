@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from .storage_encoding import RolloutStorage
+import matplotlib.pyplot as plt
 
 
 class PPO:
@@ -30,7 +31,7 @@ class PPO:
                  log_dir='run',
                  device='cpu',
                  shuffle_batch=True,
-                 encoder_deterministic=True):
+                 num_history_batch = 4):
 
         # PPO components
         self.actor = actor
@@ -43,10 +44,8 @@ class PPO:
         else:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
-        encode_param = []
-        for i, key in enumerate(self.encoder):
-            encode_param += [*key.parameters()]
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters()] + encode_param, lr=learning_rate)
+        self.encoder_input_dim = self.encoder.architecture.input_shape[0]
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters()], lr=learning_rate)
         self.device = device
 
         # env parameters
@@ -84,31 +83,10 @@ class PPO:
         self.actor_obs = None
 
         # Encoder param
-        self.encoder_deterministic = encoder_deterministic
+        self.num_history_batch = num_history_batch
 
-    def encode(self, obs, deterministic):
+        # LSTM param
 
-        kl = 0
-
-        if(deterministic): # Deterministic model
-            j = int(0)
-            obs_concat=[]
-            for i, key in enumerate(self.encoder):
-                obs_concat.append(key.evaluate(obs[:,j:j+key.architecture.input_shape[0]]))
-                j += key.architecture.input_shape[0]
-            output = torch.cat(obs_concat, dim=-1)
-
-        else: # Probabilistic model
-            j = int(0)
-            obs_concat=[]
-            for i, key in enumerate(self.encoder):
-                z, z_mu, z_logvar = key.evaluate(obs[:,j:j+key.architecture.input_shape[0]])
-                obs_concat.append(z)
-                kl += -0.5 * torch.sum(1 + z_logvar - z_mu.pow(2) - z_logvar.exp())
-                j += key.architecture.input_shape[0]
-            output = torch.cat(obs_concat, dim=-1)
-
-        return output, kl
 
     def act(self, actor_obs):
         self.actor_obs = actor_obs
@@ -121,7 +99,6 @@ class PPO:
         """
         remove actor_obs, value_obs -> into encoder_obs
         """
-
         self.storage.add_transitions(self.actor_obs, value_obs, obs, self.actions, self.actor.action_mean, self.actor.distribution.std_np, rews, dones,
                                      self.actions_log_prob)
 
@@ -149,29 +126,41 @@ class PPO:
         self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
         self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
+    def encode(self, obs):
+
+        output = self.encoder.evaluate_update(obs)
+
+        return output
+
+    def plot_grad_flow(self, named_parameters):
+        ave_grads = []
+        layers = []
+        for n, p in named_parameters:
+            if(p.requires_grad) and ("bias" not in n):
+                layers.append(n)
+                ave_grad = p.grad.clone().detach().to('cpu')
+                ave_grads.append(ave_grad.abs().mean())
+        plt.plot(ave_grads, alpha=0.3, color="b")
+        plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
+        plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+        plt.xlim(xmin=0, xmax=len(ave_grads))
+        plt.xlabel("Layers")
+        plt.ylabel("average gradient")
+        plt.title("Gradient flow")
+        plt.grid(True)
+        plt.savefig('gradient.png')
     def _train_step(self, log_this_iteration):
         mean_value_loss = 0
         mean_surrogate_loss = 0
         for epoch in range(self.num_learning_epochs):
-            for actor_obs_batch, critic_obs_batch, obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
+            for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
-                """
-                Add Encoding
-                obs_batch = []
-                for i, key in enumerate(self.encoders):
-                    obs_batch += key.evaluate(obs_batch[i])
-                
-                actor_obs_batch = obs_batch
-                critic_obs_batch = obs_batch
-                
-                """
-                obs_concat, encode_kl = self.encode(obs_batch, self.encoder_deterministic)
+                self.encoder.architecture.reset()
 
+                obs_concat = self.encode(obs_batch)
 
-                # actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_obs_batch, actions_batch)
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(obs_concat, actions_batch)
-                # value_batch = self.critic.evaluate(critic_obs_batch)
                 value_batch = self.critic.evaluate(obs_concat)
 
                 # Adjusting the learning rate using KL divergence
@@ -210,19 +199,18 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() + encode_kl
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
                 # Add kl divergence term to normalize the latent vector
 
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
 
+                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters()], self.max_grad_norm)
 
-                encode_param = []
-                for i, key in enumerate(self.encoder):
-                    encode_param += [*key.parameters()]
-                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()] + encode_param, self.max_grad_norm)
                 self.optimizer.step()
+
+                # self.plot_grad_flow(self.encoder[0].architecture.named_parameters())
 
                 if log_this_iteration:
                     mean_value_loss += value_loss.item()

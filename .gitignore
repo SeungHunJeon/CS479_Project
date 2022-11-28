@@ -19,4 +19,4 @@ data/*
 raisimGymTorch/.idea/
 */default_controller_demo/src/*
 wandb/
-
+*/*.png

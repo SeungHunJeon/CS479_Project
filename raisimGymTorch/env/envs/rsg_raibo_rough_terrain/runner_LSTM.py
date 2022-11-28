@@ -10,7 +10,7 @@ import os
 import math
 import time
 import raisimGymTorch.algo.ppo.module as ppo_module
-import raisimGymTorch.algo.ppo.ppo_encoding as PPO_Encod
+import raisimGymTorch.algo.ppo.ppo_LSTM as PPO
 import torch.nn as nn
 import numpy as np
 import torch
@@ -92,13 +92,12 @@ critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/RaiboController.hpp"])
 
-num_learning_epochs = 32
+num_learning_epochs = 16
 num_mini_batches = 1
 
-ppo = PPO_Encod.PPO(actor=actor,
+ppo = PPO.PPO(actor=actor,
               critic=critic,
-              encoder=[Encoder],
-              encoder_deterministic=True,
+              encoder=Encoder,
               num_envs=cfg['environment']['num_envs'],
               obs_shape=[env.num_obs],
               num_transitions_per_env=n_steps,
@@ -111,7 +110,6 @@ ppo = PPO_Encod.PPO(actor=actor,
               log_dir=saver.data_dir,
               shuffle_batch=False,
               desired_kl=0.006,
-              isLSTM=True,
               num_history_batch=historyNum
               )
 

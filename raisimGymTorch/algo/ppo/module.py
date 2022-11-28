@@ -129,26 +129,7 @@ class LSTM(nn.Module):
         self.output_shape = [hidden_dim]
         self.h_0 = None
         self.c_0 = None
-
-    # def obs_inorder(self, obs, update=False):
-    #     obs_order = []
-    #     if (update):
-    #         for i in range(self.hist_num):
-    #             obs_order.append(obs[:,:,self.pro_dim*i:self.pro_dim*(i+1)])
-    #             obs_order.append(obs[:,:,self.pro_dim*self.hist_num + self.ext_dim*i:self.pro_dim*self.hist_num + self.ext_dim*(i+1)])
-    #             obs_order.append(obs[:,:,(self.pro_dim+self.ext_dim)*self.hist_num + self.act_dim*i:(self.pro_dim+self.ext_dim)*self.hist_num + self.act_dim*(i+1)])
-    #
-    #     else:
-    #         for i in range(self.hist_num):
-    #             obs_order.append(obs[:,self.pro_dim*i:self.pro_dim*(i+1)])
-    #             obs_order.append(obs[:,self.pro_dim*self.hist_num + self.ext_dim*i:self.pro_dim*self.hist_num + self.ext_dim*(i+1)])
-    #             obs_order.append(obs[:,(self.pro_dim+self.ext_dim)*self.hist_num + self.act_dim*i:(self.pro_dim+self.ext_dim)*self.hist_num + self.act_dim*(i+1)])
-    #
-    #     obs_order = torch.cat(obs_order, dim=-1).to(self.device)
-    #     return obs_order
     def forward(self, obs):
-        # ordered = self.obs_inorder(obs)
-        # inputs = ordered.view(self.hist_num, obs.shape[0], -1)
         inputs = obs.view(-1, self.num_env, self.input_dim)
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
@@ -158,7 +139,8 @@ class LSTM(nn.Module):
         self.h_0 = h_n
         self.c_0 = c_n
 
-        output = outputs[self.hist_num-1, :, :]
+        # print(outputs.shape)
+        output = outputs[-1, :, :]
 
         return output
 
@@ -176,9 +158,9 @@ class LSTM(nn.Module):
 
 
         output = outputs[self.hist_num-1::self.hist_num, :, :]
-        output = output.reshape(-1, self.hidden_dim)
+        output_re = output.reshape(-1, self.hidden_dim)
 
-        return output
+        return output_re
 
     def reset(self):
         self.h_0 = None

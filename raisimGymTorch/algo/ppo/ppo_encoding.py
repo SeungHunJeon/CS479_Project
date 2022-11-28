@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from .storage_encoding import RolloutStorage
+import matplotlib.pyplot as plt
 
 
 class PPO:
@@ -142,12 +143,12 @@ class PPO:
             obs_concat=[]
             for i, key in enumerate(self.encoder):
                 if(self.isLSTM):
-                    obs_concat.append(key.evaluate_update(obs))
+                    output = key.evaluate_update(obs)
                 else:
                     ## TODO
                     obs_concat.append(key.evaluate(obs[:,j::int(self.encoder_input_dim/self.num_history_batch)]))
                 j += key.architecture.input_shape[0]
-            output = torch.cat(obs_concat, dim=-1)
+            # output = torch.cat(obs_concat, dim=-1)
 
         else: # Probabilistic model
             j = int(0)
@@ -162,6 +163,23 @@ class PPO:
 
         return output, kl
 
+    def plot_grad_flow(self, named_parameters):
+        ave_grads = []
+        layers = []
+        for n, p in named_parameters:
+            if(p.requires_grad) and ("bias" not in n):
+                layers.append(n)
+                ave_grad = p.grad.clone().detach().to('cpu')
+                ave_grads.append(ave_grad.abs().mean())
+        plt.plot(ave_grads, alpha=0.3, color="b")
+        plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
+        plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+        plt.xlim(xmin=0, xmax=len(ave_grads))
+        plt.xlabel("Layers")
+        plt.ylabel("average gradient")
+        plt.title("Gradient flow")
+        plt.grid(True)
+        plt.savefig('gradient.png')
     def _train_step(self, log_this_iteration):
         mean_value_loss = 0
         mean_surrogate_loss = 0
@@ -230,13 +248,16 @@ class PPO:
                 loss.backward()
 
 
+
+
                 encode_param = []
                 for i, key in enumerate(self.encoder):
                     encode_param += [*key.parameters()]
                 nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters()] + encode_param, self.max_grad_norm)
+
                 self.optimizer.step()
 
-
+                # self.plot_grad_flow(self.encoder[0].architecture.named_parameters())
 
                 if log_this_iteration:
                     mean_value_loss += value_loss.item()
