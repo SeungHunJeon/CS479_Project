@@ -93,6 +93,52 @@ class Encoder:
     def obs_shape(self):
         return self.architecture.input_shape
 
+class Encoder:
+    def __init__(self, architecture, device='cpu'):
+        super(Encoder, self).__init__()
+        self.architecture = architecture
+        self.architecture.to(device)
+    def predict(self, obs):
+        return self.architecture(obs).detach()
+
+    def evaluate(self, obs):
+        return self.architecture(obs)
+
+    def evaluate_update(self, obs):
+        return self.architecture.forward_update(obs)
+
+
+
+    def parameters(self):
+        return [*self.architecture.parameters()]
+
+    @property
+    def obs_shape(self):
+        return self.architecture.input_shape
+
+class Estimator:
+    def __init__(self, architecture, device='cpu'):
+        super(Estimator, self).__init__()
+        self.architecture = architecture
+        self.architecture.to(device)
+    def predict(self, obs):
+        return self.architecture(obs).detach()
+
+    def evaluate(self, obs):
+        return self.architecture(obs)
+
+    def evaluate_update(self, obs):
+        return self.architecture.forward_update(obs)
+
+
+
+    def parameters(self):
+        return [*self.architecture.parameters()]
+
+    @property
+    def obs_shape(self):
+        return self.architecture.input_shape
+
 
 class Transformer_Encoder(nn.Module):
     def __init__(self, layer, N):
@@ -105,10 +151,30 @@ class Transformer_Encoder(nn.Module):
             x = layer(x, mask)
         return self.norm(x)
 
-
+# class ROA(nn.Module):
+#     def __init__(self, architecture, device='cpu'):
+#         super(ROA, self).__init__()
+#         self.architecture = architecture
+#         self.architecture.to(device)
+#
+#     def predict(self, obs):
+#         return self.architecture(obs).detach()
+#
+#     def evaluate(self, obs):
+#         return self.architecture(obs)
+#
+#     def evaluate_update(self, obs):
+#         return self.architecture.forward_update(obs)
+#
+#     def parameters(self):
+#         return [*self.architecture.parameters()]
+#
+#     @property
+#     def obs_shape(self):
+#         return self.architecture.input_shape
 
 class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, act_dim, hist_num, num_env, device):
+    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, act_dim, hist_num, batch_num, num_env, device):
         super(LSTM, self).__init__()
         self.ext_dim = ext_dim
         self.pro_dim = pro_dim
@@ -118,6 +184,7 @@ class LSTM(nn.Module):
         self.hidden_dim = hidden_dim
         self.input_dim = input_dim
         self.num_env = num_env
+        self.batch_num = batch_num
 
         self.lstm = nn.LSTM(input_size=self.input_dim,
                             hidden_size=self.hidden_dim,
@@ -125,7 +192,7 @@ class LSTM(nn.Module):
                             batch_first=False)
 
         # self.init_weights(self.architecture, scale)
-        self.input_shape = [input_dim*hist_num]
+        self.input_shape = [input_dim*batch_num]
         self.output_shape = [hidden_dim]
         self.h_0 = None
         self.c_0 = None
@@ -157,7 +224,8 @@ class LSTM(nn.Module):
         self.c_0 = c_n
 
 
-        output = outputs[self.hist_num-1::self.hist_num, :, :]
+        output = outputs[self.batch_num-1::self.batch_num, :, :]
+
         output_re = output.reshape(-1, self.hidden_dim)
 
         return output_re
