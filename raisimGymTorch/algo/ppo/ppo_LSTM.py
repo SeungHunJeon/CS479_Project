@@ -18,9 +18,13 @@ class PPO:
                  num_transitions_per_env,
                  num_learning_epochs,
                  num_mini_batches,
+                 encoder_ROA=None,
+                 estimator=None,
                  clip_param=0.2,
                  gamma=0.998,
                  lam=0.95,
+                 lambda_ROA=1e-3,
+                 lambdaDecayFactor=0.999,
                  value_loss_coef=0.5,
                  entropy_coef=0.0,
                  learning_rate=5e-4,
@@ -37,7 +41,12 @@ class PPO:
         self.actor = actor
         self.critic = critic
         self.encoder = encoder
+        self.encoder_ROA = encoder_ROA
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape, obs_shape, actor.action_shape, device)
+        self.lambda_ROA = lambda_ROA
+        self.lambdaDecayFactor = lambdaDecayFactor
+
+        self.estimator = estimator
 
         if shuffle_batch:
             self.batch_sampler = self.storage.mini_batch_generator_shuffle
@@ -45,8 +54,9 @@ class PPO:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
         self.encoder_input_dim = self.encoder.architecture.input_shape[0]
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters()], lr=learning_rate)
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], lr=learning_rate)
         self.device = device
+        self.criteria = nn.MSELoss()
 
         # env parameters
         self.num_transitions_per_env = num_transitions_per_env
@@ -87,6 +97,12 @@ class PPO:
 
         # LSTM param
 
+        # ROA loss
+        self.loss_ROA = None
+        self.lambda_loss_ROA = None
+
+        # Estimator loss
+        self.estimator_loss = None
 
     def act(self, actor_obs):
         self.actor_obs = actor_obs
@@ -132,6 +148,10 @@ class PPO:
 
         return output
 
+    def encode_ROA(self, obs):
+        output = self.encoder_ROA.evaluate_update(obs)
+
+        return output
     def plot_grad_flow(self, named_parameters):
         ave_grads = []
         layers = []
@@ -149,16 +169,76 @@ class PPO:
         plt.title("Gradient flow")
         plt.grid(True)
         plt.savefig('gradient.png')
+
+    def get_obs_ROA(self, obs_batch):
+        obs_ROA_batch = []
+
+
+        for i in range(self.num_history_batch):
+            obs_ROA_batch.append(obs_batch[:,:,
+                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                               :(self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                                + self.encoder.architecture.pro_dim])
+            obs_ROA_batch.append(obs_batch[:,:,
+                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                 + self.encoder.architecture.pro_dim:
+                                 (self.encoder.architecture.pro_dim +
+                                                                       self.encoder.architecture.ext_dim +
+                                                                       self.encoder.architecture.act_dim)*i
+                                                                      + self.encoder.architecture.pro_dim +15])
+
+
+            obs_ROA_batch.append(obs_batch[:,:,
+                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                 + self.encoder.architecture.pro_dim+15+13:(self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                                                           + self.encoder.architecture.pro_dim+15+13 +12])
+
+        estimator_true_data = (obs_batch[:,:,
+                                   (self.encoder.architecture.pro_dim +
+                                    self.encoder.architecture.ext_dim +
+                                    self.encoder.architecture.act_dim)*(self.num_history_batch-1)
+                                   + self.encoder.architecture.pro_dim +15:
+                                   (self.encoder.architecture.pro_dim +
+                                    self.encoder.architecture.ext_dim +
+                                    self.encoder.architecture.act_dim)*(self.num_history_batch-1)
+                                   + self.encoder.architecture.pro_dim +15+13
+                                   ])
+
+        obs_ROA_batch = torch.cat(obs_ROA_batch, dim=-1)
+
+        return obs_ROA_batch, estimator_true_data.detach()
+
     def _train_step(self, log_this_iteration):
         mean_value_loss = 0
         mean_surrogate_loss = 0
+        self.loss_ROA = 0
+        self.lambda_loss_ROA = 0
+        self.estimator_loss = 0
+
+        self.lambda_ROA = pow(self.lambda_ROA, self.lambdaDecayFactor)
+        print(self.lambda_ROA)
         for epoch in range(self.num_learning_epochs):
             for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
                 self.encoder.architecture.reset()
+                self.encoder_ROA.architecture.reset()
+
+                obs_ROA_batch, estimator_true_data = self.get_obs_ROA(obs_batch)
 
                 obs_concat = self.encode(obs_batch)
+                obs_concat_d = self.encode(obs_batch).clone().detach()
+                obs_concat_ROA = self.encode_ROA(obs_ROA_batch)
+                obs_concat_ROA_d = self.encode_ROA(obs_ROA_batch).clone().detach()
+
+                estimator_input = self.encoder_ROA.evaluate(obs_ROA_batch).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
+
+                estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
+
+                lambda_loss_ROA = self.lambda_ROA * self.criteria(obs_concat, obs_concat_ROA_d)
+                loss_ROA = self.criteria(obs_concat_d, obs_concat_ROA)
+
+
 
                 actions_log_prob_batch, entropy_batch = self.actor.evaluate(obs_concat, actions_batch)
                 value_batch = self.critic.evaluate(obs_concat)
@@ -199,14 +279,19 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
+                       + lambda_loss_ROA \
+                       + loss_ROA \
+                       + estimator_loss
+
+
                 # Add kl divergence term to normalize the latent vector
 
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
 
-                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters()], self.max_grad_norm)
+                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], self.max_grad_norm)
 
                 self.optimizer.step()
 
@@ -215,10 +300,16 @@ class PPO:
                 if log_this_iteration:
                     mean_value_loss += value_loss.item()
                     mean_surrogate_loss += surrogate_loss.item()
+                    self.loss_ROA += loss_ROA.item()
+                    self.lambda_loss_ROA += lambda_loss_ROA.item()
+                    self.estimator_loss += estimator_loss.item()
 
         if log_this_iteration:
             num_updates = self.num_learning_epochs * self.num_mini_batches
             mean_value_loss /= num_updates
             mean_surrogate_loss /= num_updates
+            self.loss_ROA /= num_updates
+            self.lambda_loss_ROA /= num_updates
+            self.estimator_loss /= num_updates
 
         return mean_value_loss, mean_surrogate_loss, locals()

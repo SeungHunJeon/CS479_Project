@@ -63,19 +63,39 @@ obs_pro_dim = pro_dim
 obs_ext_dim = ext_dim
 obs_act_dim = act_dim
 
+# LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
+batchNum = cfg['LSTM']['batchNum_']
+
+# ROA Encoding
+ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
+ROA_ob_dim = historyNum * (pro_dim + act_dim + ROA_ext_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 
 total_steps = n_steps * env.num_envs
 
-Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ob_dim/historyNum),
+Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'], nn.LeakyReLU, int(ob_dim/historyNum),
+                                                int((ob_dim-ROA_ob_dim)/historyNum)), device=device)
+
+Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_ob_dim/batchNum),
+                                                          hidden_dim=hidden_dim,
+                                                          ext_dim=ROA_ext_dim,
+                                                          pro_dim=pro_dim,
+                                                          act_dim=act_dim,
+                                                          hist_num=historyNum,
+                                                          device=device,
+                                                          batch_num=batchNum,
+                                                          num_env=env.num_envs), device=device)
+
+Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ob_dim/batchNum),
                           hidden_dim=hidden_dim,
                           ext_dim=ext_dim,
                           pro_dim=pro_dim,
                           act_dim=act_dim,
                           hist_num=historyNum,
+                          batch_num=batchNum,
                           device=device,
                           num_env=env.num_envs), device=device)
 
@@ -109,6 +129,8 @@ ppo = PPO.PPO(actor=actor,
               device=device,
               log_dir=saver.data_dir,
               shuffle_batch=False,
+              encoder_ROA=Encoder_ROA,
+              estimator=Estimator,
               desired_kl=0.006,
               num_history_batch=historyNum
               )
@@ -212,6 +234,9 @@ for update in range(iteration_number, 1000000):
         data_log['PPO/value_function'] = ppo.mean_value_loss
         data_log['PPO/surrogate'] = ppo.mean_surrogate_loss
         data_log['PPO/mean_noise_std'] = ppo.mean_noise_std
+        data_log['PPO/loss_ROA'] = ppo.loss_ROA
+        data_log['PPO/lambda_loss_ROA'] = ppo.lambda_loss_ROA
+        data_log['PPO/estimator_loss'] = ppo.estimator_loss
 
         for id, data_name in enumerate(data_tags):
             data_log[data_name + '/mean'] = data_mean[id]

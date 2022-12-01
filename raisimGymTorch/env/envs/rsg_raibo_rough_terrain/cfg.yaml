@@ -28,10 +28,12 @@ environment:
   dimension:
     proprioceptiveDim_: 9
     exteroceptiveDim_: 38
-    historyNum_: 1
-#    historyNum_: 5
+    historyNum_: 5
     actionhistoryNum_: 6
     actionDim_: 2
+
+  ROA_dimension:
+    exteroceptiveDim_: 25
 
 encoder:
   proprioceptivelatentDim_: 16
@@ -40,6 +42,7 @@ encoder:
 
 LSTM:
   hiddendim_: 49
+  batchNum_: 1
 
 architecture:
   policy_net: [256, 128, 64]
@@ -51,3 +54,6 @@ architecture:
     pro_encoder_net: [128, 64] # 9 x 4
     ext_encoder_net: [256, 128, 64] # 25 x 4
     act_encoder_net: [32, 32] # 2 x 4
+
+  estimator:
+    net: [64, 64]
