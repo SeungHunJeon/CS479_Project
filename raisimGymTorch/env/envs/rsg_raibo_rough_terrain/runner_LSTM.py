@@ -20,8 +20,8 @@ import datetime
 
 # task specification
 
-os.environ["WANDB_API_KEY"] = '3bdcf6389f74ce8110d7914041ec50f6771bbee8'
-os.environ["WANDB_MODE"] = "dryrun"
+# os.environ["WANDB_API_KEY"] = '3bdcf6389f74ce8110d7914041ec50f6771bbee8'
+# os.environ["WANDB_MODE"] = "dryrun"
 
 # initialize wandb
 wandb.init(group="jsh",project=task_name)
@@ -145,6 +145,7 @@ for update in range(iteration_number, 1000000):
     start = time.time()
     env.reset()
     Encoder.architecture.reset()
+    Encoder_ROA.architecture.reset()
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.
@@ -156,7 +157,9 @@ for update in range(iteration_number, 1000000):
             'actor_architecture_state_dict': actor.architecture.state_dict(),
             'actor_distribution_state_dict': actor.distribution.state_dict(),
             'critic_architecture_state_dict': critic.architecture.state_dict(),
-            'LSTM_state_dict' : Encoder.architecture.state_dict(),
+            'Encoder_state_dict' : Encoder.architecture.state_dict(),
+            'Encoder_ROA_state_dict' : Encoder_ROA.architecture.state_dict(),
+            'Inertial_estimator': Estimator.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
@@ -185,6 +188,7 @@ for update in range(iteration_number, 1000000):
         env.turn_off_visualization()
         env.reset()
         Encoder.architecture.reset()
+        Encoder_ROA.architecture.reset()
         env.save_scaling(saver.data_dir, str(update))
 
     data_log = {}
@@ -215,7 +219,7 @@ for update in range(iteration_number, 1000000):
 
 
     ### For logging encoder (LSTM)
-    wandb.watch(Encoder.architecture)
+    # wandb.watch(Encoder.architecture)
 
 
     average_ll_performance = reward_ll_sum / total_steps

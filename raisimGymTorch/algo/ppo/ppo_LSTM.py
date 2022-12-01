@@ -23,7 +23,7 @@ class PPO:
                  clip_param=0.2,
                  gamma=0.998,
                  lam=0.95,
-                 lambda_ROA=1e-3,
+                 lambda_ROA=1e-4,
                  lambdaDecayFactor=0.999,
                  value_loss_coef=0.5,
                  entropy_coef=0.0,
@@ -205,6 +205,7 @@ class PPO:
                                    ])
 
         obs_ROA_batch = torch.cat(obs_ROA_batch, dim=-1)
+        estimator_true_data = estimator_true_data.reshape(-1, 13)
 
         return obs_ROA_batch, estimator_true_data.detach()
 
@@ -231,7 +232,7 @@ class PPO:
                 obs_concat_ROA = self.encode_ROA(obs_ROA_batch)
                 obs_concat_ROA_d = self.encode_ROA(obs_ROA_batch).clone().detach()
 
-                estimator_input = self.encoder_ROA.evaluate(obs_ROA_batch).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
+                estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
                 estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
 
