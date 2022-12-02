@@ -3,7 +3,7 @@ seed: 2
 
 environment:
   seed: 2
-  render: False
+  render: True
   num_envs: 300
   eval_every_n: 200
   num_threads: 30

@@ -11,6 +11,7 @@ import math
 import torch
 import argparse
 import collections
+import torch.nn as nn
 
 device = torch.device('cpu')
 # configuration
@@ -48,27 +49,22 @@ actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 
-pro_latent_dim = cfg['encoder']['proprioceptivelatentDim_']
-ext_latent_dim = cfg['encoder']['exteroceptivelatentDim_']
-act_latent_dim = cfg['encoder']['actionlatentDim_']
+obs_pro_dim = pro_dim
+obs_ext_dim = ext_dim
+obs_act_dim = act_dim
 
-obs_pro_dim = pro_dim*(historyNum)
-obs_ext_dim = ext_dim*(historyNum)
-obs_act_dim = act_dim*(actionhistoryNum)
+# LSTM
+hidden_dim = cfg['LSTM']['hiddendim_']
+batchNum = cfg['LSTM']['batchNum_']
 
-@staticmethod
-def latent_concat(obs):
-    with torch.no_grad():
-        obs_proprioceptive = obs[:, :pro_dim*(historyNum)]
-        obs_exteroceptive = obs[:, pro_dim*(historyNum) : (pro_dim+ext_dim)*(historyNum)]
-        obs_action = obs[:, (pro_dim+ext_dim)*(historyNum):]
+# ROA Encoding
+ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
+ROA_ob_dim = historyNum * (pro_dim + act_dim + ROA_ext_dim)
 
-        pro_latent, pro_mu, pro_logvar = pro_encoder.evaluate(torch.from_numpy(obs_proprioceptive).to(device))
-        ext_latent, ext_mu, ext_logvar = ext_encoder.evaluate(torch.from_numpy(obs_exteroceptive).to(device))
-        act_latent, act_mu, act_logvar = act_encoder.evaluate(torch.from_numpy(obs_action).to(device))
+# Training
+n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 
-        obs_concat = torch.cat((pro_latent,ext_latent,act_latent), 1)
-    return obs_concat
+total_steps = n_steps * env.num_envs
 
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
@@ -80,51 +76,61 @@ else:
     start_step_id = 0
 
     print("Visualizing and evaluating the policy: ", weight_path)
-    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], torch.nn.LeakyReLU, pro_latent_dim+ext_latent_dim+act_latent_dim, act_dim, actor=True),
+    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                                env.num_envs,
                                                                                1.0,
                                                                                NormalSampler(act_dim),
                                                                                cfg['seed']),
                              device)
-    pro_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['pro_encoder_net'],
-                                                         torch.nn.LeakyReLU,
-                                                         obs_pro_dim,
-                                                         pro_latent_dim
-                                                         ),
-                                     device)
+    Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ob_dim/batchNum),
+                                                              hidden_dim=hidden_dim,
+                                                              ext_dim=ext_dim,
+                                                              pro_dim=pro_dim,
+                                                              act_dim=act_dim,
+                                                              hist_num=historyNum,
+                                                              batch_num=batchNum,
+                                                              device=device,
+                                                              num_env=env.num_envs), device=device)
 
-    ext_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['ext_encoder_net'],
-                                                         torch.nn.LeakyReLU,
-                                                         obs_ext_dim,
-                                                         ext_latent_dim),
-                                     device)
+    Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'], nn.LeakyReLU, int(ob_dim/historyNum),
+                                                    int((ob_dim-ROA_ob_dim)/historyNum)), device=device)
 
-    act_encoder = ppo_module.Encoder(ppo_module.MLP_Prob(cfg['architecture']['encoding']['act_encoder_net'],
-                                                         torch.nn.LeakyReLU,
-                                                         obs_act_dim,
-                                                         act_latent_dim),
-                                     device)
+    Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_ob_dim/batchNum),
+                                                                  hidden_dim=hidden_dim,
+                                                                  ext_dim=ROA_ext_dim,
+                                                                  pro_dim=pro_dim,
+                                                                  act_dim=act_dim,
+                                                                  hist_num=historyNum,
+                                                                  device=device,
+                                                                  batch_num=batchNum,
+                                                                  num_env=env.num_envs), device=device)
 
 
     actor.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
     actor.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
-    pro_encoder.architecture.load_state_dict(torch.load(weight_path)['pro_encoder_state_dict'])
-    ext_encoder.architecture.load_state_dict(torch.load(weight_path)['ext_encoder_state_dict'])
-    act_encoder.architecture.load_state_dict(torch.load(weight_path)['act_encoder_state_dict'])
+    Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
+    Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
+    Estimator.architecture.load_state_dict(torch.load(weight_path)['Inertial_estimator'])
 
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
     for i in range (200):
         env.reset()
+        Encoder.architecture.reset()
+        Encoder_ROA.architecture.reset()
         time.sleep(1)
         for step in range(total_steps):
             with torch.no_grad():
                 obs = env.observe(False)
 
-                obs_concat = latent_concat(obs)
-                print(obs_concat)
-                action_ll, actions_log_prob = actor.sample(obs_concat)
+                latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+
+
+
+                # latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs).to(device))
+
+                action_ll, actions_log_prob = actor.sample(latent)
 
                 # print(action_ll)
                 env.step_visualize(action_ll)

@@ -54,7 +54,7 @@ class PPO:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
         self.encoder_input_dim = self.encoder.architecture.input_shape[0]
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], lr=learning_rate)
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], lr=learning_rate)
         self.device = device
         self.criteria = nn.MSELoss()
 
@@ -228,9 +228,9 @@ class PPO:
                 obs_ROA_batch, estimator_true_data = self.get_obs_ROA(obs_batch)
 
                 obs_concat = self.encode(obs_batch)
-                obs_concat_d = self.encode(obs_batch).clone().detach()
+                obs_concat_d = obs_concat.clone().detach()
                 obs_concat_ROA = self.encode_ROA(obs_ROA_batch)
-                obs_concat_ROA_d = self.encode_ROA(obs_ROA_batch).clone().detach()
+                obs_concat_ROA_d = obs_concat_ROA.clone().detach()
 
                 estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
@@ -292,7 +292,7 @@ class PPO:
                 self.optimizer.zero_grad()
                 loss.backward()
 
-                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], self.max_grad_norm)
+                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], self.max_grad_norm)
 
                 self.optimizer.step()
 
