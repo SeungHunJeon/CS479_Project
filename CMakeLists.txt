@@ -34,9 +34,10 @@ message(${low_controller_path})
 find_package(Eigen3 REQUIRED)
 find_package(OpenMP REQUIRED)
 
+
 if (UNIX AND NOT APPLE AND NOT ANDROID AND NOT WEBGL AND NOT WIN32)
     set(RAISIM_OS linux)
-    list(APPEND CMAKE_PREFIX_PATH ../raisimLib/raisim/${RAISIM_OS})
+    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../raisimLib/raisim/${RAISIM_OS})
 elseif(APPLE)
     set(RAISIM_OS mac)
     list(APPEND CMAKE_PREFIX_PATH ../raisim/${RAISIM_OS})
@@ -51,7 +52,10 @@ elseif(WIN32)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env/bin)
 endif()
 
-find_package(raisim CONFIG REQUIRED)
+find_package(raisim REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../raisimLib/raisim/${RAISIM_OS})
+
+#find_package(raisim REQUIRED PATHS /home/oem/workspace/raisimLib/raisim/linux)
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")

@@ -6,10 +6,12 @@ set(CMAKE_CXX_STANDARD 17)
 find_package(Eigen3 REQUIRED)
 #find_package(Torch REQUIRED)
 
-list(APPEND CMAKE_PREFIX_PATH "~/workspace/raisin_ws/src/raisin/raisin_torch/pytorch/libtorch")
-list(APPEND CMAKE_PREFIX_PATH "~/workspace/Libraries/libtorch_cpu/libtorch")
-list(APPEND CMAKE_PREFIX_PATH ../../../raisimLib/raisim/${RAISIM_OS})
-find_package(raisim CONFIG REQUIRED)
+#list(APPEND CMAKE_PREFIX_PATH "~/workspace/raisin_ws/src/raisin/raisin_torch/pytorch/libtorch")
+#list(APPEND CMAKE_PREFIX_PATH "~/workspace/Libraries/libtorch_cpu/libtorch")
+
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../raisimLib/raisim/linux")
+find_package(raisim REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../../raisimLib/raisim/linux)
+#find_package(raisim REQUIRED PATHS /home/oem/workspace/raisimLib/raisim/linux)
 
 include_directories (${EIGEN3_INCLUDE_DIRS})
 

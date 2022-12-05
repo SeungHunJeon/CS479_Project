@@ -169,8 +169,8 @@ for update in range(iteration_number, 1000000):
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
-        env.turn_on_visualization()
-        env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
+        # env.turn_on_visualization()
+        # env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
         for step in range(n_steps):
             with torch.no_grad():
@@ -183,9 +183,9 @@ for update in range(iteration_number, 1000000):
                 # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
         # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
-
-        env.stop_video_recording()
-        env.turn_off_visualization()
+        time.sleep(100)
+        # env.stop_video_recording()
+        # env.turn_off_visualization()
         env.reset()
         Encoder.architecture.reset()
         Encoder_ROA.architecture.reset()

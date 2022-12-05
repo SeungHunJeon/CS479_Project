@@ -52,6 +52,11 @@ class RaisimGymVecEnv:
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
 
+    def get_depth_image(self): ## only for one env
+        return np.array(self.wrapper.getDepthImage(), dtype=np.float32).reshape(-1, self.height, self.width)
+    def get_color_image(self): ## only for one env
+        return np.array(self.wrapper.getColorImage()).reshape(-1, self.height, self.width,4)[..., [2,1,0]].astype(np.uint8)
+
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
         var_file_name = dir_name + "/var" + str(iteration) + ".csv"

@@ -37,6 +37,15 @@ class ENVIRONMENT {
 
     raibo_->getCollisionBody("arm_link/0").setCollisionGroup(raisim::COLLISION(1));
     raibo_->getCollisionBody("arm_link/0").setCollisionMask(raisim::COLLISION(1));
+
+    auto depthSensor1 = raibo_->getSensor<raisim::DepthCamera>("depth_camera_front_camera_parent:depth");
+    depthSensor1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
+    auto rgbCamera1 = raibo_->getSensor<raisim::RGBCamera>("depth_camera_front_camera_parent:color");
+    rgbCamera1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
+
+    depthCameras[0] = depthSensor1;
+    rgbCameras[0] = rgbCamera1;
+
 //    raibo_->ignoreCollisionBetween(raibo_->getBodyIdx("base"), )
 
     /// Object spawn
@@ -249,6 +258,22 @@ class ENVIRONMENT {
   }
 
 
+  std::vector<std::vector<float>> getDepthImage(){
+    std::vector<std::vector<float>> image;
+    for (raisim::DepthCamera* depthCamera : depthCameras){
+      image.push_back(depthCamera->getDepthArray());
+    }
+    return image;
+  }
+  std::vector<std::vector<int>> getColorImage(){
+    std::vector<std::vector<int>> image;
+    for (raisim::RGBCamera* rgbCamera : rgbCameras){
+      std::vector<char> charVec = rgbCamera->getImageBuffer();
+      image.push_back(std::vector<int>{charVec.begin(), charVec.end()});
+    }
+    return image;
+  }
+
 
   void subStep() {
     Low_controller_.updateHistory();
@@ -328,6 +353,8 @@ class ENVIRONMENT {
   controller::raibotPositionController Low_controller_;
   Eigen::VectorXd jointDGain_, jointPGain_;
   RandomObjectGenerator objectGenerator_;
+  raisim::RGBCamera* rgbCameras[1];
+  raisim::DepthCamera* depthCameras[1];
 
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
