@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- This URDF was automatically created by SolidWorks to URDF Exporter! Originally created by Stephen Brawner (brawner@gmail.com) 
+     Commit Version: 1.6.0-4-g7f85cfe  Build Version: 1.6.7995.38578
+     For more information, please see http://wiki.ros.org/sw_urdf_exporter -->
+<robot
+  name="arm_test_2">
+
+  <link name="world"/>
+
+  <link
+    name="base_link">
+    <inertial>
+      <origin
+        xyz="-6.0229E-06 2.1933E-06 0.036268"
+        rpy="0 0 0" />
+      <mass
+        value="0.40931" />
+      <inertia
+        ixx="0.00025677"
+        ixy="4.1595E-06"
+        ixz="-3.6781E-09"
+        iyy="0.00024853"
+        iyz="9.8375E-10"
+        izz="0.00045579" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://arm_test_2/meshes/base_link.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.75294 0.75294 0.75294 1" />
+      </material>
+    </visual>
+  </link>
+
+  <joint name="kinova_joint_base" type="fixed">
+    <parent link="world"/>
+    <child link="base_link"/>
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+  </joint>
+
+  <link
+    name="link1">
+    <inertial>
+      <origin
+        xyz="7.682E-06 0.025925 0.11875"
+        rpy="0 0 0" />
+      <mass
+        value="0.42204" />
+      <inertia
+        ixx="0.00026113"
+        ixy="1.0757E-07"
+        ixz="-4.0427E-09"
+        iyy="0.00046901"
+        iyz="1.6464E-09"
+        izz="0.0002593" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://arm_test_2/meshes/link1.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+  </link>
+  <joint
+    name="joint1"
+    type="revolute">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="base_link" />
+    <child
+      link="link1" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-2"
+      upper="2"
+      effort="40"
+      velocity="20" />
+  </joint>
+  <link
+    name="link2">
+    <inertial>
+      <origin
+        xyz="-0.067111 -0.065486 0.11016"
+        rpy="0 0 0" />
+      <mass
+        value="0.84768" />
+      <inertia
+        ixx="0.00057616"
+        ixy="-1.4668E-05"
+        ixz="-1.8116E-05"
+        iyy="0.0065673"
+        iyz="-2.4064E-05"
+        izz="0.0061731" />
+    </inertial>
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="package://arm_test_2/meshes/link2.STL" />
+      </geometry>
+      <material
+        name="">
+        <color
+          rgba="0.79216 0.81961 0.93333 1" />
+      </material>
+    </visual>
+  </link>
+  <joint
+    name="joint2"
+    type="revolute">
+    <origin
+      xyz="0 0 0"
+      rpy="0 0 0" />
+    <parent
+      link="link1" />
+    <child
+      link="link2" />
+    <axis
+      xyz="0 0 -1" />
+    <limit
+      lower="-2"
+      upper="2"
+      effort="40"
+      velocity="20" />
+  </joint>
+</robot>

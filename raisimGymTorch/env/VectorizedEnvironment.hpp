@@ -159,6 +159,13 @@ class VectorizedEnvironment {
       perAgentStep(i, action, reward, done, true);
   }
 
+  std::vector<std::vector<float>> getDepthImage() {
+    return environments_[0]->getDepthImage();
+  }
+  std::vector<std::vector<int>> getColorImage() {
+    return environments_[0]->getColorImage();
+  }
+
   void turnOnVisualization() { if(render_) environments_[0]->turnOnVisualization(); }
   void turnOffVisualization() { if(render_) environments_[0]->turnOffVisualization(); }
   void startRecordingVideo(const std::string& videoName) { if(render_) environments_[0]->startRecordingVideo(videoName); }

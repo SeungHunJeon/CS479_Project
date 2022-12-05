@@ -5,23 +5,24 @@
 <robot
   name="raibo2_arm">
 
+
   <link name="world"/>
 
   <link
     name="base_link">
     <inertial>
       <origin
-        xyz="-0.13485 -0.32615 0.3856"
+        xyz="-2.6676E-06 6.6431E-05 0.035814"
         rpy="0 0 0" />
       <mass
         value="0.40931" />
       <inertia
-        ixx="0.00026395"
-        ixy="-3.5656E-05"
-        ixz="-2.5698E-05"
-        iyy="0.00040254"
-        iyz="8.0982E-05"
-        izz="0.0002946" />
+        ixx="0.00025674"
+        ixy="4.2386E-06"
+        ixz="-1.4089E-09"
+        iyy="0.00024856"
+        iyz="3.536E-09"
+        izz="0.00045579" />
     </inertial>
     <visual>
       <origin
@@ -29,7 +30,7 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://raibo2_arm/meshes/base_link.STL" />
+          filename="../meshes/base_link.STL" />
       </geometry>
       <material
         name="">
@@ -37,6 +38,15 @@
           rgba="0.75294 0.75294 0.75294 1" />
       </material>
     </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/base_link.obj" />
+      </geometry>
+    </collision>
   </link>
 
   <joint name="kinova_joint_base" type="fixed">
@@ -49,17 +59,17 @@
     name="link1">
     <inertial>
       <origin
-        xyz="0.00036261 -0.025923 0.051751"
+        xyz="2.0778E-07 0.025925 0.051746"
         rpy="0 0 0" />
       <mass
         value="0.42204" />
       <inertia
-        ixx="0.00026118"
-        ixy="-2.865E-06"
-        ixz="1.6256E-08"
-        iyy="0.00046897"
-        iyz="-2.8035E-09"
-        izz="0.00025929" />
+        ixx="0.00026117"
+        ixy="8.9791E-11"
+        ixz="1.0579E-07"
+        iyy="0.00046901"
+        iyz="4.9903E-09"
+        izz="0.00025926" />
     </inertial>
     <visual>
       <origin
@@ -67,30 +77,39 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://raibo2_arm/meshes/link1.STL" />
+          filename="../meshes/link1.STL" />
       </geometry>
       <material
         name="">
         <color
-          rgba="0.79216 0.81961 0.93333 1" />
+          rgba="0.75294 0.75294 0.75294 1" />
       </material>
     </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/link1.obj" />
+      </geometry>
+    </collision>
   </link>
   <joint
     name="joint1"
     type="revolute">
     <origin
-      xyz="-0.14165 -0.39992 -0.29982"
-      rpy="-0.37519 0.40075 -2.8051" />
+      xyz="0 6.0353E-05 0.066545"
+      rpy="0 0 -0.45605" />
     <parent
       link="base_link" />
     <child
       link="link1" />
     <axis
-      xyz="0 0 1" />
+      xyz="0 0 -1" />
     <limit
-      lower="-6.28"
-      upper="6.28"
+      lower="-3.28"
+      upper="3.28"
       effort="80"
       velocity="20" />
   </joint>
@@ -98,17 +117,17 @@
     name="link2">
     <inertial>
       <origin
-        xyz="0.065804 0.00041458 0.062261"
+        xyz="-0.056805 0.037306 0.05852"
         rpy="0 0 0" />
       <mass
-        value="0.8582" />
+        value="0.84768" />
       <inertia
-        ixx="0.00068402"
-        ixy="0.00077444"
-        ixz="-2.0904E-05"
-        iyy="0.0060627"
-        iyz="-2.1281E-05"
-        izz="0.0065624" />
+        ixx="0.0030313"
+        ixy="0.0027774"
+        ixz="2.9197E-05"
+        iyy="0.003718"
+        iyz="6.2474E-06"
+        izz="0.0065672" />
     </inertial>
     <visual>
       <origin
@@ -116,30 +135,39 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://raibo2_arm/meshes/link2.STL" />
+          filename="../meshes/link2.STL" />
       </geometry>
       <material
         name="">
         <color
-          rgba="0.79216 0.81961 0.93333 1" />
+          rgba="0.75294 0.75294 0.75294 1" />
       </material>
     </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/link2.obj" />
+      </geometry>
+    </collision>
   </link>
   <joint
     name="joint2"
     type="revolute">
     <origin
-      xyz="-5.52E-05 0.0039996 0.053"
-      rpy="-1.5708 0.97319 0.013801" />
+      xyz="0 -0.007 0.053"
+      rpy="1.5708 -0.19845 0" />
     <parent
       link="link1" />
     <child
       link="link2" />
     <axis
-      xyz="0 0 1" />
+      xyz="0 0 -1" />
     <limit
-      lower="-6.28"
-      upper="6.28"
+      lower="-3.28"
+      upper="3.28"
       effort="80"
       velocity="20" />
   </joint>
@@ -147,17 +175,17 @@
     name="link3">
     <inertial>
       <origin
-        xyz="0.037978 1.3805E-05 2.6943E-05"
+        xyz="-0.0444249520614745 -1.55924068481195E-05 -1.05634184573156E-06"
         rpy="0 0 0" />
       <mass
-        value="0.34252" />
+        value="0.300280421855983" />
       <inertia
-        ixx="0.00018665"
-        ixy="-1.6457E-08"
-        ixz="-1.6273E-12"
-        iyy="0.00014503"
-        iyz="1.4618E-06"
-        izz="0.00013786" />
+        ixx="0.00017841651959097"
+        ixy="-1.62939417234611E-08"
+        ixz="7.85077719638834E-11"
+        iyy="0.000136798761787988"
+        iyz="-1.46174432775188E-06"
+        izz="0.000136947477002973" />
     </inertial>
     <visual>
       <origin
@@ -165,22 +193,30 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://raibo2_arm/meshes/link3.STL" />
+          filename="../meshes/link3.STL" />
       </geometry>
       <material
         name="">
         <color
-          rgba="0.79216 0.81961 0.93333 1" />
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
       </material>
     </visual>
-
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/link3.obj" />
+      </geometry>
+    </collision>
   </link>
   <joint
     name="joint3"
     type="revolute">
     <origin
-      xyz="0.31352 -0.064094 0.08565"
-      rpy="3.1416 0 -1.1678" />
+      xyz="-0.22627 0.22627 0.08265"
+      rpy="3.1416 0 -2.1523" />
     <parent
       link="link2" />
     <child
@@ -188,8 +224,8 @@
     <axis
       xyz="0 0 1" />
     <limit
-      lower="-2.5"
-      upper="0.5"
+      lower="-1.8"
+      upper="0.4"
       effort="80"
       velocity="20" />
   </joint>
@@ -197,17 +233,17 @@
     name="link4">
     <inertial>
       <origin
-        xyz="-0.0075464 -0.001152 0.31914"
+        xyz="0.0020612307142269 -0.00735031307224393 0.319122580707953"
         rpy="0 0 0" />
       <mass
-        value="0.32249" />
+        value="0.322493892765723" />
       <inertia
-        ixx="0.00056311"
-        ixy="1.1235E-05"
-        ixz="-1.589E-07"
-        iyy="0.00049116"
-        iyz="1.0411E-06"
-        izz="0.0001007" />
+        ixx="0.000494785654256079"
+        ixy="-1.98265054493801E-05"
+        ixz="1.01227889981719E-06"
+        iyy="0.000559205616698159"
+        iyz="2.86530389277511E-07"
+        izz="0.00010097509421591" />
     </inertial>
     <visual>
       <origin
@@ -215,30 +251,39 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://raibo2_arm/meshes/link4.STL" />
+          filename="../meshes/link4.STL" />
       </geometry>
       <material
         name="">
         <color
-          rgba="0.79216 0.81961 0.93333 1" />
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
       </material>
     </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/link4.obj" />
+      </geometry>
+    </collision>
   </link>
   <joint
     name="joint4"
     type="revolute">
     <origin
-      xyz="0.07 0 0"
-      rpy="1.5708 1.5397 1.5708" />
+      xyz="-0.070002 0 0"
+      rpy="1.5708 1.063 -1.5708" />
     <parent
       link="link3" />
     <child
       link="link4" />
     <axis
-      xyz="0 0 1" />
+      xyz="0 0 -1" />
     <limit
-      lower="-6.28"
-      upper="6.28"
+      lower="-3.28"
+      upper="3.28"
       effort="40"
       velocity="20" />
   </joint>
@@ -246,17 +291,17 @@
     name="link5">
     <inertial>
       <origin
-        xyz="0.065958 0.012005 -0.025477"
+        xyz="-0.0670412479622793 -1.4068689488389E-06 -0.0255194202186986"
         rpy="0 0 0" />
       <mass
-        value="0.27079" />
+        value="0.270793262476203" />
       <inertia
-        ixx="0.00017554"
-        ixy="9.6149E-06"
-        ixz="1.1599E-05"
-        iyy="0.00012447"
-        iyz="1.0576E-06"
-        izz="0.00010711" />
+        ixx="0.000177289557334705"
+        ixy="-8.32059212755611E-11"
+        ixz="-1.16011852007938E-05"
+        iyy="0.000122719341998521"
+        iyz="1.03469981956808E-06"
+        izz="0.000107111604438449" />
     </inertial>
     <visual>
       <origin
@@ -264,21 +309,30 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://raibo2_arm/meshes/link5.STL" />
+          filename="../meshes/link5.STL" />
       </geometry>
       <material
         name="">
         <color
-          rgba="0.79216 0.81961 0.93333 1" />
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
       </material>
     </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/link5.obj" />
+      </geometry>
+    </collision>
   </link>
   <joint
     name="joint5"
     type="revolute">
     <origin
-      xyz="-0.02768 -0.0042217 0.359"
-      rpy="1.5708 -1.3841 -1.4194" />
+      xyz="0.0076283 -0.026945 0.359"
+      rpy="-1.5708 1.3723 -2.8657" />
     <parent
       link="link4" />
     <child
@@ -286,8 +340,8 @@
     <axis
       xyz="0 0 1" />
     <limit
-      lower="-2.5"
-      upper="2.5"
+      lower="-1.5"
+      upper="1.5"
       effort="40"
       velocity="20" />
   </joint>
@@ -295,17 +349,17 @@
     name="link6">
     <inertial>
       <origin
-        xyz="2.2204E-16 -1.1102E-16 -0.0064341"
+        xyz="-1.45587353284071E-09 -3.37469850675287E-09 0.00896679159595459"
         rpy="0 0 0" />
       <mass
-        value="0.026017" />
+        value="0.00616895938082152" />
       <inertia
-        ixx="5.8442E-06"
-        ixy="1.2176E-21"
-        ixz="-1.6941E-21"
-        iyy="5.8442E-06"
-        iyz="2.2764E-21"
-        izz="1.1225E-05" />
+        ixx="1.48677013808814E-06"
+        ixy="1.62190401411481E-14"
+        ixz="3.45683498077009E-14"
+        iyy="1.48676995228825E-06"
+        iyz="6.29319939715178E-14"
+        izz="2.38457325299129E-06" />
     </inertial>
     <visual>
       <origin
@@ -313,31 +367,40 @@
         rpy="0 0 0" />
       <geometry>
         <mesh
-          filename="package://raibo2_arm/meshes/link6.STL" />
+          filename="../meshes/link6.STL" />
       </geometry>
       <material
         name="">
         <color
-          rgba="0.89804 0.91765 0.92941 1" />
+          rgba="0.752941176470588 0.752941176470588 0.752941176470588 1" />
       </material>
     </visual>
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+      <geometry>
+        <mesh
+          filename="../meshes/link6.obj" />
+      </geometry>
+    </collision>
   </link>
   <joint
     name="joint6"
     type="revolute">
     <origin
-      xyz="0.086577 0.01576 -0.028"
-      rpy="-1.5708 -1.1675 -1.3907" />
+      xyz="-0.088002 0 -0.028004"
+      rpy="-1.5708 0.63873 1.5708" />
     <parent
       link="link5" />
     <child
       link="link6" />
     <axis
-      xyz="0 0 1" />
+      xyz="0 0 -1" />
     <limit
-      lower="-6.28"
-      upper="6.28"
+      lower="-3.28"
+      upper="3.28"
       effort="40"
-      velocity="10" />
+      velocity="20" />
   </joint>
 </robot>

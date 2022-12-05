@@ -41,7 +41,9 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("moveControllerCursor", &VectorizedEnvironment<ENVIRONMENT>::moveControllerCursor)
     .def("getState", &VectorizedEnvironment<ENVIRONMENT>::getState)
     .def("getObStatistics", &VectorizedEnvironment<ENVIRONMENT>::getObStatistics)
-    .def("setObStatistics", &VectorizedEnvironment<ENVIRONMENT>::setObStatistics);
+    .def("setObStatistics", &VectorizedEnvironment<ENVIRONMENT>::setObStatistics)
+    .def("getDepthImage", &VectorizedEnvironment<ENVIRONMENT>::getDepthImage)
+    .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT>::getColorImage);
 
   py::class_<NormalSampler>(m, "NormalSampler")
       .def(py::init<int>(), py::arg("dim"))

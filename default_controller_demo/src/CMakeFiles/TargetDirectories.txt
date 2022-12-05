@@ -1,6 +1,0 @@
-/home/oem/workspace/raisimGymForRaisin/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo/src/CMakeFiles/rebuild_cache.dir
-/home/oem/workspace/raisimGymForRaisin/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo/src/CMakeFiles/edit_cache.dir
-/home/oem/workspace/raisimGymForRaisin/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo/src/module/controller/CMakeFiles/edit_cache.dir
-/home/oem/workspace/raisimGymForRaisin/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo/src/module/controller/CMakeFiles/raibot_position_controller_sim.dir
-/home/oem/workspace/raisimGymForRaisin/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo/src/module/controller/CMakeFiles/rebuild_cache.dir
-/home/oem/workspace/raisimGymForRaisin/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/default_controller_demo/src/module/controller/CMakeFiles/raibot_default_controller.dir

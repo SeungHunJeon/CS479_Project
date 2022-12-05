@@ -175,11 +175,11 @@ class PPO:
 
 
         for i in range(self.num_history_batch):
-            obs_ROA_batch.append(obs_batch[:,:,
+            obs_ROA_batch.append(obs_batch[...,
                                  (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
                                                :(self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
                                                 + self.encoder.architecture.pro_dim])
-            obs_ROA_batch.append(obs_batch[:,:,
+            obs_ROA_batch.append(obs_batch[...,
                                  (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
                                  + self.encoder.architecture.pro_dim:
                                  (self.encoder.architecture.pro_dim +
@@ -188,12 +188,12 @@ class PPO:
                                                                       + self.encoder.architecture.pro_dim +15])
 
 
-            obs_ROA_batch.append(obs_batch[:,:,
+            obs_ROA_batch.append(obs_batch[...,
                                  (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
                                  + self.encoder.architecture.pro_dim+15+13:(self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
                                                                            + self.encoder.architecture.pro_dim+15+13 +12])
 
-        estimator_true_data = (obs_batch[:,:,
+        estimator_true_data = (obs_batch[...,
                                    (self.encoder.architecture.pro_dim +
                                     self.encoder.architecture.ext_dim +
                                     self.encoder.architecture.act_dim)*(self.num_history_batch-1)

@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
 
   /// create objects
   world.addGround();
-  auto kinova = world.addArticulatedSystem(binaryPath.getDirectory() + "\\rsc\\raibo2_arm\\urdf\\raibo2_arm.urdf");
+  auto kinova = world.addArticulatedSystem(binaryPath.getDirectory() + "\\rsc\\raibot\\urdf\\raibot_simplified.urdf");
 
   std::cout << kinova->getDOF() << std::endl;
 
