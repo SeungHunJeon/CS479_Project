@@ -66,6 +66,48 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 
 total_steps = n_steps * env.num_envs
 
+
+
+def get_obs_ROA(encoder, obs_batch):
+    obs_ROA_batch = []
+
+
+    for i in range(historyNum):
+        obs_ROA_batch.append(obs_batch[...,
+                             (encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
+                             :(encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
+                              + encoder.architecture.pro_dim])
+        obs_ROA_batch.append(obs_batch[...,
+                             (encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
+                             + encoder.architecture.pro_dim:
+                             (encoder.architecture.pro_dim +
+                              encoder.architecture.ext_dim +
+                              encoder.architecture.act_dim)*i
+                             + encoder.architecture.pro_dim +15])
+
+
+        obs_ROA_batch.append(obs_batch[...,
+                             (encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
+                             + encoder.architecture.pro_dim+15+13:(encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
+                                                                       + encoder.architecture.pro_dim+15+13 +12])
+
+    estimator_true_data = (obs_batch[...,
+                           (encoder.architecture.pro_dim +
+                            encoder.architecture.ext_dim +
+                            encoder.architecture.act_dim)*(historyNum-1)
+                           + encoder.architecture.pro_dim +15:
+                           (encoder.architecture.pro_dim +
+                            encoder.architecture.ext_dim +
+                            encoder.architecture.act_dim)*(historyNum-1)
+                           + encoder.architecture.pro_dim +15+13
+                           ])
+
+    obs_ROA_batch = np.concatenate(obs_ROA_batch, axis=-1)
+    estimator_true_data = estimator_true_data.reshape(-1, 13)
+
+    return obs_ROA_batch, estimator_true_data
+
+
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
 else:
@@ -124,13 +166,12 @@ else:
             with torch.no_grad():
                 obs = env.observe(False)
 
-                latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+                # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+                obs_ROA, _ = get_obs_ROA(Encoder, obs)
 
+                latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
 
-
-                # latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs).to(device))
-
-                action_ll, actions_log_prob = actor.sample(latent)
+                action_ll, actions_log_prob = actor.sample(latent_ROA)
 
                 # print(action_ll)
                 env.step_visualize(action_ll)
