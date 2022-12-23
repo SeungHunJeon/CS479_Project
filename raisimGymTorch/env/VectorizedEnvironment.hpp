@@ -177,6 +177,7 @@ class VectorizedEnvironment {
 
   void setSeed(int seed) {
     int seed_inc = seed;
+#pragma omp parallel for schedule(auto)
     for (auto *env: environments_)
       env->setSeed(seed_inc++);
   }
