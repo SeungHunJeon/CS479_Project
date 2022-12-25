@@ -16,19 +16,19 @@ class Actor:
         self.action_mean = None
 
     def sample(self, obs):
-        self.action_mean = self.architecture.architecture(obs).cpu().numpy()
+        self.action_mean = self.architecture.forward(obs, actor=True).cpu().numpy()
         actions, log_prob = self.distribution.sample(self.action_mean)
         return actions, log_prob
 
     def evaluate(self, obs, actions):
-        self.action_mean = self.architecture.architecture(obs)
+        self.action_mean = self.architecture.forward(obs, actor=True)
         return self.distribution.evaluate(self.action_mean, actions)
 
     def parameters(self):
         return [*self.architecture.parameters(), *self.distribution.parameters()]
 
     def noiseless_action(self, obs):
-        return self.architecture.architecture(torch.from_numpy(obs).to(self.device))
+        return self.architecture.forward(torch.from_numpy(obs).to(self.device), actor=True)
 
     def save_deterministic_graph(self, file_name, example_input, device='cpu'):
         transferred_graph = torch.jit.trace(self.architecture.architecture.to(device), example_input)
@@ -57,10 +57,10 @@ class Critic:
         self.architecture.to(device)
 
     def predict(self, obs):
-        return self.architecture.architecture(obs).detach()
+        return self.architecture.forward(obs, actor=False).detach()
 
     def evaluate(self, obs):
-        return self.architecture.architecture(obs)
+        return self.architecture.forward(obs, actor=False)
 
     def parameters(self):
         return [*self.architecture.parameters()]
@@ -275,7 +275,7 @@ class MLP_Prob(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, shape, actionvation_fn, input_size, output_size, actor=True):
+    def __init__(self, shape, actionvation_fn, input_size, output_size, actor=False):
         super(MLP, self).__init__()
         self.activation_fn = actionvation_fn
 
@@ -300,8 +300,14 @@ class MLP(nn.Module):
         self.input_shape = [input_size]
         self.output_shape = [output_size]
 
-    def forward(self, x):
+    def forward(self, x, actor=False):
         output = self.architecture(x)
+
+        if(actor):
+            norm = torch.norm(output, dim=-1).unsqueeze(-1)
+            output = torch.div(output, norm)
+            output = output * 3 * torch.sigmoid(norm)
+
         return output
 
     @staticmethod

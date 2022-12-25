@@ -38,13 +38,13 @@ class ENVIRONMENT {
     raibo_->getCollisionBody("arm_link/0").setCollisionGroup(raisim::COLLISION(1));
     raibo_->getCollisionBody("arm_link/0").setCollisionMask(raisim::COLLISION(1));
 
-    auto depthSensor1 = raibo_->getSensor<raisim::DepthCamera>("depth_camera_front_camera_parent:depth");
-    depthSensor1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
-    auto rgbCamera1 = raibo_->getSensor<raisim::RGBCamera>("depth_camera_front_camera_parent:color");
-    rgbCamera1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
+//    auto depthSensor1 = raibo_->getSensor<raisim::DepthCamera>("depth_camera_front_camera_parent:depth");
+//    depthSensor1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
+//    auto rgbCamera1 = raibo_->getSensor<raisim::RGBCamera>("depth_camera_front_camera_parent:color");
+//    rgbCamera1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
 
-    depthCameras[0] = depthSensor1;
-    rgbCameras[0] = rgbCamera1;
+//    depthCameras[0] = depthSensor1;
+//    rgbCameras[0] = rgbCamera1;
 
 //    raibo_->ignoreCollisionBetween(raibo_->getBodyIdx("base"), )
 
@@ -201,8 +201,8 @@ class ENVIRONMENT {
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
         subStep();
-        if(visualize)
-          sleep(simulation_dt_);
+//        if(visualize)
+//          sleep(simulation_dt_);
 
         if(isTerminalState(dummy)) {
           howManySteps++;
@@ -338,7 +338,7 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 0.2;
+  double bound_ratio = 1.0;
   raisim::ArticulatedSystem* raibo_;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;

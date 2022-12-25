@@ -43,14 +43,19 @@ class RandomObjectGenerator {
 
   void Inertial_Randomize(raisim::SingleBodyObject* object, double bound_ratio, double curriculumFactor, std::mt19937& gen, std::uniform_real_distribution<double>& uniDist, std::normal_distribution<double>& normDist) {
     /// Mass randomization (1-bound_ratio ~ 1+bound_ratio)
-    double Mass = object->getMass()*(1 + curriculumFactor*bound_ratio * normDist(gen));
+    double Mass = object->getMass()*(1 + curriculumFactor*bound_ratio * uniDist(gen));
     object->setMass(Mass);
 
     /// Inertia randomization (1-bound_ratio ~ 1+bound_ratio)
     Eigen::Matrix3d inertia_residual;
     inertia_residual.setOnes();
-    for (int i=0; i<9; i++)
-      inertia_residual(i) += curriculumFactor*bound_ratio * normDist(gen);
+    for (int i=0; i<9; i++) {
+      if(i % 3 == 0)
+        inertia_residual(i) += 0.1 + curriculumFactor*bound_ratio * uniDist(gen);
+      else
+        inertia_residual(i) += curriculumFactor*bound_ratio * normDist(gen);
+    }
+
     Eigen::Matrix3d Inertia = object->getInertiaMatrix_B().cwiseProduct(inertia_residual);
     object->setInertia(Inertia);
 
