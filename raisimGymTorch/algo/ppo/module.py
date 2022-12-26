@@ -304,7 +304,7 @@ class MLP(nn.Module):
         output = self.architecture(x)
 
         if(actor):
-            norm = torch.norm(output, dim=-1).unsqueeze(-1)
+            norm = (torch.norm(output, dim=-1)+1e-8).unsqueeze(-1)
             output = torch.div(output, norm)
             output = output * 3 * torch.sigmoid(norm)
 

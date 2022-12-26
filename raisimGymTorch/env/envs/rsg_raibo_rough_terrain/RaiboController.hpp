@@ -219,20 +219,20 @@ class RaiboController {
     Eigen::Vector2d pos_temp_;
     double dist_temp_;
 
-    dist_temp_ = ee_to_obj.head(2).norm();
-    pos_temp_ = ee_to_obj.head(2) * (1./dist_temp_ + 1e-9);
+    dist_temp_ = ee_to_obj.head(2).norm() + 1e-8;
+    pos_temp_ = ee_to_obj.head(2) * (1./dist_temp_);
 
     Obj_Info_.segment(0, 2) << pos_temp_;
     Obj_Info_.segment(2, 1) << std::min(2., dist_temp_);
 
     dist_temp_ = obj_to_target.head(2).norm();
-    pos_temp_ = obj_to_target.head(2) * (1./dist_temp_ + 1e-9);
+    pos_temp_ = obj_to_target.head(2) * (1./dist_temp_);
 
     Obj_Info_.segment(3, 2) << pos_temp_;
     Obj_Info_.segment(5, 1) << std::min(2., dist_temp_);
 
     dist_temp_ = ee_to_target.head(2).norm();
-    pos_temp_ = ee_to_target.head(2) * (1./dist_temp_ + 1e-9);
+    pos_temp_ = ee_to_target.head(2) * (1./dist_temp_);
 
     Obj_Info_.segment(6, 2) << pos_temp_;
     Obj_Info_.segment(8, 1) << std::min(2., dist_temp_);
