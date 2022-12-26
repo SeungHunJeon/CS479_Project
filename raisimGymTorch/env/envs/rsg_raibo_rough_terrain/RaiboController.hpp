@@ -220,19 +220,19 @@ class RaiboController {
     double dist_temp_;
 
     dist_temp_ = ee_to_obj.head(2).norm();
-    pos_temp_ = ee_to_obj.head(2) * (1./dist_temp_);
+    pos_temp_ = ee_to_obj.head(2) * (1./dist_temp_ + 1e-9);
 
     Obj_Info_.segment(0, 2) << pos_temp_;
     Obj_Info_.segment(2, 1) << std::min(2., dist_temp_);
 
     dist_temp_ = obj_to_target.head(2).norm();
-    pos_temp_ = obj_to_target.head(2) * (1./dist_temp_);
+    pos_temp_ = obj_to_target.head(2) * (1./dist_temp_ + 1e-9);
 
     Obj_Info_.segment(3, 2) << pos_temp_;
     Obj_Info_.segment(5, 1) << std::min(2., dist_temp_);
 
     dist_temp_ = ee_to_target.head(2).norm();
-    pos_temp_ = ee_to_target.head(2) * (1./dist_temp_);
+    pos_temp_ = ee_to_target.head(2) * (1./dist_temp_ + 1e-9);
 
     Obj_Info_.segment(6, 2) << pos_temp_;
     Obj_Info_.segment(8, 1) << std::min(2., dist_temp_);
@@ -260,10 +260,22 @@ class RaiboController {
     /// height map
     controlFrameX_ =
         {baseRot_[0], baseRot_[1], 0.}; /// body x axis projected on the world x-y plane, expressed in the world frame
-    controlFrameX_ /= controlFrameX_.norm();
+    controlFrameX_ /= (controlFrameX_.norm() + 1e-10);
     raisim::cross(zAxis_, controlFrameX_, controlFrameY_);
 
-    /// check if the feet are in contact with the ground
+
+    /// Check if the distance between command pos and robot base are under offset.
+
+    Eigen::Vector3d current_base_pos = raibo_->getBasePosition().e();
+    current_base_pos[2] = 0;
+    desired_dist_ = (current_base_pos - desired_pos_).norm();
+    if(desired_dist_ < 0.1)
+      is_achieved = true;
+
+  }
+
+  Eigen::VectorXd get_desired_pos () {
+    return desired_pos_;
   }
 
   void getObservation(Eigen::VectorXd &observation) {
@@ -271,10 +283,22 @@ class RaiboController {
   }
 
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
+
     Eigen::VectorXf position = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
+    Eigen::VectorXd current_pos_ = raibo_->getBasePosition().e();
     position += actionMean_.cast<float>();
     command_ = {position(0), position(1), 0};
+    desired_pos_ = baseRot_.e() * command_.cast<double>();
+    desired_pos_ += current_pos_;
+    desired_pos_(2) = 0;
+
+    is_achieved = false;
+//    desired_dist_ = (raibo_->getBasePosition().e() - current_pos_).norm();
     return command_;
+  }
+
+  bool is_achieve() {
+    return is_achieved;
   }
 
   bool advance(raisim::World *world, const Eigen::Ref<EigenVec> &action, double curriculumFactor) {
@@ -313,7 +337,7 @@ class RaiboController {
     command_Obj_Pos_ = command_obj_pos_;
     obj_geometry_ = obj_geometry;
 
-
+    is_achieved = true;
     // history
     for (int i = 0; i < historyNum_; i++)
     {
@@ -459,6 +483,7 @@ class RaiboController {
     stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
 
     double commandReward_tmp = std::max(5., static_cast<double>(command_.norm()));
+//    double remnant_dist =
     commandReward_ += cf * commandRewardCoeff_ * simDt_ * commandReward_tmp;
 
     torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
@@ -526,6 +551,9 @@ class RaiboController {
   std::array<bool, 4> footContactState_;
   raisim::Mat<3, 3> baseRot_;
   Eigen::Vector3f command_;
+  Eigen::Vector3d desired_pos_;
+  double desired_dist_;
+  bool is_achieved = true;
 
   // robot observation variables
   std::vector<raisim::VecDyn> heightScan_;

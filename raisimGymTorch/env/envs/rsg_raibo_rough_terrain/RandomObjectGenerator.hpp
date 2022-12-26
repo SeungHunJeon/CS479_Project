@@ -47,7 +47,11 @@ class RandomObjectGenerator {
 
   void Inertial_Randomize(raisim::SingleBodyObject* object, double bound_ratio, double curriculumFactor, std::mt19937& gen, std::uniform_real_distribution<double>& uniDist, std::normal_distribution<double>& normDist) {
     /// Mass randomization (1-bound_ratio ~ 1+bound_ratio)
-    double Mass = object->getMass()*(1 + curriculumFactor*bound_ratio * uniDist(gen));
+    double ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+    while (ratio < 0.5)
+      ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+
+    double Mass = object->getMass()*ratio;
     object->setMass(Mass);
 
     /// Inertia randomization (1-bound_ratio ~ 1+bound_ratio)
@@ -88,7 +92,10 @@ class RandomObjectGenerator {
     switch (object_shape) {
       case ObjectShape::BALL: /// 0
       {
-        double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
+        double ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+        while (ratio < 0.5)
+          ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+        double radius_ = radius * ratio;
         object_height = 2*radius_;
         classify_vector << 1, 0, 0, 0;
         geometry << 2*radius_, 2*radius_, 2*radius_;
@@ -98,8 +105,16 @@ class RandomObjectGenerator {
 
       case ObjectShape::Cylinder: /// 1
       {
-        double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
-        double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
+        double ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+        while (ratio < 0.5)
+          ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+
+        double height_ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+        while (height_ratio < 0.5)
+          height_ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+
+        double radius_ = radius * ratio;
+        double height_ = height * height_ratio;
         object_height = height;
         classify_vector << 0, 1, 0, 0;
         geometry << 2*radius_, 2*radius_, height_;
@@ -109,9 +124,21 @@ class RandomObjectGenerator {
 
       case ObjectShape::BOX: /// 2
       {
-        double width1_ = width1 * (1 + curriculumFactor * bound_ratio * normDist(gen));
-        double width2_ = width2 * (1 + curriculumFactor * bound_ratio * normDist(gen));
-        double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
+        double width_ratio_1 = (1 + curriculumFactor * bound_ratio * normDist(gen));
+        while (width_ratio_1 < 0.5)
+          width_ratio_1 = (1 + curriculumFactor * bound_ratio * normDist(gen));
+
+        double width_ratio_2 = (1 + curriculumFactor * bound_ratio * normDist(gen));
+        while (width_ratio_2 < 0.5)
+          width_ratio_2 = (1 + curriculumFactor * bound_ratio * normDist(gen));
+
+        double height_ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+        while (height_ratio < 0.5)
+          height_ratio = (1 + curriculumFactor * bound_ratio * normDist(gen));
+
+        double width1_ = width1 * width_ratio_1;
+        double width2_ = width2 * width_ratio_2;
+        double height_ = height * height_ratio;
         object_height = height_;
         classify_vector << 0, 0, 1, 0;
         geometry << width1_, width2_, height_;

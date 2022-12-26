@@ -117,6 +117,7 @@ class ENVIRONMENT {
       command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, object_height, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
+      command_ball_ = server_->addVisualSphere("command_Ball", 0.1, 0, 1, 0, 1.0);
     }
   }
 
@@ -177,17 +178,22 @@ class ENVIRONMENT {
     /// action scaling
 
     controller_.updateObservation(true, command_, heightMap_, gen_, normDist_);
-    controller_.advance(&world_, action, curriculumFactor_);
     Eigen::Vector3f command;
+    controller_.advance(&world_, action, curriculumFactor_);
     command = controller_.advance(&world_, action);
-
-//    command = command_set[command_order%4];
-//    std::cout << "command : " << command << std::endl;
-//    command_order += 1;
     Low_controller_.setCommand(command);
+
+
+//    if (controller_.is_achieved)
+//    {
+//      command = controller_.advance(&world_, action);
+//      Low_controller_.setCommand(command);
+//    }
+
     if(visualizable_)
     {
       target_pos_->setPosition(Low_controller_.getTargetPosition());
+      command_ball_->setPosition(controller_.get_desired_pos());
     }
     float dummy;
     int howManySteps;
@@ -364,7 +370,7 @@ class ENVIRONMENT {
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
   raisim::SingleBodyObject *Obj_, *Manipulate_;
-  raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_;
+  raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_, *command_ball_;
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
   raisim::Vec<3> Pos_e_;

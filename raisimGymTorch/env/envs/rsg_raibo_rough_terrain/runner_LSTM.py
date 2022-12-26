@@ -183,7 +183,6 @@ for update in range(iteration_number, 1000000):
                 # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
         # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
-        time.sleep(100)
         # env.stop_video_recording()
         # env.turn_off_visualization()
         env.reset()
