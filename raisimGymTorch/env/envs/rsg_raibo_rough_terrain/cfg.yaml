@@ -4,7 +4,7 @@ seed: 2
 environment:
   seed: 2
   render: True
-  num_envs: 300
+  num_envs: 200
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.001

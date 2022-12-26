@@ -167,6 +167,8 @@ class ENVIRONMENT {
     controller_.updateStateVariables();
     Low_controller_.reset(&world_);
     Low_controller_.updateStateVariable();
+
+
   }
 
 
@@ -174,7 +176,7 @@ class ENVIRONMENT {
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
 
-
+    controller_.updateObservation(true, command_, heightMap_, gen_, normDist_);
     controller_.advance(&world_, action, curriculumFactor_);
     Eigen::Vector3f command;
     command = controller_.advance(&world_, action);
@@ -224,15 +226,18 @@ class ENVIRONMENT {
     controller_.updateObject(Obj_);
     object_height = objectGenerator_.get_height();
 
-    double x, y, x_command, y_command;
+    object_radius = objectGenerator_.get_dist();
+
+    double x, y, x_command, y_command, offset;
     double phi_;
+    offset = 0.5;
     phi_ = uniDist_(gen_);
 
     while (true)
     {
-      x = 2.0*cos(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
-      y = 2.0*sin(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
-      if(sqrt(std::pow(x,2) + std::pow(y,2)) > 1.8)
+      x = (object_radius + offset*2)*cos(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
+      y = (object_radius + offset*2)*sin(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
+      if(sqrt(std::pow(x,2) + std::pow(y,2)) > (object_radius + offset))
         break;
     }
 
@@ -366,6 +371,8 @@ class ENVIRONMENT {
   std::vector<Eigen::Vector2f> command_set;
   int command_order = 0;
   double object_height = 0.55;
+  double object_radius;
+
 
 
   thread_local static std::mt19937 gen_;

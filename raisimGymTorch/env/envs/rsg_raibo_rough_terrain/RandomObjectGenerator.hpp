@@ -33,6 +33,10 @@ class RandomObjectGenerator {
     return object_height;
   }
 
+  double get_dist () {
+    return geometry.segment(0,2).norm();
+  }
+
   Eigen::VectorXd get_geometry () {
     return geometry;
   }
