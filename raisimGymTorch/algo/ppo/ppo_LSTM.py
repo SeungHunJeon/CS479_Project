@@ -54,7 +54,9 @@ class PPO:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
         self.encoder_input_dim = self.encoder.architecture.input_shape[0]
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], lr=learning_rate)
+        # self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], lr=learning_rate)
+        # remove estimator
+        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], lr=learning_rate)
         self.device = device
         self.criteria = nn.MSELoss()
 
@@ -282,8 +284,8 @@ class PPO:
 
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
                        + lambda_loss_ROA \
-                       + loss_ROA \
-                       + estimator_loss
+                       + loss_ROA
+                       # + estimator_loss
 
 
                 # Add kl divergence term to normalize the latent vector
@@ -292,7 +294,12 @@ class PPO:
                 self.optimizer.zero_grad()
                 loss.backward()
 
-                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], self.max_grad_norm)
+                # nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], self.max_grad_norm)
+
+                # remove estimator
+                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], self.max_grad_norm)
+
+
 
                 self.optimizer.step()
 

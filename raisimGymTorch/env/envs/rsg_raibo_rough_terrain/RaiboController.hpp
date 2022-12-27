@@ -104,11 +104,11 @@ class RaiboController {
       obMean_.segment((proprioceptiveDim_ + exteroceptiveDim_ + actionDim_)*i, proprioceptiveDim_ + exteroceptiveDim_ + actionDim_) <<
         0.0, 0.0, 1.4, /// gravity axis 3
         Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
-        Eigen::VectorXd::Constant(2, 0),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(2, 0.5),
+        Eigen::VectorXd::Constant(1, 1), /// end-effector to object distance
+        Eigen::VectorXd::Constant(2, 0.5),
         Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0),
+        Eigen::VectorXd::Constant(2, 0.5),
         Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
         Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
         Eigen::VectorXd::Constant(3, 0.0), /// object to target angular velocity
@@ -127,7 +127,7 @@ class RaiboController {
         Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
         Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
         Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to object distance
+        Eigen::VectorXd::Constant(1, 0.5), /// end-effector to object distance
         Eigen::VectorXd::Constant(2, 0.5),
         Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
         Eigen::VectorXd::Constant(2, 0.5),
@@ -149,6 +149,8 @@ class RaiboController {
     footIndices_.push_back(raibo_->getBodyIdx("RH_SHANK"));
     RSFATAL_IF(std::any_of(footIndices_.begin(), footIndices_.end(), [](int i){return i < 0;}), "footIndices_ not found")
 
+    armIndices_.push_back(raibo_->getFrameIdxByLinkName("arm_link"));
+
     /// exported data
     stepDataTag_ = {"towardObject_rew",
                     "stayObject_rew",
@@ -162,6 +164,7 @@ class RaiboController {
 
     classify_vector_.setZero(4);
     classify_vector_ << 1, 0, 0, 0;
+    pre_command_.setZero();
 
     return true;
   };
@@ -207,7 +210,7 @@ class RaiboController {
     //TODO
 
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
-    Eigen::Vector3d obj_to_target (command_Obj_Pos_ - Obj_Pos_.e());
+    Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
     Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
     ee_to_obj(2) = 0;
     obj_to_target(2) = 0;
@@ -217,25 +220,29 @@ class RaiboController {
     ee_to_target = baseRot_.e().transpose() * ee_to_target;
 
     Eigen::Vector2d pos_temp_;
-    double dist_temp_;
+    double dist_temp_min_;
 
     dist_temp_ = ee_to_obj.head(2).norm() + 1e-8;
-    pos_temp_ = ee_to_obj.head(2) * (1./dist_temp_);
-
+    pos_temp_ = ee_to_obj.head(2) * (1.0/dist_temp_);
+//    RSINFO(pos_temp_)
     Obj_Info_.segment(0, 2) << pos_temp_;
-    Obj_Info_.segment(2, 1) << std::min(2., dist_temp_);
+    dist_temp_min_ = std::min(2.0, dist_temp_);
+    Obj_Info_.segment(2, 1) << dist_temp_min_;
+//    RSINFO(dist_temp_)
 
-    dist_temp_ = obj_to_target.head(2).norm();
-    pos_temp_ = obj_to_target.head(2) * (1./dist_temp_);
+    dist_temp_ = obj_to_target.head(2).norm() + 1e-8;
+    pos_temp_ = obj_to_target.head(2) * (1.0/dist_temp_);
 
     Obj_Info_.segment(3, 2) << pos_temp_;
-    Obj_Info_.segment(5, 1) << std::min(2., dist_temp_);
+    dist_temp_min_ = std::min(2.0, dist_temp_);
+    Obj_Info_.segment(5, 1) << dist_temp_min_;
 
-    dist_temp_ = ee_to_target.head(2).norm();
-    pos_temp_ = ee_to_target.head(2) * (1./dist_temp_);
+    dist_temp_ = ee_to_target.head(2).norm() + 1e-8;
+    pos_temp_ = ee_to_target.head(2) * (1.0/dist_temp_);
 
     Obj_Info_.segment(6, 2) << pos_temp_;
-    Obj_Info_.segment(8, 1) << std::min(2., dist_temp_);
+    dist_temp_min_ = std::min(2.0, dist_temp_);
+    Obj_Info_.segment(8, 1) << dist_temp_min_;
 
     Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
 
@@ -256,7 +263,6 @@ class RaiboController {
     Obj_Info_.segment(31,4) = classify_vector_;
 
     Obj_Info_.segment(35,3) = obj_geometry_;
-
     /// height map
     controlFrameX_ =
         {baseRot_[0], baseRot_[1], 0.}; /// body x axis projected on the world x-y plane, expressed in the world frame
@@ -287,6 +293,7 @@ class RaiboController {
     Eigen::VectorXf position = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
     Eigen::VectorXd current_pos_ = raibo_->getBasePosition().e();
     position += actionMean_.cast<float>();
+    pre_command_ = command_;
     command_ = {position(0), position(1), 0};
     desired_pos_ = baseRot_.e() * command_.cast<double>();
     desired_pos_ += current_pos_;
@@ -379,8 +386,18 @@ class RaiboController {
 
     /// if the contact body is not feet
     for (auto &contact: raibo_->getContacts())
-      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end() || contact.isSelfCollision())
+    {
+      if (contact.getlocalBodyIndex() == armIndices_.front())
+      {
+        continue;
+      }
+
+//      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end() || contact.isSelfCollision())
+      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end())
         return true;
+
+    }
+
 
 
     terminalReward = 0.f;
@@ -483,8 +500,10 @@ class RaiboController {
     stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
 
     double commandReward_tmp = std::max(5., static_cast<double>(command_.norm()));
+    double command_smooth = (command_ - pre_command_).norm();
+
 //    double remnant_dist =
-    commandReward_ += cf * commandRewardCoeff_ * simDt_ * commandReward_tmp;
+    commandReward_ += cf * commandRewardCoeff_ * simDt_ * exp(-command_smooth);
 
     torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
 
@@ -550,10 +569,11 @@ class RaiboController {
   Eigen::VectorXd historyTempMemory_2;
   std::array<bool, 4> footContactState_;
   raisim::Mat<3, 3> baseRot_;
-  Eigen::Vector3f command_;
+  Eigen::Vector3f command_, pre_command_;
   Eigen::Vector3d desired_pos_;
   double desired_dist_;
   bool is_achieved = true;
+  double dist_temp_;
 
   // robot observation variables
   std::vector<raisim::VecDyn> heightScan_;

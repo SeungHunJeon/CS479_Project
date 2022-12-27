@@ -61,7 +61,7 @@ class RandomObjectGenerator {
       if(i % 3 == 0)
         inertia_residual(i) += 0.1 + curriculumFactor*bound_ratio * uniDist(gen);
       else
-        inertia_residual(i) += curriculumFactor*bound_ratio * normDist(gen);
+        inertia_residual(i) += 0.1*curriculumFactor*bound_ratio * normDist(gen);
     }
 
     Eigen::Matrix3d Inertia = object->getInertiaMatrix_B().cwiseProduct(inertia_residual);
@@ -69,12 +69,14 @@ class RandomObjectGenerator {
 
     /// COM randomization (1-bound_ratio ~ 1+bound_ratio)
     Eigen::Vector3d COM_residual;
-    COM_residual.setOnes();
+    COM_residual.setZero();
     for (int i=0; i<3; i++) {
-      COM_residual(i) += curriculumFactor*bound_ratio * normDist(gen);
+      COM_residual(i) += 0.2*curriculumFactor*bound_ratio * normDist(gen);
     }
-    Eigen::Vector3d COM = object->getCom().e().cwiseProduct(COM_residual);
+    Eigen::Vector3d COM = COM_residual;
     object->setCom(COM);
+//    RSINFO(COM)
+//    RSINFO(object->getCom().e())
   }
 
   raisim::SingleBodyObject* generateObject(raisim::World* world,

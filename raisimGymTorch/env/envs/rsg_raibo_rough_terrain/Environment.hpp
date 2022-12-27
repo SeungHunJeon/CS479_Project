@@ -165,8 +165,8 @@ class ENVIRONMENT {
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
 
     controller_.reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry());
-    controller_.updateStateVariables();
     Low_controller_.reset(&world_);
+    controller_.updateStateVariables();
     Low_controller_.updateStateVariable();
 
 
@@ -177,7 +177,7 @@ class ENVIRONMENT {
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
 
-    controller_.updateObservation(true, command_, heightMap_, gen_, normDist_);
+//    controller_.updateObservation(true, command_, heightMap_, gen_, normDist_);
     Eigen::Vector3f command;
     controller_.advance(&world_, action, curriculumFactor_);
     command = controller_.advance(&world_, action);
@@ -236,15 +236,15 @@ class ENVIRONMENT {
 
     double x, y, x_command, y_command, offset;
     double phi_;
-    offset = 0.5;
+    offset = 1.0;
     phi_ = uniDist_(gen_);
+    x = (object_radius + offset*2)*cos(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
+    y = (object_radius + offset*2)*sin(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
 
-    while (true)
+    while (sqrt(std::pow(x,2) + std::pow(y,2)) < (object_radius + offset))
     {
       x = (object_radius + offset*2)*cos(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
       y = (object_radius + offset*2)*sin(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
-      if(sqrt(std::pow(x,2) + std::pow(y,2)) > (object_radius + offset))
-        break;
     }
 
     x += gc_init_[0];
@@ -291,8 +291,9 @@ class ENVIRONMENT {
 
 
     world_.integrate1();
+    if(server_) server_->lockVisualizationServerMutex();
     world_.integrate2();
-
+    if(server_) server_->unlockVisualizationServerMutex();
     Low_controller_.updateStateVariable();
     controller_.updateStateVariables();
     controller_.accumulateRewards(curriculumFactor_, command_);
@@ -349,7 +350,7 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 1.0;
+  double bound_ratio = 0.5;
   raisim::ArticulatedSystem* raibo_;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;

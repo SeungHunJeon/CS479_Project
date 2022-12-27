@@ -180,9 +180,9 @@ for update in range(iteration_number, 1000000):
                 # print(latent.shape)
                 actions, actions_log_prob = actor.sample(latent)
                 reward, dones = env.step_visualize(actions)
-                # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
+                data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
-        # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
+        data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
         # env.stop_video_recording()
         # env.turn_off_visualization()
         env.reset()
@@ -205,13 +205,13 @@ for update in range(iteration_number, 1000000):
             ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
-            data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
+            # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
-    data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
+    # data_std = np.sqrt((data_square_sum - data_size * data_mean * data_mean) / (data_size - 1 + 1e-16))
     # take st step to get value obs
-    obs = env.observe(update < 10000)
+    obs2 = env.observe(update < 10000)
     with torch.no_grad():
-        latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+        latent = Encoder.evaluate(torch.from_numpy(obs2).to(device))
         latent = latent.detach().cpu().numpy()
 
     ppo.update(actor_obs=latent, value_obs=latent, log_this_iteration=update % 10 == 0, update=update)

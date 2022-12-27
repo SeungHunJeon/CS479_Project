@@ -95,7 +95,7 @@ class VectorizedEnvironment {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       environments_[i]->observe(ob.row(i));
-
+//    RSINFO(ob)
     if (normalizeObservation_)
       updateObservationStatisticsAndNormalize(ob, updateStatistics);
   }
