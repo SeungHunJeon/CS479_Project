@@ -71,7 +71,7 @@ class RandomObjectGenerator {
     Eigen::Vector3d COM_residual;
     COM_residual.setZero();
     for (int i=0; i<3; i++) {
-      COM_residual(i) += 0.2*curriculumFactor*bound_ratio * normDist(gen);
+      COM_residual(i) += 1.0*curriculumFactor*bound_ratio * normDist(gen);
     }
     Eigen::Vector3d COM = COM_residual;
     object->setCom(COM);
@@ -101,7 +101,7 @@ class RandomObjectGenerator {
         object_height = 2*radius_;
         classify_vector << 1, 0, 0, 0;
         geometry << 2*radius_, 2*radius_, 2*radius_;
-        return world->addSphere(radius_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addSphere(radius_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
 
@@ -120,7 +120,7 @@ class RandomObjectGenerator {
         object_height = height;
         classify_vector << 0, 1, 0, 0;
         geometry << 2*radius_, 2*radius_, height_;
-        return world->addCylinder(radius_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addCylinder(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
 
@@ -144,7 +144,7 @@ class RandomObjectGenerator {
         object_height = height_;
         classify_vector << 0, 0, 1, 0;
         geometry << width1_, width2_, height_;
-        return world->addBox(width1_, width2_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addBox(width1_, width2_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
 
@@ -156,7 +156,7 @@ class RandomObjectGenerator {
         object_height = 2 * radius_ + height_;
         classify_vector << 0, 0, 0, 1;
         geometry << 2*radius_, 2*radius_, height_+2*radius_;
-        return world->addCapsule(radius_, height_, mass, "default", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addCapsule(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
       }
 
     }
