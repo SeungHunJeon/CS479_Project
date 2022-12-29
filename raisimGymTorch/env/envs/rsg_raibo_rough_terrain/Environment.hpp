@@ -167,8 +167,8 @@ class ENVIRONMENT {
       friction = 1.1;
     world_.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
 
-    Obj_->setAngularDamping({1.0*friction/1.1, 1.0*friction/1.1, 1.0*friction/1.1});
-    Obj_->setLinearDamping(0.5*friction/1.1);
+    Obj_->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
+    Obj_->setLinearDamping(0.6*friction/1.1);
   }
 
   void reset() {
@@ -225,7 +225,7 @@ class ENVIRONMENT {
 
         subStep();
         if(visualize)
-          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+//          std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         if(isTerminalState(dummy)) {
           howManySteps++;
