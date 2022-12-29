@@ -28,6 +28,11 @@ class ENVIRONMENT {
   explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable, int id) :
       visualizable_(visualizable) {
     setSeed(id);
+
+    READ_YAML(double, curriculumFactor_, cfg["curriculum"]["initial_factor"])
+    READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
+    READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
+
     world_.addGround(0.0, "ground");
     world_.setDefaultMaterial(1.1, 0.0, 0.01);
 
@@ -67,9 +72,7 @@ class ENVIRONMENT {
     simulation_dt_ = RaiboController::getSimDt();
     high_level_control_dt_ = RaiboController::getConDt();
 
-    READ_YAML(double, curriculumFactor_, cfg["curriculum"]["initial_factor"])
-    READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
-    READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
+
     /// create heightmap
 //    groundType_ = (id+3) % 4;
 //    heightMap_ = terrainGenerator_.generateTerrain(&world_, RandomHeightMapGenerator::GroundType(groundType_), curriculumFactor_, gen_, uniDist_);

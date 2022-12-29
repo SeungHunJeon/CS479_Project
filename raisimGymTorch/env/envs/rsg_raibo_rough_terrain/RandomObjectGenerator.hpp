@@ -55,7 +55,7 @@ class RandomObjectGenerator {
     double value;
     while (true)
     {
-      value = bound_ratio * reference * curriculumFactor * normDist(gen);
+      value = bound_ratio * reference * curriculumFactor * normDist(gen); /// 0.5 * 1 * 0.2 * normDist
       if (std::abs(value) < bound_ratio * reference * curriculumFactor)
         break;
     }
@@ -178,9 +178,8 @@ class RandomObjectGenerator {
                           std::uniform_real_distribution<double>& uniDist,
                           std::normal_distribution<double>& normDist) {
     /// Mass randomization (1-bound_ratio ~ 1+bound_ratio)
-    double ratio;
-    ratio = soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-    ratio = 1 + std::abs(ratio);
+    double ratio = 1;
+    ratio += soft_sample(ratio, bound_ratio, curriculumFactor, gen, normDist);
 
     double Mass = object->getMass()*ratio;
     object->setMass(Mass);
@@ -229,9 +228,8 @@ class RandomObjectGenerator {
     switch (object_shape) {
       case ObjectShape::BALL: /// 0
       {
-        double ratio;
-        ratio = soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-        ratio = 1 + std::abs(ratio);
+        double ratio = 1;
+        ratio += soft_sample(ratio, bound_ratio, curriculumFactor, gen, normDist);
 
         double radius_ = radius * ratio;
         object_height = 2*radius_;
@@ -243,12 +241,11 @@ class RandomObjectGenerator {
 
       case ObjectShape::Cylinder: /// 1
       {
-        double ratio, height_ratio;
-        ratio = soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-        ratio = 1 + std::abs(ratio);
+        double ratio = 1;
+        ratio += soft_sample(ratio, bound_ratio, curriculumFactor, gen, normDist);
 
-        height_ratio = soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-        height_ratio = 1 + std::abs(height_ratio);
+        double height_ratio = 1;
+        height_ratio += soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
 
         double radius_ = radius * ratio;
         double height_ = height * height_ratio;
@@ -261,17 +258,14 @@ class RandomObjectGenerator {
 
       case ObjectShape::BOX: /// 2
       {
-        double width_ratio_1;
-        width_ratio_1 = soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-        width_ratio_1 = 1 + std::abs(width_ratio_1);
+        double width_ratio_1 = 1;
+        width_ratio_1 += soft_sample(width_ratio_1, bound_ratio, curriculumFactor, gen, normDist);
 
-        double width_ratio_2;
-        width_ratio_2 = soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-        width_ratio_2 = 1 + std::abs(width_ratio_2);
+        double width_ratio_2 = 1;
+        width_ratio_2 += soft_sample(width_ratio_2, bound_ratio, curriculumFactor, gen, normDist);
 
-        double height_ratio;
-        height_ratio = soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-        height_ratio = 1 + std::abs(height_ratio);
+        double height_ratio = 1;
+        height_ratio += soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
 
         double width1_ = width1 * width_ratio_1;
         double width2_ = width2 * width_ratio_2;

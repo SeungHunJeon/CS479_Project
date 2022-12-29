@@ -203,7 +203,6 @@ for update in range(iteration_number, 1000000):
 
             action = ppo.act(latent)
 
-
             reward, dones = env.step(action)
 
             ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones)
