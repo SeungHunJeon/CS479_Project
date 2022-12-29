@@ -203,7 +203,9 @@ for update in range(iteration_number, 1000000):
 
             action = ppo.act(latent)
 
+
             reward, dones = env.step(action)
+
             ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)

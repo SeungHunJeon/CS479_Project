@@ -101,7 +101,7 @@ class ENVIRONMENT {
 
     // Reward coefficients
     controller_.setRewardConfig(cfg);
-    command_Obj_Pos_ << 2, 2, object_height/2;
+    command_Obj_Pos_ << 2, 2, command_object_height_/2;
 
     command_set.push_back({1.5,0});
     command_set.push_back({-1.5, 0});
@@ -115,7 +115,7 @@ class ENVIRONMENT {
       server_->launchServer(8080);
       server_->focusOn(raibo_);
       std::cout << "Launch Server !!" << std::endl;
-      command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, object_height, 1, 0, 0, 0.5);
+      command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, command_object_height_, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
       command_ball_ = server_->addVisualSphere("command_Ball", 0.1, 0, 1, 0, 1.0);
@@ -225,7 +225,7 @@ class ENVIRONMENT {
 
         subStep();
         if(visualize)
-          sleep(low_level_control_dt_);
+          std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
         if(isTerminalState(dummy)) {
           howManySteps++;
@@ -244,7 +244,7 @@ class ENVIRONMENT {
     world_.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, 3.0, 0.5, 0.55, 1.0, 1.0);
-    Obj_->setAppearance("0, 1, 0, 0.3");
+    Obj_->setAppearance("0, 1, 0, 1.0");
     controller_.updateObject(Obj_);
     object_height = objectGenerator_.get_height();
 
@@ -277,7 +277,7 @@ class ENVIRONMENT {
     x_command = x + sqrt(2)*cos(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
     y_command = y + sqrt(2)*sin(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
 
-    command_Obj_Pos_ << x_command, y_command, object_height/2;
+    command_Obj_Pos_ << x_command, y_command, command_object_height_/2;
 
     if(visualizable_)
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
@@ -395,6 +395,7 @@ class ENVIRONMENT {
   std::vector<Eigen::Vector2f> command_set;
   int command_order = 0;
   double object_height = 0.55;
+  double command_object_height_ = 0.55;
   double object_radius;
 
 

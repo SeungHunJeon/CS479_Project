@@ -157,11 +157,14 @@ else:
 
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
+    for i in range (int(int(iteration_number) / 100)):
+        env.curriculum_callback()
+
     for i in range (200):
+        env.curriculum_callback()
         env.reset()
         Encoder.architecture.reset()
         Encoder_ROA.architecture.reset()
-        time.sleep(1)
         for step in range(total_steps):
             with torch.no_grad():
                 obs = env.observe(False)
