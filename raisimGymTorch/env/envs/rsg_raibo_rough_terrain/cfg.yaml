@@ -28,7 +28,7 @@ environment:
   dimension:
     proprioceptiveDim_: 9
     exteroceptiveDim_: 43
-    inertialparamDim_: 14
+    inertialparamDim_: 15
     historyNum_: 5
     actionhistoryNum_: 6
     actionDim_: 2
