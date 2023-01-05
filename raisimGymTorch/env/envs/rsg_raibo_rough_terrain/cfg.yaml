@@ -42,7 +42,7 @@ encoder:
   actionlatentDim_: 4
 
 LSTM:
-  hiddendim_: 50
+  hiddendim_: 54
   batchNum_: 1
 
 architecture:
