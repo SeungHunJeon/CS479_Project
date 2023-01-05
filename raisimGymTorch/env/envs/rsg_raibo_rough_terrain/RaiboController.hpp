@@ -77,7 +77,7 @@ class RaiboController {
     actionScaled_.setZero(actionDim_);
 
     actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
-    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 0.5); /// joint target
+    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 2.0); /// joint target
 
     obMean_.setZero(obDim_);
     obStd_.setZero(obDim_);
@@ -112,13 +112,15 @@ class RaiboController {
         Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
         Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
         Eigen::VectorXd::Constant(3, 0.0), /// object to target angular velocity
-        0.0, 0.0, 1.4, /// Orientation
+        0.0, 0.0, 1.4, /// Orientation row(2)
+        0.0, 0.0, 0.0, /// Orientation row(1)
         Eigen::VectorXd::Constant(4,0.5), /// one hot vector
         1.0, 1.0, 1.0, /// object geometry
         Eigen::VectorXd::Constant(1, 2), /// mass
         Eigen::VectorXd::Constant(3, 0), /// COM
         Eigen::VectorXd::Constant(9, 0), /// Inertia
         1.1, /// friction
+        0.5, /// contact
         Eigen::VectorXd::Constant(actionDim_, 0.0);
     }
 
@@ -135,13 +137,15 @@ class RaiboController {
         Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
         Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
         Eigen::VectorXd::Constant(3, 0.5), /// object to angular velocity
-        Eigen::VectorXd::Constant(3,0.3), /// Orientation
+        Eigen::VectorXd::Constant(3,0.3), /// Orientation row(2)
+        Eigen::VectorXd::Constant(3,0.3), /// Orientation row(1)
         Eigen::VectorXd::Constant(4,0.2), /// one hot vector
         0.2, 0.2, 0.2, /// object geometry
         Eigen::VectorXd::Constant(1, 0.2), /// mass
         Eigen::VectorXd::Constant(3, 0.5), /// COM
         Eigen::VectorXd::Constant(9, 0.2), /// Inertia
         0.2, /// friction
+        0.5,
         Eigen::VectorXd::Constant(actionDim_, 0.5);
     }
 
@@ -204,6 +208,15 @@ class RaiboController {
     raibo_->getFramePosition(raibo_->getFrameIdxByLinkName("arm_link"), ee_Pos_w_);
     raibo_->getFrameVelocity(raibo_->getFrameIdxByLinkName("arm_link"), ee_Vel_w_);
 
+    is_contact = false;
+
+    for (auto &contact: raibo_->getContacts()) {
+      if (contact.getlocalBodyIndex() == armIndices_.front()) {
+        is_contact = true;
+        break;
+      }
+    }
+
     /// Object info
 
     Obj_->getPosition(Obj_Pos_);
@@ -252,21 +265,27 @@ class RaiboController {
 
     Obj_Info_.segment(15,3) = Obj_->getOrientation().e().row(2);
 
-    Obj_Info_.segment(18,4) = classify_vector_;
+    Obj_Info_.segment(18,3) = Obj_->getOrientation().e().row(1);
 
-    Obj_Info_.segment(22,3) = obj_geometry_;
+    Obj_Info_.segment(21,4) = classify_vector_;
 
-    Obj_Info_.segment(25, 1) << Obj_->getMass();
+    Obj_Info_.segment(25,3) = obj_geometry_;
 
-    Obj_Info_.segment(26, 3) << Obj_->getCom().e();
+    Obj_Info_.segment(28, 1) << Obj_->getMass();
 
-    Obj_Info_.segment(29,3) = Obj_->getInertiaMatrix_B().row(0);
+    Obj_Info_.segment(29, 3) << Obj_->getCom().e();
 
-    Obj_Info_.segment(32,3) = Obj_->getInertiaMatrix_B().row(1);
+    Obj_Info_.segment(32,3) = Obj_->getInertiaMatrix_B().row(0);
 
-    Obj_Info_.segment(35,3) = Obj_->getInertiaMatrix_B().row(2);
+    Obj_Info_.segment(35,3) = Obj_->getInertiaMatrix_B().row(1);
 
-    Obj_Info_.segment(38,1) << friction_;
+    Obj_Info_.segment(38,3) = Obj_->getInertiaMatrix_B().row(2);
+
+    Obj_Info_.segment(41,1) << friction_;
+
+    Obj_Info_.segment(42,1) << static_cast<double>(is_contact);
+    /// Add Obj is contact
+
     /// height map
     controlFrameX_ =
         {baseRot_[0], baseRot_[1], 0.}; /// body x axis projected on the world x-y plane, expressed in the world frame
@@ -550,11 +569,11 @@ class RaiboController {
   static constexpr size_t historyLength_ = 14;
 
   int proprioceptiveDim_ = 9;
-  int exteroceptiveDim_ = 39;
+  int exteroceptiveDim_ = 43;
   int historyNum_ = 4;
   int actionNum_ = 5;
 
-  static constexpr size_t obDim_ = 250;
+  static constexpr size_t obDim_ = 270;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
@@ -601,6 +620,7 @@ class RaiboController {
   raisim::Mat<3,3> Obj_Rot_, Tar_Rot_;
   raisim::Vec<3> ee_Pos_w_, ee_Vel_w_, ee_Avel_w_;
   raisim::Mat<3,3> eeRot_w_;
+  bool is_contact = false;
 
   // control variables
   static constexpr double conDt_ = 0.25;

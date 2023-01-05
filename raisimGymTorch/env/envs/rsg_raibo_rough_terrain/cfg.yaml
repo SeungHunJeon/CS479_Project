@@ -27,14 +27,14 @@ environment:
   hierarchical: True
   dimension:
     proprioceptiveDim_: 9
-    exteroceptiveDim_: 39
+    exteroceptiveDim_: 43
     inertialparamDim_: 14
     historyNum_: 5
     actionhistoryNum_: 6
     actionDim_: 2
 
   ROA_dimension:
-    exteroceptiveDim_: 25
+    exteroceptiveDim_: 28
 
 encoder:
   proprioceptivelatentDim_: 16
