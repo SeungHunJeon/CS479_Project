@@ -32,6 +32,13 @@ class ENVIRONMENT {
     READ_YAML(double, curriculumFactor_, cfg["curriculum"]["initial_factor"])
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
+    READ_YAML(bool, is_discrete_, cfg["discrete_action"])
+
+    if(is_discrete_) {
+      READ_YAML(int, radial_, cfg["discrete"]["radial"])
+      READ_YAML(int, tangential_, cfg["discrete"]["tangential"])
+    }
+
 
     world_.addGround(0.0, "ground");
     world_.setDefaultMaterial(1.1, 0.0, 0.01);
@@ -111,6 +118,9 @@ class ENVIRONMENT {
     command_set.push_back({0, 1.5});
     command_set.push_back({0, -1.5});
 
+
+    if (is_discrete_)
+      controller_.update_discrete_command_lib(radial_, tangential_);
 
     // visualize if it is the first environment
     if (visualizable_) {
@@ -379,6 +389,7 @@ class ENVIRONMENT {
   Eigen::VectorXd obScaled_;
   Eigen::Vector3d command_;
   bool visualizable_ = false;
+  bool is_discrete_ = false;
   int object_type = 0;
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_;
@@ -400,7 +411,8 @@ class ENVIRONMENT {
   double object_height = 0.55;
   double command_object_height_ = 0.55;
   double object_radius;
-
+  int radial_ = 0;
+  int tangential_ = 0;
 
 
   thread_local static std::mt19937 gen_;

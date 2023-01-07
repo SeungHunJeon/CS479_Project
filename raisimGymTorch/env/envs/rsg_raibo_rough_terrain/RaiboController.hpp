@@ -331,10 +331,43 @@ class RaiboController {
     return is_achieved;
   }
 
+  void update_discrete_command_lib (const int radial, const int tangent) {
+    is_discrete_ = true;
+    command_library_.reserve(radial * tangent);
+    double radial_gap_ = 3.0 / static_cast<double>(radial);
+    double angle_gap_ = 2*M_PI / static_cast<double>(tangent);
+    double radius = 0., angle = 0.;
+    Eigen::Vector2d command_element;
+    for(int i=0; i<tangent; i++) {
+      radius = 0.;
+      for (int j=0; j<radial; j++) {
+        command_element << radius*cos(angle), radius*sin(angle);
+        command_library_.push_back(command_element);
+        radius += radial_gap_;
+      }
+      angle += angle_gap_;
+    }
+
+  }
+
+  /// For discrete label into continuous action
+  Eigen::VectorXd action_converter(const Eigen::VectorXd &action) {
+    Eigen::Vector2d continuous_action;
+    auto itr = std::find(action.begin(), action.end(), 1);
+    auto idx = std::distance(action.begin(), itr);
+    continuous_action = command_library_[idx];
+
+    return continuous_action;
+  }
+
   bool advance(raisim::World *world, const Eigen::Ref<EigenVec> &action, double curriculumFactor) {
     /// action scaling
     std::rotate(actionInfoHistory_.begin(), actionInfoHistory_.begin()+1, actionInfoHistory_.end());
-    actionInfoHistory_[actionNum_ - 1] = action.cast<double>();
+    if (is_discrete_)
+      actionInfoHistory_[actionNum_ - 1] = action_converter(action.cast<double>());
+
+    else
+      actionInfoHistory_[actionNum_ - 1] = action.cast<double>();
 //    actionTarget_ = action.cast<double>();
 //
 //    jointTarget_.head(nlegJoints_) << actionTarget_.head(nlegJoints_).cwiseProduct(actionStd_.head(nlegJoints_));
@@ -605,6 +638,7 @@ class RaiboController {
   Eigen::Vector3d desired_pos_;
   double desired_dist_;
   bool is_achieved = true;
+  bool is_discrete_ = false;
   double dist_temp_;
   double friction_ = 1.1;
 
@@ -621,6 +655,7 @@ class RaiboController {
   raisim::Vec<3> ee_Pos_w_, ee_Vel_w_, ee_Avel_w_;
   raisim::Mat<3,3> eeRot_w_;
   bool is_contact = false;
+  std::vector<Eigen::Vector2d> command_library_;
 
   // control variables
   static constexpr double conDt_ = 0.25;

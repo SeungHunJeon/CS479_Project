@@ -2,6 +2,7 @@ import torch.nn as nn
 import numpy as np
 import torch
 from torch.distributions import Normal
+from torch.distributions import Categorical
 from ..helper import Transformer
 
 class Actor:
@@ -39,7 +40,7 @@ class Actor:
         return self.architecture.parameters()
 
     def update(self):
-        self.distribution.update()
+        return 0
 
     @property
     def obs_shape(self):
@@ -275,10 +276,10 @@ class MLP_Prob(nn.Module):
 
 
 class MLP(nn.Module):
-    def __init__(self, shape, actionvation_fn, input_size, output_size, actor=False):
+    def __init__(self, shape, actionvation_fn, input_size, output_size, actor=False, discrete=False):
         super(MLP, self).__init__()
         self.activation_fn = actionvation_fn
-
+        self.discrete = discrete
         modules = [nn.Linear(input_size, shape[0]), self.activation_fn()]
         scale = [np.sqrt(2)]
 
@@ -303,10 +304,13 @@ class MLP(nn.Module):
     def forward(self, x, actor=False):
         output = self.architecture(x)
 
-        if(actor):
-            norm = (torch.norm(output, dim=-1)+1e-8).unsqueeze(-1)
-            output = torch.div(output, norm)
-            output = output * 3 * torch.sigmoid(norm)
+        if (actor == True):
+            if(self.discrete == True):
+                output = torch.softmax(output, dim=1)
+            elif(self.discrete == False):
+                norm = (torch.norm(output, dim=-1)+1e-8).unsqueeze(-1)
+                output = torch.div(output, norm)
+                output = output * 3 * torch.sigmoid(norm)
 
         return output
 
@@ -315,6 +319,34 @@ class MLP(nn.Module):
         [torch.nn.init.orthogonal_(module.weight, gain=scales[idx]) for idx, module in
          enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
 
+class DiscreteDistribution(nn.Module):
+    def __init__(self, dim, size, fast_sampler, seed = 0):
+        super(DiscreteDistribution, self).__init__()
+        self.dim = dim
+        self.distribution = None
+        self.fast_sampler = fast_sampler
+        self.fast_sampler.seed(seed)
+        self.samples = np.zeros([size,dim], dtype=np.float32)
+        self.logprob = np.zeros(size, dtype=np.float32)
+    # def sample(self, logits):
+    #     distribution = Categorical(probs=logits)
+    #     sample = distribution.sample()
+    #     return sample, distribution.log_prob(sample)
+    def sample(self, logits):
+        self.fast_sampler.sample(logits, self.samples, self.logprob)
+        return self.samples.copy(), self.logprob.copy()
+    def evaluate(self, logits, outputs):
+        '''
+        :param logits: Probability value that from network's output
+        :param outputs: sampled label w.r.t probability
+        :return:
+        '''
+        distribution = Categorical(probs=logits)
+        actions_log_prob = distribution.log_prob(torch.argmax(outputs, dim=1))
+        entropy = distribution.entropy()
+        return actions_log_prob, entropy
+    def entropy(self):
+        return self.distribution.entropy()
 
 class MultivariateGaussianDiagonalCovariance(nn.Module):
     def __init__(self, dim, size, init_std, fast_sampler, seed=0):
@@ -336,6 +368,11 @@ class MultivariateGaussianDiagonalCovariance(nn.Module):
         return self.samples.copy(), self.logprob.copy()
 
     def evaluate(self, logits, outputs):
+        '''
+        :param logits: action mean
+        :param outputs: sampled action from distribution
+        :return: log probability that sampled action from distribution also entropy
+        '''
         distribution = Normal(logits, self.std.reshape(self.dim))
         actions_log_prob = distribution.log_prob(outputs).sum(dim=1)
         entropy = distribution.entropy().sum(dim=1)

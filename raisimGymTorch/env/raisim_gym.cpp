@@ -49,4 +49,9 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
       .def(py::init<int>(), py::arg("dim"))
       .def("seed", &NormalSampler::seed)
       .def("sample", &NormalSampler::sample);
+
+  py::class_<DiscreteSampler>(m, "DiscreteSampler")
+      .def(py::init<int>(), py::arg("dim"))
+      .def("seed", &DiscreteSampler::seed)
+      .def("sample", &DiscreteSampler::sample);
 }

@@ -2,6 +2,7 @@ record_video: no
 seed: 2
 
 environment:
+  discrete_action: True
   seed: 2
   render: True
   num_envs: 300
@@ -11,6 +12,9 @@ environment:
   control_dt: 0.25
   low_level_control_dt: 0.005
   max_time: 10.0
+  discrete:
+    radial: 15
+    tangential: 18
   reward:
     commandRewardCoeff_: 1e-1
 #    commandRewardCoeff_: 0

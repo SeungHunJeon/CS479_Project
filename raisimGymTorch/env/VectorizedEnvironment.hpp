@@ -5,7 +5,7 @@
 
 #ifndef SRC_RAISIMGYMVECENV_HPP
 #define SRC_RAISIMGYMVECENV_HPP
-
+#include <boost/range/algorithm/copy.hpp>
 #include "omp.h"
 #include "Yaml.hpp"
 #include <Eigen/Core>
@@ -292,8 +292,67 @@ class NormalDistribution {
   std::normal_distribution<float> normDist_;
   static thread_local std::mt19937 gen_;
 };
-thread_local std::mt19937 raisim::NormalDistribution::gen_;
 
+class DiscreteDistribution {
+ public:
+  DiscreteDistribution(): distDist_{1,2,3} {}
+
+  void reinit(const Eigen::Ref<EigenVec> &prob) {
+    distDist_.param({prob.begin(), prob.end()});
+  }
+
+  const Eigen::Ref<EigenVec> sample(int dim, int &idx){
+    idx = distDist_(gen_);
+    EigenVec sample_vector(dim, 1);
+    sample_vector.setZero();
+    Eigen::Ref<EigenVec> sample_vec(sample_vector);
+    sample_vec[idx] = 1;
+    return sample_vec;
+    }
+
+  void seed(int i) {gen_.seed(i);}
+  double logprob(int idx) {
+    return std::log(distDist_.probabilities()[idx]);
+  }
+
+ private:
+  std::discrete_distribution<int> distDist_;
+  static thread_local std::mt19937 gen_;
+};
+
+thread_local std::mt19937 raisim::NormalDistribution::gen_;
+thread_local std::mt19937 raisim::DiscreteDistribution::gen_;
+
+class DiscreteSampler {
+ public:
+  DiscreteSampler(int dim) {
+    dim_ = dim;
+    discrete_.resize(THREAD_COUNT);
+    seed(0);
+  }
+
+  void seed(int seed) {
+#pragma omp parallel for schedule(static, 1)
+    for (int i = 0; i < THREAD_COUNT; i++)
+      discrete_[0].seed(i + seed);
+  }
+
+  inline void sample(Eigen::Ref<EigenRowMajorMat> &prob,
+                     Eigen::Ref<EigenRowMajorMat> &samples,
+                     Eigen::Ref<EigenVec> &log_prob) {
+    int agentNumber = log_prob.rows();
+    int idx = 0;
+#pragma omp parallel for schedule(auto)
+    for (int agentId = 0; agentId < agentNumber; agentId++) {
+      discrete_[omp_get_thread_num()].reinit(prob.row(agentId));
+      samples.row(agentId) = discrete_[omp_get_thread_num()].sample(dim_, idx);
+      log_prob(agentId) = discrete_[omp_get_thread_num()].logprob(idx);
+    }
+  }
+
+  int dim_;
+  std::vector<DiscreteDistribution> discrete_;
+};
 
 class NormalSampler {
  public:
