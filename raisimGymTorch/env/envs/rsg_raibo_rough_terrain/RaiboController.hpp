@@ -77,7 +77,7 @@ class RaiboController {
     actionScaled_.setZero(actionDim_);
 
     actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
-    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 2.0); /// joint target
+    actionStd_<< Eigen::VectorXd::Constant(actionDim_, 1.0); /// joint target
 
     obMean_.setZero(obDim_);
     obStd_.setZero(obDim_);
@@ -312,8 +312,12 @@ class RaiboController {
   }
 
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
+    Eigen::VectorXf position;
+    if(is_discrete_)
+      position = action_converter(action.cast<double>()).cast<float>().cwiseQuotient(actionStd_.cast<float>());
+    else
+      position = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
 
-    Eigen::VectorXf position = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
     Eigen::VectorXd current_pos_ = raibo_->getBasePosition().e();
     position += actionMean_.cast<float>();
     pre_command_ = command_;
@@ -331,19 +335,21 @@ class RaiboController {
     return is_achieved;
   }
 
+  /// For discrete command library
   void update_discrete_command_lib (const int radial, const int tangent) {
     is_discrete_ = true;
-    command_library_.reserve(radial * tangent);
-    double radial_gap_ = 3.0 / static_cast<double>(radial);
+    command_library_.reserve(radial * tangent + 1);
+    double radial_gap_ = 0.5 / static_cast<double>(radial);
     double angle_gap_ = 2*M_PI / static_cast<double>(tangent);
     double radius = 0., angle = 0.;
-    Eigen::Vector2d command_element;
+    Eigen::Vector2d command_element = Eigen::Vector2d::Zero();
+    command_library_.push_back(command_element);
     for(int i=0; i<tangent; i++) {
       radius = 0.;
       for (int j=0; j<radial; j++) {
+        radius += radial_gap_;
         command_element << radius*cos(angle), radius*sin(angle);
         command_library_.push_back(command_element);
-        radius += radial_gap_;
       }
       angle += angle_gap_;
     }

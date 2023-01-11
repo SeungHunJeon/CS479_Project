@@ -1,5 +1,5 @@
 # task specification
-task_name = "Random_Object_encod_LSTM"
+task_name = "Random_Object_encod_LSTM_discrete"
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
@@ -52,7 +52,7 @@ env = VecEnv(RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environmen
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
-prob_dim = cfg['environment']['discrete']['radial'] * cfg['environment']['discrete']['tangential']
+prob_dim = cfg['environment']['discrete']['radial'] * cfg['environment']['discrete']['tangential'] + 1
 
 # Encoding
 historyNum = cfg['environment']['dimension']['historyNum_']

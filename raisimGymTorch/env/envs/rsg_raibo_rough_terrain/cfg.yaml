@@ -13,8 +13,8 @@ environment:
   low_level_control_dt: 0.005
   max_time: 10.0
   discrete:
-    radial: 15
-    tangential: 18
+    radial: 1
+    tangential: 72
   reward:
     commandRewardCoeff_: 1e-1
 #    commandRewardCoeff_: 0
