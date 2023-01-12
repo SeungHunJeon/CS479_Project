@@ -5,7 +5,6 @@
 
 #ifndef SRC_RAISIMGYMVECENV_HPP
 #define SRC_RAISIMGYMVECENV_HPP
-#include <boost/range/algorithm/copy.hpp>
 #include "omp.h"
 #include "Yaml.hpp"
 #include <Eigen/Core>
