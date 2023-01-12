@@ -186,7 +186,7 @@ class LSTM(nn.Module):
         self.num_env = num_env
         self.batch_num = batch_num
 
-        self.block_dim = int((ext_dim + pro_dim + dyn_dim + act_dim) / hist_num)
+        self.block_dim = ext_dim + pro_dim + dyn_dim + act_dim
 
         self.lstm = nn.LSTM(input_size=self.input_dim,
                             hidden_size=self.hidden_dim,
