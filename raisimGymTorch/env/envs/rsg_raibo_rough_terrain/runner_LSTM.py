@@ -49,9 +49,7 @@ if mode == 'retrain':
     cfg['environment']['curriculum']['initial_factor'] = 1
 env = VecEnv(RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
-# shortcuts
-ob_dim = env.num_obs
-act_dim = env.num_acts
+
 
 # Encoding
 historyNum = cfg['environment']['dimension']['historyNum_']
@@ -59,42 +57,47 @@ actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
+dynamics_dim = cfg['environment']['dimension']['dynamicsDim_']
+ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
 
-obs_pro_dim = pro_dim
-obs_ext_dim = ext_dim
-obs_act_dim = act_dim
+# shortcuts
+act_dim = env.num_acts
+Encoder_ob_dim = historyNum * (pro_dim + ext_dim)
 
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
 
 # ROA Encoding
-ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
-ROA_ob_dim = historyNum * (pro_dim + act_dim + ROA_ext_dim)
+ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 
 total_steps = n_steps * env.num_envs
 
-Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'], nn.LeakyReLU, int(ob_dim/historyNum),
-                                                int((ob_dim-ROA_ob_dim)/historyNum)), device=device)
+Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
+                                                nn.LeakyReLU,
+                                                int(Encoder_ob_dim/historyNum),
+                                                int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
 
-Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_ob_dim/batchNum),
+Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/batchNum),
                                                           hidden_dim=hidden_dim,
                                                           ext_dim=ROA_ext_dim,
                                                           pro_dim=pro_dim,
                                                           act_dim=act_dim,
+                                                          dyn_dim=dynamics_dim,
                                                           hist_num=historyNum,
                                                           device=device,
                                                           batch_num=batchNum,
                                                           num_env=env.num_envs), device=device)
 
-Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ob_dim/batchNum),
+Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/batchNum),
                           hidden_dim=hidden_dim,
                           ext_dim=ext_dim,
                           pro_dim=pro_dim,
                           act_dim=act_dim,
+                          dyn_dim=dynamics_dim,
                           hist_num=historyNum,
                           batch_num=batchNum,
                           device=device,
@@ -177,7 +180,9 @@ for update in range(iteration_number, 1000000):
         for step in range(n_steps):
             with torch.no_grad():
                 obs = env.observe(False)
-                latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+
+                # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+                latent = Encoder.evaluate(ppo.filter_action_from_obs(obs).to(device))
                 # print(latent)
                 # print(latent.shape)
                 actions, actions_log_prob = actor.sample(latent)
@@ -198,7 +203,9 @@ for update in range(iteration_number, 1000000):
         with torch.no_grad():
             obs = env.observe(update < 10000)
 
-            latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+            # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+            latent = Encoder.evaluate(ppo.filter_action_from_obs(obs).to(device))
+
             latent = latent.detach().cpu().numpy()
 
             action = ppo.act(latent)
@@ -214,7 +221,8 @@ for update in range(iteration_number, 1000000):
     # take st step to get value obs
     obs2 = env.observe(update < 10000)
     with torch.no_grad():
-        latent = Encoder.evaluate(torch.from_numpy(obs2).to(device))
+        # latent = Encoder.evaluate(torch.from_numpy(obs2).to(device))
+        latent = Encoder.evaluate(ppo.filter_action_from_obs(obs2).to(device))
         latent = latent.detach().cpu().numpy()
 
     ppo.update(actor_obs=latent, value_obs=latent, log_this_iteration=update % 10 == 0, update=update)

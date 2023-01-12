@@ -205,7 +205,7 @@ class ENVIRONMENT {
 
 //    controller_.updateObservation(true, command_, heightMap_, gen_, normDist_);
     Eigen::Vector3f command;
-    controller_.advance(&world_, action, curriculumFactor_);
+
     command = controller_.advance(&world_, action);
     Low_controller_.setCommand(command);
 
@@ -227,13 +227,19 @@ class ENVIRONMENT {
     int howManySteps;
     int lowlevelSteps;
 
+    /// Low level frequency
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
+      /// per 0.02 sec, update history
       if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.historyNum_))
+      {
         controller_.updateHistory();
+        controller_.update_actionHistory(&world_, action, curriculumFactor_);
+      }
       Low_controller_.updateObservation(&world_);
       Low_controller_.advance(&world_);
 
+      /// Simulation frequency
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
         subStep();

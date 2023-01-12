@@ -1,5 +1,7 @@
 from datetime import datetime
 import os
+
+import numpy
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -145,9 +147,33 @@ class PPO:
         self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
         self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
-    def encode(self, obs):
 
-        output = self.encoder.evaluate_update(obs)
+    def filter_action_from_obs(self, obs):
+        filtered_obs = []
+        for i in range(self.num_history_batch):
+            filtered_obs.append(obs[...,
+                                (self.encoder.architecture.block_dim)*i:
+                                (self.encoder.architecture.block_dim)*i
+                                + self.encoder.architecture.pro_dim
+                                + self.encoder.architecture.ext_dim])
+
+            # filtered_obs.append(obs[...,
+            #                     (self.encoder.architecture.block_dim)*i
+            #                     + self.encoder.architecture.pro_dim
+            #                     + self.encoder.architecture.ext_dim
+            #                     + self.encoder.architecture.act_dim:
+            #                     (self.encoder.architecture.block_dim)*i
+            #                     + self.encoder.architecture.block_dim])
+
+        if isinstance(filtered_obs[0], numpy.ndarray):
+            filtered_obs = numpy.concatenate(filtered_obs, axis=-1)
+            return torch.Tensor(filtered_obs)
+        if isinstance(filtered_obs[0], torch.Tensor):
+            filtered_obs = torch.cat(filtered_obs, dim=-1)
+            return filtered_obs
+    def encode(self, obs_batch):
+        obs_batch = self.filter_action_from_obs(obs_batch)
+        output = self.encoder.evaluate_update(obs_batch)
 
         return output
 
@@ -180,35 +206,33 @@ class PPO:
         for i in range(self.num_history_batch):
             # Get proprioceptive part of observation
             obs_ROA_batch.append(obs_batch[...,
-                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i:
-                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                 (self.encoder.architecture.block_dim)*i:
+                                 (self.encoder.architecture.block_dim)*i
                                                 + self.encoder.architecture.pro_dim])
 
             # Get Exteroceptive part of observation except inertial parameter
             obs_ROA_batch.append(obs_batch[...,
-                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                 (self.encoder.architecture.block_dim)*i
                                  + self.encoder.architecture.pro_dim:
-                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
+                                 (self.encoder.architecture.block_dim)*i
                                  + self.encoder.architecture.pro_dim
                                  + self.encoder.architecture.ext_dim - self.inertial_dim])
 
-            # Get action part of observation
-            obs_ROA_batch.append(obs_batch[...,
-                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
-                                 + self.encoder.architecture.pro_dim+self.encoder.architecture.ext_dim:
-                                 (self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim + self.encoder.architecture.act_dim)*i
-                                 + self.encoder.architecture.pro_dim+self.encoder.architecture.ext_dim+self.encoder.architecture.act_dim])
+            # # Get action part of observation
+            # obs_ROA_batch.append(obs_batch[...,
+            #                      (self.encoder.architecture.block_dim)*i
+            #                      + self.encoder.architecture.pro_dim
+            #                      + self.encoder.architecture.ext_dim
+            #                      + self.encoder.architecture.act_dim:
+            #                      (self.encoder.architecture.block_dim)*i
+            #                      + self.encoder.architecture.block_dim])
 
         # Distillate the true inertial parameter (oracle)
         estimator_true_data = (obs_batch[...,
-                                   (self.encoder.architecture.pro_dim +
-                                    self.encoder.architecture.ext_dim +
-                                    self.encoder.architecture.act_dim)*(self.num_history_batch-1)
+                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
                                    + self.encoder.architecture.pro_dim
                                    + self.encoder.architecture.ext_dim - self.inertial_dim:
-                                   (self.encoder.architecture.pro_dim +
-                                    self.encoder.architecture.ext_dim +
-                                    self.encoder.architecture.act_dim)*(self.num_history_batch-1)
+                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
                                    + self.encoder.architecture.pro_dim
                                    + self.encoder.architecture.ext_dim
                                    ])
@@ -235,6 +259,13 @@ class PPO:
                 self.encoder_ROA.architecture.reset()
 
                 obs_ROA_batch, estimator_true_data = self.get_obs_ROA(obs_batch)
+
+                """
+                For model update, we'll use
+                1. action batch except last action -> splicing
+                2. obs_concat_ROA -> splicing
+                3. 
+                """
 
                 obs_concat = self.encode(obs_batch)
                 obs_concat_d = obs_concat.clone().detach()
