@@ -15,6 +15,8 @@ class PPO:
                  actor,
                  critic,
                  encoder,
+                 obj_f_dynamics,
+                 obs_f_dyanmics,
                  obs_shape,
                  num_envs,
                  num_transitions_per_env,
@@ -50,6 +52,8 @@ class PPO:
         self.lambdaDecayFactor = lambdaDecayFactor
         self.inertial_dim = inertial_dim
         self.estimator = estimator
+        self.obj_f_dynamics = obj_f_dynamics
+        self.obs_f_dynamics = obs_f_dyanmics
 
         if shuffle_batch:
             self.batch_sampler = self.storage.mini_batch_generator_shuffle
@@ -57,7 +61,13 @@ class PPO:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
         self.encoder_input_dim = self.encoder.architecture.input_shape[0]
-        self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], lr=learning_rate)
+        self.optimizer = optim.Adam([*self.actor.parameters(),
+                                     *self.critic.parameters(),
+                                     *self.encoder.parameters(),
+                                     *self.encoder_ROA.parameters(),
+                                     *self.estimator.parameters(),
+                                     *self.obj_f_dynamics.parameters(),
+                                     *self.obs_f_dynamics.parameters()], lr=learning_rate)
         # remove estimator
         # self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], lr=learning_rate)
         self.device = device
@@ -147,17 +157,32 @@ class PPO:
         self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
         self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
+    def filter_for_obj_f_dynamics_from_obs(self, obs_batch):
+        obj_f_dynamics_obs = []
+        obj_f_dynamics_true = []
 
-    def filter_action_from_obs(self, obs):
+        for i in range(self.num_history_batch):
+            # For concatenating s_t, a_t
+            obj_f_dynamics_obs.append(obs_batch[...,
+                                (self.encoder.architecture.block_dim)*(i+1)
+                                - self.encoder.architecture.dyn_dim
+                                - self.encoder.architecture.act_dim:
+                                (self.encoder.architecture.block_dim)*(i+1)])
+
+
+
+
+        return obj_f_dynamics_obs
+    def filter_for_encode_from_obs(self, obs_batch):
         filtered_obs = []
         for i in range(self.num_history_batch):
-            filtered_obs.append(obs[...,
+            filtered_obs.append(obs_batch[...,
                                 (self.encoder.architecture.block_dim)*i:
                                 (self.encoder.architecture.block_dim)*i
                                 + self.encoder.architecture.pro_dim
                                 + self.encoder.architecture.ext_dim])
 
-            # filtered_obs.append(obs[...,
+            # filtered_obs.append(obs_batch[...,
             #                     (self.encoder.architecture.block_dim)*i
             #                     + self.encoder.architecture.pro_dim
             #                     + self.encoder.architecture.ext_dim
@@ -172,7 +197,7 @@ class PPO:
             filtered_obs = torch.cat(filtered_obs, dim=-1)
             return filtered_obs
     def encode(self, obs_batch):
-        obs_batch = self.filter_action_from_obs(obs_batch)
+        obs_batch = self.filter_for_encode_from_obs(obs_batch)
         output = self.encoder.evaluate_update(obs_batch)
 
         return output
@@ -228,16 +253,32 @@ class PPO:
             #                      + self.encoder.architecture.block_dim])
 
         # Distillate the true inertial parameter (oracle)
-        estimator_true_data = (obs_batch[...,
-                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-                                   + self.encoder.architecture.pro_dim
-                                   + self.encoder.architecture.ext_dim - self.inertial_dim:
-                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-                                   + self.encoder.architecture.pro_dim
-                                   + self.encoder.architecture.ext_dim
-                                   ])
+
+        estimator_true_data = []
+
+        for i in range(self.num_history_batch):
+            estimator_true_data.append(obs_batch[..., self.encoder.architecture.block_dim*i
+                                       + self.encoder.architecture.pro_dim
+                                       + self.encoder.architecture.ext_dim - self.inertial_dim:
+                                       self.encoder.architecture.block_dim*i
+                                       + self.encoder.architecture.pro_dim
+                                       + self.encoder.architecture.ext_dim])
+
+        # estimator_true_data = (obs_batch[...,
+        #                            (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+        #                            + self.encoder.architecture.pro_dim
+        #                            + self.encoder.architecture.ext_dim - self.inertial_dim:
+        #                            (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+        #                            + self.encoder.architecture.pro_dim
+        #                            + self.encoder.architecture.ext_dim
+        #                            ])
 
         obs_ROA_batch = torch.cat(obs_ROA_batch, dim=-1)
+
+        estimator_true_data = torch.cat(estimator_true_data, dim=-1)
+        estimator_true_data = estimator_true_data.permute((1,0,2))
+        estimator_true_data = estimator_true_data.reshape(self.num_envs, -1, self.inertial_dim)
+        estimator_true_data = estimator_true_data.permute((1,0,2))
         estimator_true_data = estimator_true_data.reshape(-1, self.inertial_dim)
 
         return obs_ROA_batch, estimator_true_data.detach()
@@ -267,22 +308,25 @@ class PPO:
                 3. 
                 """
 
-                obs_concat = self.encode(obs_batch)
-                obs_concat_d = obs_concat.clone().detach()
-                obs_concat_ROA = self.encode_ROA(obs_ROA_batch)
-                obs_concat_ROA_d = obs_concat_ROA.clone().detach()
+                latent = self.encode(obs_batch)
+                latent_d = latent.clone().detach()
+                latent_ROA = self.encode_ROA(obs_ROA_batch)
+                latent_ROA_d = latent_ROA.clone().detach()
 
                 estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
                 estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
 
-                lambda_loss_ROA = self.lambda_ROA * self.criteria(obs_concat, obs_concat_ROA_d)
-                loss_ROA = self.criteria(obs_concat_d, obs_concat_ROA)
+                lambda_loss_ROA = self.lambda_ROA * self.criteria(latent, latent_ROA_d)
+                loss_ROA = self.criteria(latent_d, latent_ROA)
 
+                latent_for_update = latent[self.num_history_batch-1::self.num_history_batch, :]
 
+                # actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent, actions_batch)
+                # value_batch = self.critic.evaluate(latent)
 
-                actions_log_prob_batch, entropy_batch = self.actor.evaluate(obs_concat, actions_batch)
-                value_batch = self.critic.evaluate(obs_concat)
+                actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent_for_update, actions_batch)
+                value_batch = self.critic.evaluate(latent_for_update)
 
                 # Adjusting the learning rate using KL divergence
                 mu_batch = self.actor.action_mean

@@ -63,3 +63,9 @@ architecture:
 
   estimator:
     net: [64, 64]
+
+  obj_f_dynamics:
+    net: [256, 128, 64]
+
+  obs_f_dynamics:
+    net: [256, 128]

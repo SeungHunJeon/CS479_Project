@@ -199,7 +199,10 @@ class LSTM(nn.Module):
         self.h_0 = None
         self.c_0 = None
     def forward(self, obs):
-        inputs = obs.view(-1, self.num_env, self.input_dim)
+
+        inputs = torch.reshape(obs, (self.num_env, -1, self.input_dim))
+        inputs = torch.permute(inputs, (1, 0, 2))
+
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
         else:
@@ -216,7 +219,17 @@ class LSTM(nn.Module):
     def forward_update(self, obs):
         # ordered = self.obs_inorder(obs, update=True)
         # inputs = ordered.view(-1, self.num_env, self.input_dim)
-        inputs = obs.view(-1, self.num_env, self.input_dim)
+        # print(obs[0,0,52:104]) # 40 300 260 (52 * 5)
+        # inputs = obs.view(-1, self.num_env, self.input_dim)
+
+        inputs = torch.permute(obs, (1,0,2)) # 40 300 5*a -> 300 40 5*a
+        inputs = torch.reshape(inputs, (self.num_env, -1, self.input_dim)) # 300 200 a
+        inputs = torch.permute(inputs, (1,0,2)) # 200 300 a
+
+
+
+        # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
+
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
         else:
@@ -225,12 +238,9 @@ class LSTM(nn.Module):
         self.h_0 = h_n
         self.c_0 = c_n
 
+        output = outputs.reshape(-1, self.hidden_dim)
 
-        output = outputs[self.batch_num-1::self.batch_num, :, :]
-
-        output_re = output.reshape(-1, self.hidden_dim)
-
-        return output_re
+        return output
 
     def reset(self):
         self.h_0 = None

@@ -98,29 +98,53 @@ class RolloutStorage:
         mini_batch_size = batch_size // num_mini_batches
 
         for indices in BatchSampler(SubsetRandomSampler(range(batch_size)), mini_batch_size, drop_last=True):
-            actor_obs_batch = self.actor_obs_tc.view(-1, *self.actor_obs_tc.size()[2:])[indices]
-            critic_obs_batch = self.critic_obs_tc.view(-1, *self.critic_obs_tc.size()[2:])[indices]
-            obs_batch = self.obs_tc.view(-1, *self.obs.size()[2:])[indices]
-            actions_batch = self.actions_tc.view(-1, self.actions_tc.size(-1))[indices]
-            sigma_batch = self.sigma_tc.view(-1, self.sigma_tc.size(-1))[indices]
-            mu_batch = self.mu_tc.view(-1, self.mu_tc.size(-1))[indices]
-            values_batch = self.values_tc.view(-1, 1)[indices]
-            returns_batch = self.returns_tc.view(-1, 1)[indices]
-            old_actions_log_prob_batch = self.actions_log_prob_tc.view(-1, 1)[indices]
-            advantages_batch = self.advantages_tc.view(-1, 1)[indices]
+
+            actor_obs_batch = torch.reshape(self.actor_obs_tc, (-1, *self.actor_obs_tc.size()[2:]))[indices]
+            critic_obs_batch = torch.reshape(self.critic_obs_tc, (-1, *self.critic_obs_tc.size()[2:]))[indices]
+            obs_batch = torch.reshape(self.obs_tc, (-1, *self.obs.size()[2:]))[indices]
+            actions_batch = torch.reshape(self.actions_tc, (-1, self.actions_tc.size(-1)))[indices]
+            sigma_batch = torch.reshape(self.sigma_tc, (-1, self.sigma_tc.size(-1)))[indices]
+            mu_batch = torch.reshape(self.mu_tc, (-1, self.mu_tc.size(-1)))[indices]
+            values_batch = torch.reshape(self.values_tc, (-1, 1))[indices]
+            returns_batch = torch.reshape(self.returns_tc, (-1, 1))[indices]
+            old_actions_log_prob_batch = torch.reshape(self.actions_log_prob_tc, (-1, 1))[indices]
+            advantages_batch = torch.reshape(self.advantages_tc, (-1, 1))[indices]
+
+            # actor_obs_batch = self.actor_obs_tc.view(-1, *self.actor_obs_tc.size()[2:])[indices]
+            # critic_obs_batch = self.critic_obs_tc.view(-1, *self.critic_obs_tc.size()[2:])[indices]
+            # obs_batch = self.obs_tc.view(-1, *self.obs.size()[2:])[indices]
+            # actions_batch = self.actions_tc.view(-1, self.actions_tc.size(-1))[indices]
+            # sigma_batch = self.sigma_tc.view(-1, self.sigma_tc.size(-1))[indices]
+            # mu_batch = self.mu_tc.view(-1, self.mu_tc.size(-1))[indices]
+            # values_batch = self.values_tc.view(-1, 1)[indices]
+            # returns_batch = self.returns_tc.view(-1, 1)[indices]
+            # old_actions_log_prob_batch = self.actions_log_prob_tc.view(-1, 1)[indices]
+            # advantages_batch = self.advantages_tc.view(-1, 1)[indices]
             yield actor_obs_batch, critic_obs_batch, obs_batch, actions_batch, sigma_batch, mu_batch, values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch
 
     def mini_batch_generator_inorder(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env
         mini_batch_size = batch_size // num_mini_batches
         for batch_id in range(num_mini_batches):
-            yield self.obs_tc[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.actions_tc.view(-1, self.actions_tc.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.sigma_tc.view(-1, self.sigma_tc.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.mu_tc.view(-1, self.mu_tc.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.values_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.advantages_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.returns_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
-                self.actions_log_prob_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+
+            obs_batch = self.obs_tc[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            action_batch = torch.reshape(self.actions_tc, (-1, self.actions_tc.size(-1)))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            sigma_batch = torch.reshape(self.sigma_tc, (-1, self.sigma_tc.size(-1)))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            mu_batch = torch.reshape(self.mu_tc, (-1, self.mu_tc.size(-1)))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            value_batch = torch.reshape(self.values_tc, (-1, 1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            advantage_batch = torch.reshape(self.advantages_tc, (-1, 1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            return_batch = torch.reshape(self.returns_tc, (-1, 1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            action_log_prob_batch = torch.reshape(self.actions_log_prob_tc, (-1, 1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+
+            yield obs_batch, action_batch, sigma_batch, mu_batch, value_batch, advantage_batch, return_batch, action_log_prob_batch
+
+            # yield self.obs_tc[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+            #     self.actions_tc.view(-1, self.actions_tc.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+            #     self.sigma_tc.view(-1, self.sigma_tc.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+            #     self.mu_tc.view(-1, self.mu_tc.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+            #     self.values_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+            #     self.advantages_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+            #     self.returns_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
+            #     self.actions_log_prob_tc.view(-1, 1)[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
 
 

@@ -76,12 +76,28 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 
 total_steps = n_steps * env.num_envs
 
+obs_f_dynamics_input_dim = pro_dim + ROA_ext_dim + act_dim
+
+obs_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obs_f_dynamics']['net'],
+                                                     nn.LeakyReLU,
+                                                     obs_f_dynamics_input_dim,
+                                                     pro_dim + ROA_ext_dim),
+                                      device=device)
+
+obj_f_dynamics_input_dim = dynamics_dim + hidden_dim + act_dim
+
+obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
+                                                     nn.LeakyReLU,
+                                                     obj_f_dynamics_input_dim,
+                                                     dynamics_dim),
+                                      device=device)
+
 Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                 nn.LeakyReLU,
                                                 int(Encoder_ob_dim/historyNum),
                                                 int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
 
-Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/batchNum),
+Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
                                                           hidden_dim=hidden_dim,
                                                           ext_dim=ROA_ext_dim,
                                                           pro_dim=pro_dim,
@@ -92,7 +108,7 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           batch_num=batchNum,
                                                           num_env=env.num_envs), device=device)
 
-Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/batchNum),
+Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                           hidden_dim=hidden_dim,
                           ext_dim=ext_dim,
                           pro_dim=pro_dim,
@@ -122,6 +138,8 @@ num_mini_batches = 1
 ppo = PPO.PPO(actor=actor,
               critic=critic,
               encoder=Encoder,
+              obj_f_dynamics=obj_f_dynamics,
+              obs_f_dyanmics=obs_f_dynamics,
               num_envs=cfg['environment']['num_envs'],
               obs_shape=[env.num_obs],
               num_transitions_per_env=n_steps,
@@ -182,7 +200,7 @@ for update in range(iteration_number, 1000000):
                 obs = env.observe(False)
 
                 # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
-                latent = Encoder.evaluate(ppo.filter_action_from_obs(obs).to(device))
+                latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
                 # print(latent)
                 # print(latent.shape)
                 actions, actions_log_prob = actor.sample(latent)
@@ -204,7 +222,7 @@ for update in range(iteration_number, 1000000):
             obs = env.observe(update < 10000)
 
             # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
-            latent = Encoder.evaluate(ppo.filter_action_from_obs(obs).to(device))
+            latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
 
             latent = latent.detach().cpu().numpy()
 
@@ -222,7 +240,7 @@ for update in range(iteration_number, 1000000):
     obs2 = env.observe(update < 10000)
     with torch.no_grad():
         # latent = Encoder.evaluate(torch.from_numpy(obs2).to(device))
-        latent = Encoder.evaluate(ppo.filter_action_from_obs(obs2).to(device))
+        latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs2).to(device))
         latent = latent.detach().cpu().numpy()
 
     ppo.update(actor_obs=latent, value_obs=latent, log_this_iteration=update % 10 == 0, update=update)
