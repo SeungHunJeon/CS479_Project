@@ -74,8 +74,10 @@ ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
-
 total_steps = n_steps * env.num_envs
+
+# PPO coeff
+entropy_coeff_ = cfg['environment']['entropy_coeff']
 
 obs_f_dynamics_input_dim = pro_dim + ROA_ext_dim + act_dim
 
@@ -159,7 +161,7 @@ ppo = PPO.PPO(actor=actor,
               desired_kl=0.006,
               num_history_batch=historyNum,
               inertial_dim=inertial_dim,
-              entropy_coef=1e-4
+              entropy_coef=entropy_coeff_
               )
 
 iteration_number = 0
