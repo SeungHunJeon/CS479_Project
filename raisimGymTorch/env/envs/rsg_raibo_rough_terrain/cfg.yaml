@@ -47,6 +47,7 @@ encoder:
   actionlatentDim_: 4
 
 LSTM:
+  is_decouple_: False
   hiddendim_: 52
   batchNum_: 1
 

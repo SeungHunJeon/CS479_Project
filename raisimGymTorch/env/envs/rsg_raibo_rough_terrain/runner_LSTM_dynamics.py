@@ -1,5 +1,5 @@
 # task specification
-task_name = "Random_Object_encod_LSTM"
+task_name = "Random_Object_encod_LSTM_dyn"
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
@@ -158,7 +158,8 @@ ppo = PPO.PPO(actor=actor,
               estimator=Estimator,
               desired_kl=0.006,
               num_history_batch=historyNum,
-              inertial_dim=inertial_dim
+              inertial_dim=inertial_dim,
+              entropy_coef=1e-4
               )
 
 iteration_number = 0

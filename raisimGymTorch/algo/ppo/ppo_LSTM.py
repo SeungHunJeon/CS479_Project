@@ -66,8 +66,9 @@ class PPO:
                                      *self.encoder.parameters(),
                                      *self.encoder_ROA.parameters(),
                                      *self.estimator.parameters(),
-                                     *self.obj_f_dynamics.parameters(),
-                                     *self.obs_f_dynamics.parameters()], lr=learning_rate)
+                                     *self.obj_f_dynamics.parameters()
+                                     # *self.obs_f_dynamics.parameters()
+                                     ], lr=learning_rate)
         # remove estimator
         # self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], lr=learning_rate)
         self.device = device
@@ -119,6 +120,12 @@ class PPO:
         # Estimator loss
         self.estimator_loss = None
 
+        # Obj F model lsos
+        self.obj_f_dynamics_loss = None
+
+        # Entropy
+        self.entropy_mean = None
+
     def act(self, actor_obs):
         self.actor_obs = actor_obs
         with torch.inference_mode():
@@ -157,22 +164,48 @@ class PPO:
         self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
         self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
-    def filter_for_obj_f_dynamics_from_obs(self, obs_batch):
+
+    # def filter_for_obs_f_dynamics_from_obs(self, obs_batch, latent_batch):
+    #     obs_f_dynamics_obs = []
+    #
+    #     return obs_f_dynamics_obs
+    def filter_for_obj_f_dynamics_from_obs(self, obs_batch, latent_batch):
+
+        # TODO -> whether
+        if(self.encoder.architecture.is_decouple):
+
+            obs_batch = obs_batch.permute((1,0,2))
+            obs_batch = obs_batch.reshape((self.num_envs, -1, int(obs_batch.shape[-1] / self.num_history_batch)))
+            obs_batch = obs_batch.permute((1,0,2))
+
         obj_f_dynamics_obs = []
-        obj_f_dynamics_true = []
 
-        for i in range(self.num_history_batch):
-            # For concatenating s_t, a_t
-            obj_f_dynamics_obs.append(obs_batch[...,
-                                (self.encoder.architecture.block_dim)*(i+1)
-                                - self.encoder.architecture.dyn_dim
-                                - self.encoder.architecture.act_dim:
-                                (self.encoder.architecture.block_dim)*(i+1)])
+        obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim
+                                          - self.encoder.architecture.dyn_dim
+                                          - self.encoder.architecture.act_dim:
+                                          self.encoder.architecture.block_dim]
 
+        obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.dyn_dim + self.encoder.architecture.act_dim)
 
+        obj_f_dynamics_obs.append(obs_batch_f)
 
+        latent_batch = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
 
-        return obj_f_dynamics_obs
+        latent_batch = latent_batch[:-1, ...]
+
+        latent_batch = latent_batch.reshape((-1, self.encoder.architecture.hidden_dim))
+
+        obj_f_dynamics_obs.append(latent_batch)
+
+        obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
+
+        obj_f_dynamics_true = obs_batch[1:, :, self.encoder.architecture.block_dim
+                                               - self.encoder.architecture.dyn_dim:
+                                               self.encoder.architecture.block_dim].clone().detach()
+
+        obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_dim)
+
+        return obj_f_dynamics_obs, obj_f_dynamics_true
     def filter_for_encode_from_obs(self, obs_batch):
         filtered_obs = []
         for i in range(self.num_history_batch):
@@ -254,31 +287,35 @@ class PPO:
 
         # Distillate the true inertial parameter (oracle)
 
-        estimator_true_data = []
 
-        for i in range(self.num_history_batch):
-            estimator_true_data.append(obs_batch[..., self.encoder.architecture.block_dim*i
-                                       + self.encoder.architecture.pro_dim
-                                       + self.encoder.architecture.ext_dim - self.inertial_dim:
-                                       self.encoder.architecture.block_dim*i
-                                       + self.encoder.architecture.pro_dim
-                                       + self.encoder.architecture.ext_dim])
 
-        # estimator_true_data = (obs_batch[...,
-        #                            (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-        #                            + self.encoder.architecture.pro_dim
-        #                            + self.encoder.architecture.ext_dim - self.inertial_dim:
-        #                            (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-        #                            + self.encoder.architecture.pro_dim
-        #                            + self.encoder.architecture.ext_dim
-        #                            ])
+        if(self.encoder.architecture.is_decouple):
+            estimator_true_data = []
+            for i in range(self.num_history_batch):
+                estimator_true_data.append(obs_batch[..., self.encoder.architecture.block_dim*i
+                                           + self.encoder.architecture.pro_dim
+                                           + self.encoder.architecture.ext_dim - self.inertial_dim:
+                                           self.encoder.architecture.block_dim*i
+                                           + self.encoder.architecture.pro_dim
+                                           + self.encoder.architecture.ext_dim])
+            estimator_true_data = torch.cat(estimator_true_data, dim=-1)
+            estimator_true_data = estimator_true_data.permute((1,0,2))
+            estimator_true_data = estimator_true_data.reshape(self.num_envs, -1, self.inertial_dim)
+            estimator_true_data = estimator_true_data.permute((1,0,2))
+
+
+        else:
+            estimator_true_data = (obs_batch[...,
+                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                                   + self.encoder.architecture.pro_dim
+                                   + self.encoder.architecture.ext_dim - self.inertial_dim:
+                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                                   + self.encoder.architecture.pro_dim
+                                   + self.encoder.architecture.ext_dim
+                                   ])
+
 
         obs_ROA_batch = torch.cat(obs_ROA_batch, dim=-1)
-
-        estimator_true_data = torch.cat(estimator_true_data, dim=-1)
-        estimator_true_data = estimator_true_data.permute((1,0,2))
-        estimator_true_data = estimator_true_data.reshape(self.num_envs, -1, self.inertial_dim)
-        estimator_true_data = estimator_true_data.permute((1,0,2))
         estimator_true_data = estimator_true_data.reshape(-1, self.inertial_dim)
 
         return obs_ROA_batch, estimator_true_data.detach()
@@ -289,6 +326,8 @@ class PPO:
         self.loss_ROA = 0
         self.lambda_loss_ROA = 0
         self.estimator_loss = 0
+        self.obj_f_dynamics_loss = 0
+        self.entropy_mean = 0
 
         self.lambda_ROA = pow(self.lambda_ROA, self.lambdaDecayFactor)
         print(self.lambda_ROA)
@@ -313,6 +352,8 @@ class PPO:
                 latent_ROA = self.encode_ROA(obs_ROA_batch)
                 latent_ROA_d = latent_ROA.clone().detach()
 
+                obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent)
+
                 estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
                 estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
@@ -320,13 +361,15 @@ class PPO:
                 lambda_loss_ROA = self.lambda_ROA * self.criteria(latent, latent_ROA_d)
                 loss_ROA = self.criteria(latent_d, latent_ROA)
 
-                latent_for_update = latent[self.num_history_batch-1::self.num_history_batch, :]
 
-                # actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent, actions_batch)
-                # value_batch = self.critic.evaluate(latent)
+                if(self.encoder.architecture.is_decouple):
+                    latent_for_update = latent[self.num_history_batch-1::self.num_history_batch, :]
+                    actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent_for_update, actions_batch)
+                    value_batch = self.critic.evaluate(latent_for_update)
 
-                actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent_for_update, actions_batch)
-                value_batch = self.critic.evaluate(latent_for_update)
+                else:
+                    actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent, actions_batch)
+                    value_batch = self.critic.evaluate(latent)
 
                 # Adjusting the learning rate using KL divergence
                 mu_batch = self.actor.action_mean
@@ -354,6 +397,10 @@ class PPO:
                                                                                    1.0 + self.clip_param)
                 surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
+                obj_f_dyn_predict = self.obj_f_dynamics.evaluate(obj_f_dyn_input)
+
+                obj_f_dynamics_loss = self.criteria(obj_f_dyn_predict, obj_f_dyn_true)
+
                 # Value function loss
                 if self.use_clipped_value_loss:
                     value_clipped = current_values_batch + (value_batch - current_values_batch).clamp(-self.clip_param,
@@ -367,7 +414,8 @@ class PPO:
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
                        + lambda_loss_ROA \
                        + loss_ROA \
-                       + estimator_loss
+                       + estimator_loss \
+                       + obj_f_dynamics_loss
 
 
                 # Add kl divergence term to normalize the latent vector
@@ -376,7 +424,12 @@ class PPO:
                 self.optimizer.zero_grad()
                 loss.backward()
 
-                nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters(), *self.estimator.parameters()], self.max_grad_norm)
+                nn.utils.clip_grad_norm_([*self.actor.parameters(),
+                                          *self.critic.parameters(),
+                                          *self.encoder.parameters(),
+                                          *self.encoder_ROA.parameters(),
+                                          *self.estimator.parameters(),
+                                          *self.obj_f_dynamics.parameters()], self.max_grad_norm)
 
                 # remove estimator
                 # nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], self.max_grad_norm)
@@ -393,6 +446,8 @@ class PPO:
                     self.loss_ROA += loss_ROA.item()
                     self.lambda_loss_ROA += lambda_loss_ROA.item()
                     self.estimator_loss += estimator_loss.item()
+                    self.obj_f_dynamics_loss += obj_f_dynamics_loss.item()
+                    self.entropy_mean = (self.entropy_coef * entropy_batch.mean()).item()
 
         if log_this_iteration:
             num_updates = self.num_learning_epochs * self.num_mini_batches
@@ -401,5 +456,7 @@ class PPO:
             self.loss_ROA /= num_updates
             self.lambda_loss_ROA /= num_updates
             self.estimator_loss /= num_updates
+            self.obj_f_dynamics_loss /= num_updates
+            self.entropy_mean /= num_updates
 
         return mean_value_loss, mean_surrogate_loss, locals()
