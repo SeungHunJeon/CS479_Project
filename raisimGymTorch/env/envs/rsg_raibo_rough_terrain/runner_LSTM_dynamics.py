@@ -192,8 +192,8 @@ for update in range(iteration_number, 1000000):
             'Encoder_ROA_state_dict' : Encoder_ROA.architecture.state_dict(),
             'Inertial_estimator': Estimator.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
-            'obj_f_dynamics_state_dict': obj_f_dynamics.state_dict(),
-            'obs_f_dynamics_state_dict': obs_f_dynamics.state_dict()
+            'obj_f_dynamics_state_dict': obj_f_dynamics.architecture.state_dict(),
+            'obs_f_dynamics_state_dict': obs_f_dynamics.architecture.state_dict()
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
         data_size = 0
