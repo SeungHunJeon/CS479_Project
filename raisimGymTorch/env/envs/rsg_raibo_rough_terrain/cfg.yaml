@@ -12,7 +12,7 @@ environment:
   control_dt: 0.25
   low_level_control_dt: 0.005
   max_time: 10.0
-  entropy_coeff: 1e-3
+  entropy_coeff: 1e-2
   discrete:
     radial: 1
     tangential: 72

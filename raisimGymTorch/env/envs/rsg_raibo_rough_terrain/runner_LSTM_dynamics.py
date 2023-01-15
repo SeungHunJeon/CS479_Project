@@ -24,7 +24,7 @@ import datetime
 # os.environ["WANDB_MODE"] = "dryrun"
 
 # initialize wandb
-wandb.init(group="jsh",project=task_name)
+
 
 # configuration
 parser = argparse.ArgumentParser()
@@ -166,6 +166,8 @@ ppo = PPO.PPO(actor=actor,
 
 iteration_number = 0
 
+wandb.init(group="jsh",project=task_name,name='entropy'+str(entropy_coeff_))
+
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
 
@@ -190,6 +192,8 @@ for update in range(iteration_number, 1000000):
             'Encoder_ROA_state_dict' : Encoder_ROA.architecture.state_dict(),
             'Inertial_estimator': Estimator.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
+            'obj_f_dynamics_state_dict': obj_f_dynamics.state_dict(),
+            'obs_f_dynamics_state_dict': obs_f_dynamics.state_dict()
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
         data_size = 0

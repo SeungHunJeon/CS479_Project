@@ -65,7 +65,7 @@ class PPO:
                                      *self.critic.parameters(),
                                      *self.encoder.parameters(),
                                      *self.encoder_ROA.parameters(),
-                                     *self.estimator.parameters(),
+                                     # *self.estimator.parameters(),
                                      *self.obj_f_dynamics.parameters()
                                      # *self.obs_f_dynamics.parameters()
                                      ], lr=learning_rate)
@@ -414,8 +414,9 @@ class PPO:
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
                        + lambda_loss_ROA \
                        + loss_ROA \
-                       + estimator_loss \
                        + obj_f_dynamics_loss
+                       # + estimator_loss \
+
 
 
                 # Add kl divergence term to normalize the latent vector
@@ -428,7 +429,7 @@ class PPO:
                                           *self.critic.parameters(),
                                           *self.encoder.parameters(),
                                           *self.encoder_ROA.parameters(),
-                                          *self.estimator.parameters(),
+                                          # *self.estimator.parameters(),
                                           *self.obj_f_dynamics.parameters()], self.max_grad_norm)
 
                 # remove estimator
