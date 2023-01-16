@@ -90,6 +90,15 @@ class VectorizedEnvironment {
       environments_[i]->reset();
   }
 
+//  void synchronize() {
+//#pragma omp parallel for schedule(auto)
+//    for (int i = 1; i < num_envs_; i++){
+////      environments_[i] = nullptr;
+////      environments_[i] = environments_[0];
+//    }
+//
+//  }
+
   void observe(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics=false) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)

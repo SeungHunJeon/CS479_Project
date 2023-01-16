@@ -76,6 +76,9 @@ class RaisimGymVecEnv:
         self.wrapper.observe(self._observation, update_statistics)
         return self._observation
 
+    # def synchronize(self):
+    #     self.wrapper.synchronize()
+
     def reset(self):
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self.wrapper.reset()

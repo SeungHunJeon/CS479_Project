@@ -12,6 +12,7 @@ import torch
 import argparse
 import collections
 import torch.nn as nn
+import raisimGymTorch.algo.MPPI.mppi as mppi
 
 device = torch.device('cpu')
 # configuration
@@ -26,14 +27,17 @@ home_path = task_path + "/../../../.."
 # config
 cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 
+# MPPI
+n_samples = cfg['MPPI']['nSamples_']
+n_horizon = cfg['MPPI']['nHorizon_']
+gamma = cfg['MPPI']['gamma_']
+
 # create environment from the configuration file
-cfg['environment']['num_envs'] = 1
+cfg['environment']['num_envs'] = 1 + n_samples
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
 
-
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-# env.set_command(0)  # ensures that the initial command is zero
 
 # shortcuts
 ob_dim = env.num_obs
@@ -48,24 +52,28 @@ historyNum = cfg['environment']['dimension']['historyNum_']
 actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
+inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
+dynamics_dim = cfg['environment']['dimension']['dynamicsDim_']
+ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
 
-obs_pro_dim = pro_dim
-obs_ext_dim = ext_dim
-obs_act_dim = act_dim
+# shortcuts
+act_dim = env.num_acts
+Encoder_ob_dim = historyNum * (pro_dim + ext_dim)
 
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
+is_decouple = cfg['LSTM']['is_decouple_']
 
 # ROA Encoding
-ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
-ROA_ob_dim = historyNum * (pro_dim + act_dim + ROA_ext_dim)
+ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
-
 total_steps = n_steps * env.num_envs
 
+# PPO coeff
+entropy_coeff_ = cfg['environment']['entropy_coeff']
 
 
 def get_obs_ROA(encoder, obs_batch):
@@ -73,39 +81,36 @@ def get_obs_ROA(encoder, obs_batch):
 
 
     for i in range(historyNum):
+        # Get proprioceptive part of observation
         obs_ROA_batch.append(obs_batch[...,
-                             (encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
-                             :(encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
-                              + encoder.architecture.pro_dim])
+                             (encoder.architecture.block_dim)*i:
+                             (encoder.architecture.block_dim)*i
+                             + encoder.architecture.pro_dim])
+
+        # Get Exteroceptive part of observation except inertial parameter
         obs_ROA_batch.append(obs_batch[...,
-                             (encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
+                             (encoder.architecture.block_dim)*i
                              + encoder.architecture.pro_dim:
-                             (encoder.architecture.pro_dim +
-                              encoder.architecture.ext_dim +
-                              encoder.architecture.act_dim)*i
-                             + encoder.architecture.pro_dim +15])
+                             (encoder.architecture.block_dim)*i
+                             + encoder.architecture.pro_dim
+                             + encoder.architecture.ext_dim - inertial_dim])
 
 
-        obs_ROA_batch.append(obs_batch[...,
-                             (encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
-                             + encoder.architecture.pro_dim+15+13:(encoder.architecture.pro_dim + encoder.architecture.ext_dim + encoder.architecture.act_dim)*i
-                                                                       + encoder.architecture.pro_dim+15+13 +12])
-
-    estimator_true_data = (obs_batch[...,
-                           (encoder.architecture.pro_dim +
-                            encoder.architecture.ext_dim +
-                            encoder.architecture.act_dim)*(historyNum-1)
-                           + encoder.architecture.pro_dim +15:
-                           (encoder.architecture.pro_dim +
-                            encoder.architecture.ext_dim +
-                            encoder.architecture.act_dim)*(historyNum-1)
-                           + encoder.architecture.pro_dim +15+13
-                           ])
+    # estimator_true_data = (obs_batch[...,
+    #                        (encoder.architecture.pro_dim +
+    #                         encoder.architecture.ext_dim +
+    #                         encoder.architecture.act_dim)*(historyNum-1)
+    #                        + encoder.architecture.pro_dim +15:
+    #                        (encoder.architecture.pro_dim +
+    #                         encoder.architecture.ext_dim +
+    #                         encoder.architecture.act_dim)*(historyNum-1)
+    #                        + encoder.architecture.pro_dim +15+13
+    #                        ])
 
     obs_ROA_batch = np.concatenate(obs_ROA_batch, axis=-1)
-    estimator_true_data = estimator_true_data.reshape(-1, 13)
+    # estimator_true_data = estimator_true_data.reshape(-1, 13)
 
-    return obs_ROA_batch, estimator_true_data
+    return obs_ROA_batch
 
 
 if weight_path == "":
@@ -118,6 +123,52 @@ else:
     start_step_id = 0
 
     print("Visualizing and evaluating the policy: ", weight_path)
+
+    obs_f_dynamics_input_dim = pro_dim + ROA_ext_dim + act_dim
+
+    obs_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obs_f_dynamics']['net'],
+                                                         nn.LeakyReLU,
+                                                         obs_f_dynamics_input_dim,
+                                                         pro_dim + ROA_ext_dim),
+                                          device=device)
+
+    obj_f_dynamics_input_dim = dynamics_dim + hidden_dim + act_dim
+
+    obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
+                                                         nn.LeakyReLU,
+                                                         obj_f_dynamics_input_dim,
+                                                         dynamics_dim),
+                                          device=device)
+
+    Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
+                                                    nn.LeakyReLU,
+                                                    int(Encoder_ob_dim/historyNum),
+                                                    int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
+
+    Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
+                                                                  hidden_dim=hidden_dim,
+                                                                  ext_dim=ROA_ext_dim,
+                                                                  pro_dim=pro_dim,
+                                                                  act_dim=act_dim,
+                                                                  dyn_dim=dynamics_dim,
+                                                                  hist_num=historyNum,
+                                                                  device=device,
+                                                                  batch_num=batchNum,
+                                                                  num_env=env.num_envs,
+                                                                  is_decouple=is_decouple), device=device)
+
+    Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
+                                                              hidden_dim=hidden_dim,
+                                                              ext_dim=ext_dim,
+                                                              pro_dim=pro_dim,
+                                                              act_dim=act_dim,
+                                                              dyn_dim=dynamics_dim,
+                                                              hist_num=historyNum,
+                                                              batch_num=batchNum,
+                                                              device=device,
+                                                              num_env=env.num_envs,
+                                                              is_decouple=is_decouple), device=device)
+
     actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                                env.num_envs,
@@ -125,28 +176,6 @@ else:
                                                                                NormalSampler(act_dim),
                                                                                cfg['seed']),
                              device)
-    Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ob_dim/batchNum),
-                                                              hidden_dim=hidden_dim,
-                                                              ext_dim=ext_dim,
-                                                              pro_dim=pro_dim,
-                                                              act_dim=act_dim,
-                                                              hist_num=historyNum,
-                                                              batch_num=batchNum,
-                                                              device=device,
-                                                              num_env=env.num_envs), device=device)
-
-    Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'], nn.LeakyReLU, int(ob_dim/historyNum),
-                                                    int((ob_dim-ROA_ob_dim)/historyNum)), device=device)
-
-    Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_ob_dim/batchNum),
-                                                                  hidden_dim=hidden_dim,
-                                                                  ext_dim=ROA_ext_dim,
-                                                                  pro_dim=pro_dim,
-                                                                  act_dim=act_dim,
-                                                                  hist_num=historyNum,
-                                                                  device=device,
-                                                                  batch_num=batchNum,
-                                                                  num_env=env.num_envs), device=device)
 
 
     actor.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
@@ -154,9 +183,21 @@ else:
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
     Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
     Estimator.architecture.load_state_dict(torch.load(weight_path)['Inertial_estimator'])
+    obj_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['obj_f_dynamics_state_dict'])
+    obs_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['obs_f_dynamics_state_dict'])
 
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
+
+    traj_sampler = mppi.MPPI(dynamics=obj_f_dynamics,
+                             encoder=Encoder,
+                             actor=actor,
+                             environment=env,
+                             n_samples=n_samples,
+                             horizon=n_horizon,
+                             gamma=gamma,
+                             device=device)
+
     for i in range (int(int(iteration_number) / 100)):
         env.curriculum_callback()
 
@@ -169,8 +210,10 @@ else:
             with torch.no_grad():
                 obs = env.observe(False)
 
+                env.synchronize()
+
                 # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
-                obs_ROA, _ = get_obs_ROA(Encoder, obs)
+                obs_ROA = get_obs_ROA(Encoder, obs)
 
                 latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
 

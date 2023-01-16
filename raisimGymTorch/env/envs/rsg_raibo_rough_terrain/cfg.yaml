@@ -42,6 +42,11 @@ environment:
   ROA_dimension:
     exteroceptiveDim_: 28
 
+MPPI:
+  nSamples_: 300
+  nHorizon_: 20
+  gamma_: 1e-1
+
 encoder:
   proprioceptivelatentDim_: 16
   exteroceptivelatentDim_: 32

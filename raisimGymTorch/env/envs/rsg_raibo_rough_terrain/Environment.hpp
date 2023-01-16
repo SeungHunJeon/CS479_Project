@@ -137,8 +137,35 @@ class ENVIRONMENT {
     }
   }
 
+
+
   ~ENVIRONMENT() { if (server_) server_->killServer(); }
 
+
+  void clone(const ENVIRONMENT& environment) {
+    friction = environment.friction;
+    world_ = environment.world_;
+    curriculumFactor_ = environment.curriculumFactor_;
+    curriculumDecayFactor_ = environment.curriculumDecayFactor_;
+    obScaled_ = environment.obScaled_;
+    command_ = environment.command_;
+    object_type = environment.object_type;
+    controller_ = environment.controller_;
+//    Low_controller_ = _ENVIRONMENT.Low_controller_;
+//    objectGenerator_ = _ENVIRONMENT.objectGenerator_;
+    command_Obj_Pos_ = environment.command_Obj_Pos_;
+    Dist_eo_ = environment.Dist_eo_;
+    Dist_og_ = environment.Dist_og_;
+    Pos_e_ = environment.Pos_e_;
+    command_set = environment.command_set;
+
+//    raisim::ArticulatedSystem* raibo_;
+//    raisim::HeightMap* heightMap_;
+//    std::unique_ptr<raisim::RaisimServer> server_;
+//    raisim::Visuals *commandSphere_, *controllerSphere_;
+//    raisim::SingleBodyObject *Obj_, *Manipulate_;
+//    raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_, *command_ball_, *com_pos_, *com_noisify_;
+  }
 
   void adapt_Low_controller (controller::raibotPositionController controller) {
     Low_controller_ = controller;
