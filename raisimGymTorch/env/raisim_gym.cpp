@@ -43,7 +43,7 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("getObStatistics", &VectorizedEnvironment<ENVIRONMENT>::getObStatistics)
     .def("setObStatistics", &VectorizedEnvironment<ENVIRONMENT>::setObStatistics)
     .def("getDepthImage", &VectorizedEnvironment<ENVIRONMENT>::getDepthImage)
-    .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT>::getColorImage);Z
+    .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT>::getColorImage);
 //    .def("synchronize", &VectorizedEnvironment<ENVIRONMENT>::synchronize);
 
   py::class_<NormalSampler>(m, "NormalSampler")

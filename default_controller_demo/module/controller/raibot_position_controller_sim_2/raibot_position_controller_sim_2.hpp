@@ -140,6 +140,40 @@ class raibotPositionController {
     raibotController_.updateHistory();
   }
 
+
+
+  void setJointPositionHistory(Eigen::VectorXd &joint_position_history) {
+    raibotController_.setJointPositionHistory(joint_position_history);
+  }
+
+  void setJointVelocityHistory(Eigen::VectorXd &joint_velocity_history) {
+    raibotController_.setJointVelocityHistory(joint_velocity_history);
+  }
+
+  void setPrevAction(Eigen::VectorXd &prevAction) {
+    raibotController_.setPrevAction(prevAction);
+  }
+
+  void setPrevPrevAction(Eigen::VectorXd &prevprevAction) {
+    raibotController_.setPrevPrevAction(prevprevAction);
+  }
+
+  void getJointPositionHistory(Eigen::VectorXd &joint_position_history) {
+    joint_position_history = raibotController_.getJointPositionHistory();
+  }
+
+  void getJointVelocityHistory(Eigen::VectorXd &joint_velocity_history) {
+    joint_velocity_history = raibotController_.getJointVelocityHistory();
+  }
+
+  void getPrevAction(Eigen::VectorXd &prevAction) {
+    prevAction = raibotController_.getPrevAction();
+  }
+
+  void getPrevPrevAction(Eigen::VectorXd &prevprevAction) {
+    prevprevAction = raibotController_.getPrevPrevAction();
+  }
+
   void test() {
     Eigen::Matrix<float, 133, 1> actor_input;
     actor_input.setOnes();

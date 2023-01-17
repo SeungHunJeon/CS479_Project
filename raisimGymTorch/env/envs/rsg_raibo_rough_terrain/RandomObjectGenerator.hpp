@@ -212,6 +212,50 @@ class RandomObjectGenerator {
     object->setCom(COM);
   }
 
+  void compute_ratio(double bound_ratio,
+                     double curriculumFactor,
+                     std::mt19937& gen,
+                     std::normal_distribution<double>& normDist){
+    ratio = 1;
+    height_ratio = 1;
+    width_ratio_1 = 1;
+    width_ratio_2 = 1;
+    ratio += soft_sample(ratio, bound_ratio, curriculumFactor, gen, normDist);
+    height_ratio += soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
+    width_ratio_1 += soft_sample(width_ratio_1, bound_ratio, curriculumFactor, gen, normDist);
+    width_ratio_2 += soft_sample(width_ratio_2, bound_ratio, curriculumFactor, gen, normDist);
+  }
+
+  void get_ratio(double &ratio_,
+                 double &height_ratio_,
+                 double &width_ratio_1_,
+                 double &width_ratio_2_) {
+    ratio_ = ratio;
+    height_ratio_ = height_ratio;
+    width_ratio_1_ = width_ratio_1;
+    width_ratio_2_ = width_ratio_2;
+  }
+
+  raisim::SingleBodyObject* generateObject(raisim::World* world)
+  {
+    switch (object_shape_) {
+      case ObjectShape::BALL:
+      {
+        return world->addSphere(radius_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+      }
+
+      case ObjectShape::Cylinder:
+      {
+        return world->addCylinder(radius_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+      }
+
+      case ObjectShape::BOX:
+      {
+        return world->addBox(width1_, width2_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+      }
+    }
+  }
+
   raisim::SingleBodyObject* generateObject(raisim::World* world,
                                  ObjectShape object_shape,
                                  double curriculumFactor,
@@ -228,53 +272,41 @@ class RandomObjectGenerator {
     switch (object_shape) {
       case ObjectShape::BALL: /// 0
       {
-        double ratio = 1;
-        ratio += soft_sample(ratio, bound_ratio, curriculumFactor, gen, normDist);
-
-        double radius_ = radius * ratio;
+        compute_ratio(bound_ratio, curriculumFactor, gen, normDist);
+        radius_ = radius * ratio;
         object_height = 2*radius_;
         classify_vector << 1, 0, 0, 0;
         geometry << 2*radius_, 2*radius_, 2*radius_;
-        return world->addSphere(radius_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+//        return world->addSphere(radius_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addSphere(radius_, mass, "object");
       }
 
 
       case ObjectShape::Cylinder: /// 1
       {
-        double ratio = 1;
-        ratio += soft_sample(ratio, bound_ratio, curriculumFactor, gen, normDist);
-
-        double height_ratio = 1;
-        height_ratio += soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-
-        double radius_ = radius * ratio;
-        double height_ = height * height_ratio;
+        compute_ratio(bound_ratio, curriculumFactor, gen, normDist);
+        radius_ = radius * ratio;
+        height_ = height * height_ratio;
         object_height = height_;
         classify_vector << 0, 1, 0, 0;
         geometry << 2*radius_, 2*radius_, height_;
-        return world->addCylinder(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+//        return world->addCylinder(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addCylinder(radius_, height_, mass, "object");
       }
 
 
       case ObjectShape::BOX: /// 2
       {
-        double width_ratio_1 = 1;
-        width_ratio_1 += soft_sample(width_ratio_1, bound_ratio, curriculumFactor, gen, normDist);
-
-        double width_ratio_2 = 1;
-        width_ratio_2 += soft_sample(width_ratio_2, bound_ratio, curriculumFactor, gen, normDist);
-
-        double height_ratio = 1;
-        height_ratio += soft_sample(1, bound_ratio, curriculumFactor, gen, normDist);
-
-        double width1_ = width1 * width_ratio_1;
-        double width2_ = width2 * width_ratio_2;
-        double height_ = height * height_ratio;
+        compute_ratio(bound_ratio, curriculumFactor, gen, normDist);
+        width1_ = width1 * width_ratio_1;
+        width2_ = width2 * width_ratio_2;
+        height_ = height * height_ratio;
 
         object_height = height_;
         classify_vector << 0, 0, 1, 0;
         geometry << width1_, width2_, height_;
-        return world->addBox(width1_, width2_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+//        return world->addBox(width1_, width2_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addBox(width1_, width2_, height_, mass, "object");
       }
 
 
@@ -294,6 +326,8 @@ class RandomObjectGenerator {
   }
 
  private:
+  double ratio, height_ratio, width_ratio_1, width_ratio_2;
+  double height_, width2_, width1_, radius_;
   int object_seed_;
   double object_height;
   ObjectShape object_shape_;

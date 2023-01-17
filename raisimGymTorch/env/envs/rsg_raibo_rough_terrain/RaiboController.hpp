@@ -603,6 +603,26 @@ class RaiboController {
 
   }
 
+  void set_History(std::vector<Eigen::VectorXd> &obj_info_history,
+                   std::vector<Eigen::VectorXd> &state_info_history,
+                   std::vector<Eigen::VectorXd> &action_info_history,
+                   std::vector<Eigen::VectorXd> &dynamics_info_history) {
+    objectInfoHistory_ = obj_info_history;
+    stateInfoHistory_ = state_info_history;
+    actionInfoHistory_ = action_info_history;
+    dynamicsInfoHistory_ = dynamics_info_history;
+  }
+
+  void get_History(std::vector<Eigen::VectorXd> &obj_info_history,
+                   std::vector<Eigen::VectorXd> &state_info_history,
+                   std::vector<Eigen::VectorXd> &action_info_history,
+                   std::vector<Eigen::VectorXd> &dynamics_info_history) {
+    obj_info_history = objectInfoHistory_;
+    state_info_history = stateInfoHistory_;
+    action_info_history = actionInfoHistory_;
+    dynamics_info_history = dynamicsInfoHistory_;
+  }
+
   inline void setStandingMode(bool mode) { standingMode_ = mode; }
 
   [[nodiscard]] const Eigen::VectorXd &getJointPositionHistory() const { return jointPositionHistory_; }

@@ -272,8 +272,25 @@ class RaiboPositionController {
 
   inline void setStandingMode(bool mode) { standingMode_ = mode; }
 
+  [[nodiscard]] void setJointPositionHistory(Eigen::VectorXd &jointPositionHistory) {
+    jointPositionHistory_ = jointPositionHistory;
+  }
+  [[nodiscard]] void setJointVelocityHistory (Eigen::VectorXd &jointVelocityHistory) {
+    jointVelocityHistory_ = jointVelocityHistory;
+  }
+
+  [[nodiscard]] void setPrevAction (Eigen::VectorXd &prevAction) {
+    previousAction_ = prevAction;
+  }
+
+  [[nodiscard]] void setPrevPrevAction (Eigen::VectorXd &prevprevAction) {
+    prevprevAction_ = prevprevAction;
+  }
+
   [[nodiscard]] const Eigen::VectorXd &getJointPositionHistory() const { return jointPositionHistory_; }
   [[nodiscard]] const Eigen::VectorXd &getJointVelocityHistory() const { return jointVelocityHistory_; }
+  [[nodiscard]] const Eigen::VectorXd &getPrevAction() const { return previousAction_; }
+  [[nodiscard]] const Eigen::VectorXd &getPrevPrevAction() const { return prevprevAction_; }
 
   [[nodiscard]] static constexpr int getObDim() { return obDim_; }
   [[nodiscard]] static constexpr int getActionDim() { return actionDim_; }

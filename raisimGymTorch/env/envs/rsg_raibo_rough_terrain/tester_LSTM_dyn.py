@@ -210,7 +210,7 @@ else:
             with torch.no_grad():
                 obs = env.observe(False)
 
-                env.synchronize()
+                # env.synchronize()
 
                 # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
                 obs_ROA = get_obs_ROA(Encoder, obs)
