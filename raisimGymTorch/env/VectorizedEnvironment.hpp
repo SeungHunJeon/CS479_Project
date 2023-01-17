@@ -40,6 +40,10 @@ class VectorizedEnvironment {
     READ_YAML(double, simDt, cfg_["simulation_dt"])
     READ_YAML(double, conDt, cfg_["control_dt"])
     READ_YAML(double, low_conDt, cfg_["low_level_control_dt"])
+    READ_YAML(bool, is_rollout_, cfg_["Rollout"])
+
+    if(is_rollout_)
+      num_envs_ = 1;
 
     if (cfg_["hierarchical"].template As<bool>()) {
       environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && 0 == 0, 0));
@@ -82,6 +86,8 @@ class VectorizedEnvironment {
       epsilon.setConstant(1e-8);
     }
   }
+
+
 
   // resets all environments and returns observation
   void reset() {
@@ -150,6 +156,11 @@ class VectorizedEnvironment {
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
     environments_[0]->getState(gc, gv);
+  }
+
+  void step_Rollout(Eigen::Ref<EigenRowMajorMat> &action) {
+    for (int i = 0; i < num_envs_; i++)
+      perAgentStep_Rollout(i, action, false);
   }
 
   void step(Eigen::Ref<EigenRowMajorMat> &action,
@@ -256,6 +267,12 @@ class VectorizedEnvironment {
       ob.row(i) = (ob.row(i) - obMean_.transpose()).template cwiseQuotient((obVar_ + epsilon).cwiseSqrt().transpose());
   }
 
+  inline void perAgentStep_Rollout(int agentId,
+                           Eigen::Ref<EigenRowMajorMat> &action,
+                           bool visualize) {
+    environments_[agentId]->rollout_step(action.row(agentId), visualize);
+  }
+
   inline void perAgentStep(int agentId,
                            Eigen::Ref<EigenRowMajorMat> &action,
                            Eigen::Ref<EigenVec> &reward,
@@ -287,6 +304,8 @@ class VectorizedEnvironment {
   float obCount_ = 1e-4;
   EigenVec recentMean_, recentVar_, delta_;
   EigenVec epsilon;
+  bool is_rollout_;
+
 };
 
 class NormalDistribution {

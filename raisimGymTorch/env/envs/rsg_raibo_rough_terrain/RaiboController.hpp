@@ -633,6 +633,7 @@ class RaiboController {
   [[nodiscard]] static constexpr double getSimDt() { return simDt_; }
   [[nodiscard]] static constexpr double getConDt() { return conDt_; }
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) { gc = gc_.cast<float>(); gv = gv_.cast<float>(); }
+  void setState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {raibo_->setState(gc.cast<double>(), gv.cast<double>());}
 
   static void setSimDt(double dt) {
     RSFATAL_IF(fabs(dt - simDt_) > 1e-12, "sim dt is fixed to " << simDt_)

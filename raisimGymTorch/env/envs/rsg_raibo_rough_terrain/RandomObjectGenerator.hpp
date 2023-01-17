@@ -171,6 +171,12 @@ class RandomObjectGenerator {
     }
   }
 
+  void Inertial_Randomize(raisim::SingleBodyObject* object) {
+    object->setMass(Mass);
+    object->setInertia(Inertia);
+    object->setCom(COM);
+  }
+
   void Inertial_Randomize(raisim::SingleBodyObject* object,
                           double bound_ratio,
                           double curriculumFactor,
@@ -178,30 +184,16 @@ class RandomObjectGenerator {
                           std::uniform_real_distribution<double>& uniDist,
                           std::normal_distribution<double>& normDist) {
     /// Mass randomization (1-bound_ratio ~ 1+bound_ratio)
-    double ratio = 1;
-    ratio += soft_sample(ratio, bound_ratio, curriculumFactor, gen, normDist);
+    double mass_ratio = 1;
+    mass_ratio += soft_sample(mass_ratio, bound_ratio, curriculumFactor, gen, normDist);
 
-    double Mass = object->getMass()*ratio;
+    Mass = object->getMass()*mass_ratio;
     object->setMass(Mass);
 
-    /// Inertia randomization (1-bound_ratio ~ 1+bound_ratio)
-//    Eigen::Matrix3d inertia_residual;
-//    inertia_residual.setOnes();
-//    for (int i=0; i<9; i++) {
-//      if(i % 3 == 0)
-//        inertia_residual(i) += 0.1 + curriculumFactor*bound_ratio * uniDist(gen);
-//      else
-//        inertia_residual(i) += 0.1*curriculumFactor*bound_ratio * normDist(gen);
-//    }
-//
-//    Eigen::Matrix3d Inertia = object->getInertiaMatrix_B().cwiseProduct(inertia_residual);
-
-    Eigen::Matrix3d Inertia = sample_inertia(object, curriculumFactor, bound_ratio, gen, uniDist, normDist);
+    Inertia = sample_inertia(object, curriculumFactor, bound_ratio, gen, uniDist, normDist);
     object->setInertia(Inertia);
 
     /// COM randomization (1-bound_ratio ~ 1+bound_ratio)
-
-    Eigen::Vector3d COM;
 
     COM = sample_com(bound_ratio,
                      curriculumFactor,
@@ -236,22 +228,25 @@ class RandomObjectGenerator {
     width_ratio_2_ = width_ratio_2;
   }
 
-  raisim::SingleBodyObject* generateObject(raisim::World* world)
+  raisim::SingleBodyObject* generateObject(raisim::World* world, const double &mass)
   {
     switch (object_shape_) {
       case ObjectShape::BALL:
       {
-        return world->addSphere(radius_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+//        return world->addSphere(radius_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addSphere(radius_, mass, "object");
       }
 
       case ObjectShape::Cylinder:
       {
-        return world->addCylinder(radius_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+//        return world->addCylinder(radius_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addCylinder(radius_, height_, mass, "object");
       }
 
       case ObjectShape::BOX:
       {
-        return world->addBox(width1_, width2_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+//        return world->addBox(width1_, width2_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+        return world->addBox(width1_, width2_, height_, mass, "object");
       }
     }
   }
@@ -326,6 +321,9 @@ class RandomObjectGenerator {
   }
 
  private:
+  double Mass;
+  Eigen::Vector3d COM;
+  Eigen::Matrix3d Inertia;
   double ratio, height_ratio, width_ratio_1, width_ratio_2;
   double height_, width2_, width1_, radius_;
   int object_seed_;
