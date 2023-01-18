@@ -7,6 +7,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 #include "Environment.hpp"
+#include "Environment_Rollout.hpp"
 #include "VectorizedEnvironment.hpp"
 
 namespace py = pybind11;
@@ -45,6 +46,39 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("getDepthImage", &VectorizedEnvironment<ENVIRONMENT>::getDepthImage)
     .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT>::getColorImage);
 //    .def("synchronize", &VectorizedEnvironment<ENVIRONMENT>::synchronize);
+
+  py::class_<VectorizedEnvironment<ENVIRONMENT_ROLLOUT>>(m, "RaisimGymRaiboRoughTerrain_ROLLOUT")
+      .def(py::init<std::string, std::string>())
+      .def("init", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::init)
+      .def("reset", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::reset)
+      .def("observe", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::observe)
+      .def("step", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::step)
+      .def("step_visualize", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::step_visualize)
+      .def("setSeed", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::setSeed)
+      .def("close", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::close)
+      .def("isTerminalState", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::isTerminalState)
+      .def("setSimulationTimeStep", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::setSimulationTimeStep)
+      .def("setControlTimeStep", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::setControlTimeStep)
+      .def("getObDim", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getObDim)
+      .def("getActionDim", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getActionDim)
+      .def("getNumOfEnvs", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getNumOfEnvs)
+      .def("turnOnVisualization", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::turnOnVisualization)
+      .def("turnOffVisualization", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::turnOffVisualization)
+      .def("stopRecordingVideo", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::stopRecordingVideo)
+      .def("startRecordingVideo", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::startRecordingVideo)
+      .def("curriculumUpdate", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::curriculumUpdate)
+      .def("getStepDataTag", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getStepDataTag)
+      .def("getStepData", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getStepData)
+      .def("setCommand", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::setCommand)
+      .def("moveControllerCursor", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::moveControllerCursor)
+      .def("getState", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getState)
+      .def("getObStatistics", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getObStatistics)
+      .def("setObStatistics", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::setObStatistics)
+      .def("getDepthImage", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getDepthImage)
+      .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getColorImage)
+      .def("synchronize", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::synchronize)
+      .def("step_Rollout", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::step_Rollout)
+      .def("getRolloutState", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getRolloutState);
 
   py::class_<NormalSampler>(m, "NormalSampler")
       .def(py::init<int>(), py::arg("dim"))

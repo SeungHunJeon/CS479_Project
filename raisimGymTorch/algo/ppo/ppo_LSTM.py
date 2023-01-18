@@ -65,7 +65,7 @@ class PPO:
                                      *self.critic.parameters(),
                                      *self.encoder.parameters(),
                                      *self.encoder_ROA.parameters(),
-                                     # *self.estimator.parameters(),
+                                     *self.estimator.parameters(),
                                      *self.obj_f_dynamics.parameters()
                                      # *self.obs_f_dynamics.parameters()
                                      ], lr=learning_rate)
@@ -305,7 +305,7 @@ class PPO:
 
 
         else:
-            estimator_true_data = (obs_batch[...,
+            estimator_true_data = (obs_batch[-1, :,
                                    (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
                                    + self.encoder.architecture.pro_dim
                                    + self.encoder.architecture.ext_dim - self.inertial_dim:
@@ -354,7 +354,7 @@ class PPO:
 
                 obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent)
 
-                estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
+                estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
                 estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
 
@@ -414,8 +414,8 @@ class PPO:
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
                        + lambda_loss_ROA \
                        + loss_ROA \
-                       + obj_f_dynamics_loss
-                       # + estimator_loss \
+                       + obj_f_dynamics_loss \
+                       + estimator_loss
 
 
 
@@ -429,7 +429,7 @@ class PPO:
                                           *self.critic.parameters(),
                                           *self.encoder.parameters(),
                                           *self.encoder_ROA.parameters(),
-                                          # *self.estimator.parameters(),
+                                          *self.estimator.parameters(),
                                           *self.obj_f_dynamics.parameters()], self.max_grad_norm)
 
                 # remove estimator

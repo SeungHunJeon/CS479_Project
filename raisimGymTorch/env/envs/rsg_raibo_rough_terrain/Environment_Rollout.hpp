@@ -33,7 +33,7 @@ class ENVIRONMENT_ROLLOUT {
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
     READ_YAML(bool, is_discrete_, cfg["discrete_action"])
-    READ_YAML(bool, n_samples, cfg["nSamples_"])
+    READ_YAML(int, n_samples, cfg["nSamples_"])
 
     if(is_discrete_) {
       READ_YAML(int, radial_, cfg["discrete"]["radial"])
@@ -98,14 +98,10 @@ class ENVIRONMENT_ROLLOUT {
     Low_controller_0.create(&world_0);
     Low_controller_0.init(&world_0);
 
-
-
     for (int i = 0; i<n_samples; i++) {
       raisim::World *world;
       RaiboController *controller;
       controller::raibotPositionController *low_controller;
-
-
 
       world->addGround(0.0, "ground");
       world->setDefaultMaterial(1.1, 0.0, 0.01);
@@ -216,7 +212,7 @@ class ENVIRONMENT_ROLLOUT {
 
 
   void hard_reset_Rollout() {
-#pragma omp parallel for schedule(auto)
+//#pragma omp parallel for schedule(auto)
     for(int i=0; i<n_samples; i++) {
       world_batch_[i]->setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
       reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("object"))->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
@@ -238,7 +234,7 @@ class ENVIRONMENT_ROLLOUT {
     if(curriculumFactor_ > 0.4)
       hard_reset_Rollout();
     /// set the state
-#pragma omp parallel for scheudle(auto)
+//#pragma omp parallel for schedule(auto)
     for (int i =0; i< n_samples; i++) {
       auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("object"));
       objectGenerator_.Inertial_Randomize(obj);
@@ -264,12 +260,12 @@ class ENVIRONMENT_ROLLOUT {
     controller_0.updateStateVariables();
     Low_controller_0.updateStateVariable();
 
-    reset_Rollout();
+//    reset_Rollout();
   }
 
 
-  double rollout_step(Eigen::Ref<EigenRowMajorMat> &action) {
-#pragma omp parallel for schedule(auto)
+  void rollout_step(Eigen::Ref<EigenRowMajorMat> &action, bool b) {
+//#pragma omp parallel for schedule(auto)
     for (int i = 0; i<n_samples; i++) {
       Eigen::Vector3f command;
 
@@ -307,6 +303,8 @@ class ENVIRONMENT_ROLLOUT {
       }
     }
   }
+
+
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
@@ -364,7 +362,7 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void updateObstacle_Rollout(bool curriculum_Update = false) {
-#pragma omp parallel for schedule(auto)
+//#pragma omp parallel for schedule(auto)
     for (int i=0; i<n_samples; i++) {
       world_batch_[i]->removeObject(world_batch_[i]->getObject("object"));
       auto Obj = objectGenerator_.generateObject(world_batch_[i], obj_mass_);
@@ -435,13 +433,7 @@ class ENVIRONMENT_ROLLOUT {
     Eigen::Vector3d lin_vel;
     Eigen::Vector3d ang_vel;
     Eigen::Matrix3d inertia;
-    double mass;
     Eigen::Vector3d com;
-    double ratio;
-    double height_ratio;
-    double width_ratio_1;
-    double width_ratio_2;
-    double _friction;
 
     /// For Robot info
     Eigen::VectorXf gc;
@@ -466,7 +458,7 @@ class ENVIRONMENT_ROLLOUT {
     get_robot_info_(gc,
                     gv);
 
-#pragma omp parallel for schedule(auto)
+//#pragma omp parallel for schedule(auto)
     for (int i=0; i<n_samples; i++) {
       controller_batch_[i]->set_History(obj_info_history,
                                         state_info_history,
@@ -485,6 +477,8 @@ class ENVIRONMENT_ROLLOUT {
       obj->setLinearVelocity(lin_vel);
       obj->setAngularVelocity(ang_vel);
     }
+
+
 
   }
 
@@ -544,7 +538,7 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void subStep_Rollout() {
-#pragma omp parallel for schedule(auto)
+//#pragma omp parallel for schedule(auto)
     for (int i=0; i<n_samples; i++) {
       Low_controller_batch_[i]->updateHistory();
       world_batch_[i]->integrate1();
@@ -570,7 +564,7 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void observe_Rollout(Eigen::Ref<EigenRowMajorMat> ob) {
-#pragma omp parallel for schedule(auto)
+//#pragma omp parallel for schedule(auto)
     for (int i=0; i<n_samples; i++) {
     controller_batch_[i]->updateObservation(true,
                                             command_,
@@ -625,6 +619,17 @@ class ENVIRONMENT_ROLLOUT {
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
     controller_0.getState(gc, gv);
+    RSINFO(gc)
+    RSINFO(gv)
+  }
+
+  void getRolloutState(Eigen::Ref<EigenRowMajorMat> gc, Eigen::Ref<EigenRowMajorMat> gv) {
+//#pragma omp parallel for schedule(auto)
+    for (int i = 0; i<n_samples; i++) {
+      controller_batch_[i]->getState(gc.row(i), gv.row(i));
+    }
+    RSINFO(gc)
+    RSINFO(gv)
   }
 
  protected:

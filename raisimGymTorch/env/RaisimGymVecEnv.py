@@ -52,6 +52,10 @@ class RaisimGymVecEnv:
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
 
+
+    def step_rollout(self, action):
+        self.wrapper.step_Rollout(action)
+
     def get_depth_image(self): ## only for one env
         return np.array(self.wrapper.getDepthImage(), dtype=np.float32).reshape(-1, self.height, self.width)
     def get_color_image(self): ## only for one env
@@ -103,6 +107,13 @@ class RaisimGymVecEnv:
 
     def get_state(self, gc, gv):
         self.wrapper.getState(gc, gv)
+
+    def get_rollout_state(self, gc, gv):
+        self.wrapper.getRolloutState(gc, gv)
+
+    def synchronize(self):
+        self.wrapper.synchronize()
+
 
     @property
     def num_envs(self):

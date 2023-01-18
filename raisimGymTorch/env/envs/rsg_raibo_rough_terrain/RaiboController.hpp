@@ -59,8 +59,10 @@ class RaiboController {
  public:
   inline bool create(raisim::World *world, raisim::SingleBodyObject *obj) {
     raibo_ = reinterpret_cast<raisim::ArticulatedSystem *>(world->getObject("robot"));
-    gc_.resize(raibo_->getGeneralizedCoordinateDim());
-    gv_.resize(raibo_->getDOF());
+    gc_.setZero(raibo_->getGeneralizedCoordinateDim());
+    gv_.setZero(raibo_->getDOF());
+//    gc_.resize(raibo_->getGeneralizedCoordinateDim());
+//    gv_.resize(raibo_->getDOF());
     jointVelocity_.resize(nJoints_);
     nominalConfig_.setZero(nJoints_);
     nominalConfig_ << 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672, 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672;
@@ -632,6 +634,7 @@ class RaiboController {
   [[nodiscard]] static constexpr int getActionDim() { return actionDim_; }
   [[nodiscard]] static constexpr double getSimDt() { return simDt_; }
   [[nodiscard]] static constexpr double getConDt() { return conDt_; }
+
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) { gc = gc_.cast<float>(); gv = gv_.cast<float>(); }
   void setState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {raibo_->setState(gc.cast<double>(), gv.cast<double>());}
 

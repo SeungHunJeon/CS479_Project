@@ -87,7 +87,10 @@ class VectorizedEnvironment {
     }
   }
 
-
+  void synchronize() {
+    for (int i = 0; i< num_envs_; i++)
+      environments_[i]->synchronize();
+  }
 
   // resets all environments and returns observation
   void reset() {
@@ -156,6 +159,10 @@ class VectorizedEnvironment {
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
     environments_[0]->getState(gc, gv);
+  }
+
+  void getRolloutState(Eigen::Ref<EigenRowMajorMat> gc, Eigen::Ref<EigenRowMajorMat> gv) {
+    environments_[0]->getRolloutState(gc, gv);
   }
 
   void step_Rollout(Eigen::Ref<EigenRowMajorMat> &action) {
@@ -270,7 +277,7 @@ class VectorizedEnvironment {
   inline void perAgentStep_Rollout(int agentId,
                            Eigen::Ref<EigenRowMajorMat> &action,
                            bool visualize) {
-    environments_[agentId]->rollout_step(action.row(agentId), visualize);
+    environments_[agentId]->rollout_step(action, visualize);
   }
 
   inline void perAgentStep(int agentId,

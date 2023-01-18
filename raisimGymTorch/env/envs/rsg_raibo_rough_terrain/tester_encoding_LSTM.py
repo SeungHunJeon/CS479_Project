@@ -161,7 +161,7 @@ else:
         env.curriculum_callback()
 
     for i in range (200):
-        env.curriculum_callback()
+        # env.curriculum_callback()
         env.reset()
         Encoder.architecture.reset()
         Encoder_ROA.architecture.reset()
@@ -169,12 +169,14 @@ else:
             with torch.no_grad():
                 obs = env.observe(False)
 
-                # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
-                obs_ROA, _ = get_obs_ROA(Encoder, obs)
+                latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+                # obs_ROA, _ = get_obs_ROA(Encoder, obs)
 
-                latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
 
-                action_ll, actions_log_prob = actor.sample(latent_ROA)
+
+                # latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+
+                action_ll, actions_log_prob = actor.sample(latent)
 
                 # print(action_ll)
                 env.step_visualize(action_ll)

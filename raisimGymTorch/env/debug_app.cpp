@@ -4,6 +4,7 @@
 //----------------------------//
 
 #include "Environment.hpp"
+#include "Environment_Rollout.hpp"
 #include "VectorizedEnvironment.hpp"
 #include <chrono>
 
@@ -52,6 +53,8 @@ int main(int argc, char *argv[]) {
   }
   config_str.pop_back();
   VectorizedEnvironment<ENVIRONMENT> vecEnv(resourceDir, config_str);
+  VectorizedEnvironment<ENVIRONMENT_ROLLOUT> vecEnvRollout(resourceDir, config_str);
+  vecEnvRollout.init();
   vecEnv.init();
 
   Yaml::Node config;
@@ -69,6 +72,10 @@ int main(int argc, char *argv[]) {
   vecEnv.reset();
   vecEnv.step(action_ref, reward_ref, dones_ref);
   vecEnv.observe(ob_ref);
+
+  vecEnvRollout.reset();
+  vecEnvRollout.step(action_ref, reward_ref, dones_ref);
+  vecEnvRollout.observe(ob_ref);
 
   vecEnv.reset();
   vecEnv.step(action_ref, reward_ref, dones_ref);

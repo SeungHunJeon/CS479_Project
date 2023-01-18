@@ -4,6 +4,7 @@ import numpy as np
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin import rsg_raibo_rough_terrain
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import NormalSampler
+from raisimGymTorch.env.bin import rsg_raibo_rough_terrain
 from raisimGymTorch.env.RaisimGymVecEnv import RaisimGymVecEnv as VecEnv
 import raisimGymTorch.algo.ppo.module as ppo_module
 import os
@@ -221,6 +222,23 @@ else:
 
                 # print(action_ll)
                 env.step_visualize(action_ll)
+                # gc = np.array([1]*19, dtype=np.float32)
+                # gv = np.array([1]*18, dtype=np.float32)
+                # env.get_state(gc, gv)
+                # env.synchronize()
+                # print(gc)
+                # print(gv)
+                # gc_batch = np.ones((300,19), dtype=np.float32)
+                # gv_batch = np.ones((300,18), dtype=np.float32)
+                # env.get_rollout_state(gc_batch, gv_batch)
+                # print(gc_batch)
+                # print(gv_batch)
+
+                # TODO add MPPI here
+                '''
+                action_traj = MPPI(state, e, o)
+                '''
+
 
     env.turn_off_visualization()
     env.reset()
