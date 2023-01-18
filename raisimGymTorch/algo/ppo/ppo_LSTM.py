@@ -354,7 +354,9 @@ class PPO:
 
                 obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent)
 
-                estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
+                # estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
+
+                estimator_input = self.encode(obs_batch[-1, ...]).reshape(-1, self.encoder.architecture.hidden_dim)
 
                 estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
 

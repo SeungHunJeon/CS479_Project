@@ -15,6 +15,7 @@ raisimGymTorch/env/data/*
 id_rsa
 */data/*
 raisimGymTorch/env/bin/rsg*
+raisimGymTorch/env/bin/*
 data/*
 raisimGymTorch/.idea/
 */default_controller_demo/src/*
