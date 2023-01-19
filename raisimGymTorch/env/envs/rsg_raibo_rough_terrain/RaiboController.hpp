@@ -240,6 +240,10 @@ class RaiboController {
 
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
     Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+
+    if(obj_to_target.head(2).norm() < 0.08)
+      is_success_ = true;
+
     Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
     ee_to_obj(2) = 0;
     obj_to_target(2) = 0;
@@ -432,6 +436,7 @@ class RaiboController {
     command_Obj_Pos_ = command_obj_pos_;
     obj_geometry_ = obj_geometry;
 
+    is_success_ = false;
     is_achieved = true;
     friction_ = friction;
     // history
@@ -635,6 +640,10 @@ class RaiboController {
   [[nodiscard]] static constexpr double getSimDt() { return simDt_; }
   [[nodiscard]] static constexpr double getConDt() { return conDt_; }
 
+  bool is_success() {
+    return is_success_;
+  }
+
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) { gc = gc_.cast<float>(); gv = gv_.cast<float>(); }
   void setState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {raibo_->setState(gc.cast<double>(), gv.cast<double>());}
 
@@ -722,6 +731,9 @@ class RaiboController {
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector3d obj_geometry_;
   Eigen::VectorXd classify_vector_;
+
+  // For testing
+  bool is_success_ = false;
 
 
   // reward variables

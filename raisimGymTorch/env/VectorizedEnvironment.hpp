@@ -157,6 +157,13 @@ class VectorizedEnvironment {
     return sample_size;
   }
 
+  void getSuccess(Eigen::Ref<EigenBoolVec> &success) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i< num_envs_; i++) {
+      success[i] = environments_[i]->check_success();
+    }
+  }
+
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
     environments_[0]->getState(gc, gv);
   }
@@ -184,6 +191,18 @@ class VectorizedEnvironment {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       perAgentStep(i, action, reward, done, true);
+  }
+
+  void step_visualize_success(Eigen::Ref<EigenRowMajorMat> &action,
+                              Eigen::Ref<EigenVec> &reward,
+                              Eigen::Ref<EigenBoolVec> &done,
+                              Eigen::Ref<EigenBoolVec> &success) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i< num_envs_; i++)
+    {
+      if(success[i] == false)
+        perAgentStep(i, action, reward, done, true);
+    }
   }
 
   std::vector<std::vector<float>> getDepthImage() {

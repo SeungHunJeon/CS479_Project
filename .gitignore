@@ -17,6 +17,7 @@ id_rsa
 raisimGymTorch/env/bin/rsg*
 raisimGymTorch/env/bin/*
 data/*
+*/cfg.yaml
 raisimGymTorch/.idea/
 */default_controller_demo/src/*
 wandb/

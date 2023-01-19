@@ -1,6 +1,7 @@
 record_video: no
 seed: 2
-
+task_name: "Random_Object_encod_LSTM_dyn"
+name: "Estimating from Encoder"
 environment:
   Rollout: False
   discrete_action: False

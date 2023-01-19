@@ -23,6 +23,7 @@ class RaisimGymVecEnv:
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
+        self._success = np.zeros(self.num_envs, dtype=np.bool)
         self.rewards = [[] for _ in range(self.num_envs)]
         self.wrapper.setSeed(seed)
         self.count = 0.0
@@ -52,6 +53,9 @@ class RaisimGymVecEnv:
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
 
+    def step_visualize_success(self, action, success):
+        self.wrapper.step_visualize_success(action, self._reward, self._done, self._success)
+        return self._reward.copy(), self._done.copy()
 
     def step_rollout(self, action):
         self.wrapper.step_Rollout(action)
@@ -101,6 +105,11 @@ class RaisimGymVecEnv:
 
     def get_step_data_tag(self):
         return self.wrapper.getStepDataTag()
+
+    def get_success_state(self):
+        self.wrapper.getSuccess(self._success)
+
+        return self._success
 
     def get_step_data(self, data_size, data_mean, data_var, data_min, data_max):
         return self.wrapper.getStepData(data_size, data_mean, data_var, data_min, data_max)

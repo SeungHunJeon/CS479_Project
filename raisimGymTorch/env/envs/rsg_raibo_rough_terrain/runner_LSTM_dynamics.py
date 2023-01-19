@@ -1,5 +1,5 @@
 # task specification
-task_name = "Random_Object_encod_LSTM_dyn"
+
 
 from ruamel.yaml import YAML, dump, RoundTripDumper
 from raisimGymTorch.env.bin.rsg_raibo_rough_terrain import RaisimGymRaiboRoughTerrain
@@ -50,6 +50,9 @@ if mode == 'retrain':
 env = VecEnv(RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 
+# wandb name
+name = cfg['name']
+task_name = cfg['task_name']
 
 # Encoding
 historyNum = cfg['environment']['dimension']['historyNum_']
@@ -166,7 +169,7 @@ ppo = PPO.PPO(actor=actor,
 
 iteration_number = 0
 
-wandb.init(group="jsh",project=task_name,name='entropy'+str(entropy_coeff_))
+wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)

@@ -381,6 +381,10 @@ class ENVIRONMENT {
   }
 
   void subStep() {
+    if(controller_.is_success()) {
+      Obj_->setAppearance("0, 0, 1, 0.7");
+    }
+
     Low_controller_.updateHistory();
 
 
@@ -419,6 +423,11 @@ class ENVIRONMENT {
     Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
     controller_.updateClassifyvector(temp);
   }
+
+  bool check_success() {
+    return controller_.is_success();
+  }
+
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
     controllerSphere_->setPosition(pos[0], pos[1], heightMap_->getHeight(pos[0], pos[1]));

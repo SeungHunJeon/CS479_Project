@@ -120,7 +120,7 @@ else:
     print("Loaded weight from {}\n".format(weight_path))
 
     n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
-    total_steps = n_steps * 1
+    total_steps = n_steps * 3
     start_step_id = 0
 
     print("Visualizing and evaluating the policy: ", weight_path)
@@ -202,7 +202,9 @@ else:
     for i in range (int(int(iteration_number) / 100)):
         env.curriculum_callback()
 
-    for i in range (200):
+    success_batch = []
+
+    for i in range (100):
         env.curriculum_callback()
         env.reset()
         Encoder.architecture.reset()
@@ -220,8 +222,9 @@ else:
 
                 action_ll, actions_log_prob = actor.sample(latent_ROA)
 
+                success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                 # print(action_ll)
-                env.step_visualize(action_ll)
+                env.step_visualize_success(action_ll, success)
                 # gc = np.array([1]*19, dtype=np.float32)
                 # gv = np.array([1]*18, dtype=np.float32)
                 # env.get_state(gc, gv)
@@ -233,11 +236,18 @@ else:
                 # env.get_rollout_state(gc_batch, gv_batch)
                 # print(gc_batch)
                 # print(gv_batch)
-
+                # success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                 # TODO add MPPI here
                 '''
                 action_traj = MPPI(state, e, o)
                 '''
+        success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
+        # success_sum = torch.sum(success, dim=0) / success.shape(0)
+        # print(success_sum)
+        success_batch.append(success)
+    success_batch = torch.cat(success_batch, dim=0)
+    print(torch.sum(success_batch, dim=0))
+
 
 
     env.turn_off_visualization()
