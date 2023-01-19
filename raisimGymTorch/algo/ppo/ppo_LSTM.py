@@ -180,12 +180,20 @@ class PPO:
 
         obj_f_dynamics_obs = []
 
+        # obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim
+        #                                   - self.encoder.architecture.dyn_dim
+        #                                   - self.encoder.architecture.act_dim:
+        #                                   self.encoder.architecture.block_dim]
+
         obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim
                                           - self.encoder.architecture.dyn_dim
                                           - self.encoder.architecture.act_dim:
-                                          self.encoder.architecture.block_dim]
+                                          self.encoder.architecture.block_dim
+                                          - self.encoder.architecture.dyn_dim]
 
-        obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.dyn_dim + self.encoder.architecture.act_dim)
+        # obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.dyn_dim + self.encoder.architecture.act_dim)
+
+        obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.act_dim)
 
         obj_f_dynamics_obs.append(obs_batch_f)
 
@@ -199,9 +207,12 @@ class PPO:
 
         obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
 
-        obj_f_dynamics_true = obs_batch[1:, :, self.encoder.architecture.block_dim
+        obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim
                                                - self.encoder.architecture.dyn_dim:
-                                               self.encoder.architecture.block_dim].clone().detach()
+                                               self.encoder.architecture.block_dim]
+            - obs_batch[:-1, :, self.encoder.architecture.block_dim
+                               - self.encoder.architecture.dyn_dim:
+                               self.encoder.architecture.block_dim]).clone().detach()
 
         obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_dim)
 

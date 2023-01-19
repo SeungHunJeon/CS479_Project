@@ -90,7 +90,7 @@ obs_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obs_f_
                                                      pro_dim + ROA_ext_dim),
                                       device=device)
 
-obj_f_dynamics_input_dim = dynamics_dim + hidden_dim + act_dim
+obj_f_dynamics_input_dim = hidden_dim + act_dim
 
 obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
                                                      nn.LeakyReLU,
@@ -169,7 +169,7 @@ ppo = PPO.PPO(actor=actor,
 
 iteration_number = 0
 
-wandb.init(group="jsh",project=task_name,name=name)
+# wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
