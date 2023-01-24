@@ -133,7 +133,7 @@ else:
                                                          pro_dim + ROA_ext_dim),
                                           device=device)
 
-    obj_f_dynamics_input_dim = dynamics_dim + hidden_dim + act_dim
+    obj_f_dynamics_input_dim = hidden_dim + act_dim
 
     obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
                                                          nn.LeakyReLU,

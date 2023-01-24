@@ -8,7 +8,6 @@
 #include "unsupported/Eigen/MatrixFunctions"
 #include "raisim/RaisimServer.hpp"
 
-
 Eigen::Matrix3d hat(const Eigen::Vector3d R3) {
   Eigen::Matrix3d so3;
   so3 << 0, -R3(2), R3(1),
@@ -181,6 +180,7 @@ class RaiboController {
     classify_vector_ << 1, 0, 0, 0;
     pre_command_.setZero();
 
+    success_batch_.resize(success_batch_num_);
 
 
     return true;
@@ -205,8 +205,10 @@ class RaiboController {
     dynamicsInfoHistory_[historyNum_ - 1] = dynamics_Info_;
 
   }
-
+  /// Simdt
   void updateStateVariables() {
+    is_success_ = false;
+
     raibo_->getState(gc_, gv_);
     jointVelocity_ = gv_.tail(nJoints_);
 
@@ -241,8 +243,11 @@ class RaiboController {
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
     Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
 
-    if(obj_to_target.head(2).norm() < 0.08)
+    if(obj_to_target.head(2).norm() < 0.05)
       is_success_ = true;
+
+    std::rotate(success_batch_.begin(), success_batch_.begin()+1, success_batch_.end());
+    success_batch_[success_batch_num_ - 1] = is_success_;
 
     Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
     ee_to_obj(2) = 0;
@@ -453,6 +458,8 @@ class RaiboController {
       for (int j=0; j < actionDim_; j++)
         actionInfoHistory_[i](j) = normDist_(gen_) * 0.1;
 
+    std::fill(success_batch_.begin(), success_batch_.end(), false);
+
   }
 
   [[nodiscard]] float getRewardSum(bool visualize) {
@@ -478,19 +485,22 @@ class RaiboController {
   [[nodiscard]] bool isTerminalState(float &terminalReward) {
     terminalReward = float(terminalRewardCoeff_);
 
-    /// if the contact body is not feet
-    for (auto &contact: raibo_->getContacts())
-    {
-      if (contact.getlocalBodyIndex() == armIndices_.front())
-      {
-        continue;
-      }
+    if(std::find(success_batch_.begin(), success_batch_.end(), false) == success_batch_.end())
+      return true;
 
-//      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end() || contact.isSelfCollision())
-      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end())
-        return true;
-
-    }
+//    /// if the contact body is not feet
+//    for (auto &contact: raibo_->getContacts())
+//    {
+//      if (contact.getlocalBodyIndex() == armIndices_.front())
+//      {
+//        continue;
+//      }
+//
+////      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end() || contact.isSelfCollision())
+//      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end())
+//        return true;
+//
+//    }
 
 
 
@@ -704,6 +714,8 @@ class RaiboController {
   double desired_dist_;
   bool is_achieved = true;
   bool is_discrete_ = false;
+  const int success_batch_num_ = 50;
+  std::vector<bool> success_batch_;
   double dist_temp_;
   double friction_ = 1.1;
 

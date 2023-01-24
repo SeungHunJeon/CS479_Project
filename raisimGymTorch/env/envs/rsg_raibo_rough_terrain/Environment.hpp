@@ -62,7 +62,7 @@ class ENVIRONMENT {
 
     /// Object spawn
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, 3.0, 0.5, 0.55, 1.0, 1.0);
+                                           normDist_, bound_ratio, obj_mass, 0.5, 0.55, 1.0, 1.0);
 
     object_height = objectGenerator_.get_height();
     Obj_->setPosition(2, 2, object_height/2);
@@ -266,7 +266,7 @@ class ENVIRONMENT {
 
     world_.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, 3.0, 0.5, 0.55, 1.0, 1.0);
+                                           normDist_, bound_ratio, obj_mass, 0.5, 0.55, 1.0, 1.0);
     Obj_->setAppearance("0, 1, 0, 0.3");
     controller_.updateObject(Obj_);
     object_height = objectGenerator_.get_height();
@@ -405,7 +405,7 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float& terminalReward) {
-//    return controller_.isTerminalState(terminalReward);
+    return controller_.isTerminalState(terminalReward);
     return false;
   }
 
@@ -447,6 +447,7 @@ class ENVIRONMENT {
   }
 
  protected:
+  const double obj_mass = 2.0;
   double friction = 1.1;
   static constexpr int nJoints_ = 12;
   raisim::World world_;

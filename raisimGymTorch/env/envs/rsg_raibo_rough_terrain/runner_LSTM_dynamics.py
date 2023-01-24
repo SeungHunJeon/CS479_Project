@@ -169,7 +169,7 @@ ppo = PPO.PPO(actor=actor,
 
 iteration_number = 0
 
-# wandb.init(group="jsh",project=task_name,name=name)
+wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
