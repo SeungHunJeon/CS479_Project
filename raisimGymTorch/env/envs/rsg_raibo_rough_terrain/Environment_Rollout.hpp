@@ -34,15 +34,17 @@ class ENVIRONMENT_ROLLOUT {
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
     READ_YAML(bool, is_discrete_, cfg["discrete_action"])
     READ_YAML(int, n_samples, cfg["nSamples_"])
+    READ_YAML(int, historyNum_, cfg["dimension"]["historyNum_"])
+    READ_YAML(int, nHorizon_, cfg["nHorizon_"])
 
     if(is_discrete_) {
       READ_YAML(int, radial_, cfg["discrete"]["radial"])
       READ_YAML(int, tangential_, cfg["discrete"]["tangential"])
     }
 
-    world_batch_.reserve(n_samples);
-    controller_batch_.reserve(n_samples);
-    Low_controller_batch_.reserve(n_samples);
+    world_batch_.resize(n_samples);
+    controller_batch_.resize(n_samples);
+    Low_controller_batch_.resize(n_samples);
 
     /// set curriculum
     simulation_dt_ = RaiboController::getSimDt();
@@ -91,6 +93,17 @@ class ENVIRONMENT_ROLLOUT {
     gc_init_from_ = gc_init_;
     raibo_0->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
+    obj_info_history.resize(historyNum_);
+    state_info_history.resize(historyNum_);
+    action_info_history.resize(historyNum_);
+    dynamics_info_history.resize(historyNum_);
+    predict_Obj_batch_.resize(nHorizon_);
+
+    joint_position_history.setZero(nJoints_ * 14);
+    joint_velocity_history.setZero(nJoints_ * 14);
+    prevAction.setZero(nJoints_);
+    prevprevAction.setZero(nJoints_);
+
     // Reward coefficients
     controller_0.setRewardConfig(cfg);
     command_Obj_Pos_ << 2, 2, command_object_height_/2;
@@ -98,10 +111,11 @@ class ENVIRONMENT_ROLLOUT {
     Low_controller_0.create(&world_0);
     Low_controller_0.init(&world_0);
 
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i<n_samples; i++) {
-      raisim::World *world;
-      RaiboController *controller;
-      controller::raibotPositionController *low_controller;
+      raisim::World *world = new raisim::World;
+      RaiboController *controller = new RaiboController;
+      controller::raibotPositionController *low_controller = new controller::raibotPositionController;
 
       world->addGround(0.0, "ground");
       world->setDefaultMaterial(1.1, 0.0, 0.01);
@@ -114,13 +128,10 @@ class ENVIRONMENT_ROLLOUT {
       raibo->getCollisionBody("arm_link/0").setCollisionMask(raisim::COLLISION(1));
 
       /// Object spawn
-      auto Obj = objectGenerator_.generateObject(world, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                             normDist_, bound_ratio, obj_mass_, 0.5, 0.55, 1.0, 1.0);
-
+      auto Obj = objectGenerator_.generateObject(world, obj_mass_, i);
       object_height = objectGenerator_.get_height();
       Obj->setPosition(2, 2, object_height/2);
       Obj->setOrientation(1, 0, 0, 0);
-
       /// create controller
       controller->create(world, Obj);
 
@@ -132,7 +143,6 @@ class ENVIRONMENT_ROLLOUT {
 
       *low_controller = Low_controller_0;
       low_controller->init(world);
-
 
       world_batch_[i] = world;
       controller_batch_[i] = controller;
@@ -147,6 +157,11 @@ class ENVIRONMENT_ROLLOUT {
       server_->focusOn(raibo_0);
       std::cout << "Launch Server !!" << std::endl;
       command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, command_object_height_, 1, 0, 0, 0.5);
+#pragma omp parallel for schedule(auto)
+      for (int i = 0; i<nHorizon_; i++) {
+        auto Obj = server_->addVisualSphere("Predict_Obj_" + std::to_string(i), 0.2, 0.4, 0.4, 0.8, 0.6);
+        predict_Obj_batch_[i] = Obj;
+      }
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
       command_ball_ = server_->addVisualSphere("command_Ball", 0.1, 0, 1, 0, 1.0);
@@ -185,7 +200,7 @@ class ENVIRONMENT_ROLLOUT {
   { controller_0.setSimDt(dt);
     Low_controller_0.setSimDt(dt);
     world_0.setTimeStep(dt);
-
+#pragma omp parallel for schedule(auto)
     for(int i = 0; i<n_samples; i++) {
       world_batch_[i]->setTimeStep(dt);
       controller_batch_[i]->setSimDt(dt);
@@ -196,7 +211,7 @@ class ENVIRONMENT_ROLLOUT {
   void setControlTimeStep(double dt, double low_dt) {
     controller_0.setConDt(dt);
     Low_controller_0.setConDt(low_dt);
-
+#pragma omp parallel for schedule(auto)
     for(int i = 0; i<n_samples; i++) {
       controller_batch_[i]->setConDt(dt);
       Low_controller_batch_[i]->setConDt(low_dt);
@@ -212,11 +227,11 @@ class ENVIRONMENT_ROLLOUT {
 
 
   void hard_reset_Rollout() {
-//#pragma omp parallel for schedule(auto)
+#pragma omp parallel for schedule(auto)
     for(int i=0; i<n_samples; i++) {
-      world_batch_[i]->setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
-      reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("object"))->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
-      reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("object"))->setLinearDamping(0.6*friction/1.1);
+      auto obj = reinterpret_cast<SingleBodyObject *> (world_batch_[i]->getObject("Object"));
+      obj->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
+      obj->setLinearDamping(0.6*friction/1.1);
     }
   }
 
@@ -234,13 +249,14 @@ class ENVIRONMENT_ROLLOUT {
     if(curriculumFactor_ > 0.4)
       hard_reset_Rollout();
     /// set the state
-//#pragma omp parallel for schedule(auto)
+#pragma omp parallel for schedule(auto)
     for (int i =0; i< n_samples; i++) {
-      auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("object"));
+      auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
       objectGenerator_.Inertial_Randomize(obj);
       auto raibo = reinterpret_cast<ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
       raibo->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-      controller_batch_[i]->reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+      controller_batch_[i]->reset_Rollout(command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+//      controller_batch_[i]->reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
       Low_controller_batch_[i]->reset(world_batch_[i]);
       controller_batch_[i]->updateStateVariables();
       Low_controller_batch_[i]->updateStateVariable();
@@ -260,12 +276,13 @@ class ENVIRONMENT_ROLLOUT {
     controller_0.updateStateVariables();
     Low_controller_0.updateStateVariable();
 
-//    reset_Rollout();
+    reset_Rollout();
+    synchronize();
   }
 
 
   void rollout_step(Eigen::Ref<EigenRowMajorMat> &action, bool b) {
-//#pragma omp parallel for schedule(auto)
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i<n_samples; i++) {
       Eigen::Vector3f command;
 
@@ -291,20 +308,18 @@ class ENVIRONMENT_ROLLOUT {
         /// Simulation frequency
         for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
-          subStep_Rollout();
+          subStep_Rollout(i);
 //          if(visualize)
 //          std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-            if(isTerminalState(dummy)) {
-              howManySteps++;
-              break;
-            }
+//            if(isTerminalState(dummy)) {
+//              howManySteps++;
+//              break;
+//            }
         }
       }
     }
   }
-
-
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
@@ -362,10 +377,11 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void updateObstacle_Rollout(bool curriculum_Update = false) {
-//#pragma omp parallel for schedule(auto)
+#pragma omp parallel for schedule(auto)
     for (int i=0; i<n_samples; i++) {
-      world_batch_[i]->removeObject(world_batch_[i]->getObject("object"));
-      auto Obj = objectGenerator_.generateObject(world_batch_[i], obj_mass_);
+      world_batch_[i]->removeObject(world_batch_[i]->getObject("Object"));
+      auto Obj = objectGenerator_.generateObject(world_batch_[i], obj_mass_, i);
+      controller_batch_[i]->updateObject(Obj);
     }
   }
 
@@ -415,29 +431,16 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void synchronize() {
-    /// For Controller History
-    std::vector<Eigen::VectorXd> obj_info_history;
-    std::vector<Eigen::VectorXd> state_info_history;
-    std::vector<Eigen::VectorXd> action_info_history;
-    std::vector<Eigen::VectorXd> dynamics_info_history;
 
-    /// For Low Controller History
-    Eigen::VectorXd joint_position_history;
-    Eigen::VectorXd joint_velocity_history;
-    Eigen::VectorXd prevAction;
-    Eigen::VectorXd prevprevAction;
 
-    /// For Object Info
-    Eigen::Vector3d pos;
-    Eigen::Matrix3d Rot;
-    Eigen::Vector3d lin_vel;
-    Eigen::Vector3d ang_vel;
-    Eigen::Matrix3d inertia;
-    Eigen::Vector3d com;
+
+
 
     /// For Robot info
-    Eigen::VectorXf gc;
-    Eigen::VectorXf gv;
+    Eigen::VectorXf gc(raibo_0->getGeneralizedCoordinateDim());
+    Eigen::VectorXf gv(raibo_0->getDOF());
+
+
 
     get_Controller_History(obj_info_history,
                            state_info_history,
@@ -458,28 +461,50 @@ class ENVIRONMENT_ROLLOUT {
     get_robot_info_(gc,
                     gv);
 
-//#pragma omp parallel for schedule(auto)
+    Eigen::VectorXd gc_double = gc.cast<double>();
+    Eigen::VectorXd gv_double = gv.cast<double>();
+#pragma omp parallel for schedule(auto)
     for (int i=0; i<n_samples; i++) {
       controller_batch_[i]->set_History(obj_info_history,
                                         state_info_history,
                                         action_info_history,
                                         dynamics_info_history);
-
       Low_controller_batch_[i]->setJointPositionHistory(joint_position_history);
       Low_controller_batch_[i]->setJointVelocityHistory(joint_velocity_history);
       Low_controller_batch_[i]->setPrevAction(prevAction);
       Low_controller_batch_[i]->setPrevPrevAction(prevprevAction);
 
-      controller_batch_[i]->setState(gc, gv);
-      auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("object"));
+      auto raibo = reinterpret_cast<raisim::ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
+      raibo->setState(gc_double, gv_double);
+
+      auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
       obj->setPosition(pos);
       obj->setOrientation(Rot);
       obj->setLinearVelocity(lin_vel);
       obj->setAngularVelocity(ang_vel);
+
+      controller_batch_[i]->updateStateVariables();
+      Low_controller_batch_[i]->updateStateVariable();
     }
 
 
 
+  }
+
+  void predict_obj_update(Eigen::Ref<EigenRowMajorMat> &predict_state_batch) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i<nHorizon_; i++) {
+      predict_Obj_batch_[i]->setPosition(predict_state_batch.row(i).cast<double>());
+    }
+
+  }
+
+  void get_obj_pos(Eigen::Ref<EigenRowMajorMat> &obj_pos) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i<n_samples; i++) {
+      auto Obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
+      obj_pos.row(i) = Obj->getPosition().cast<float>();
+    }
   }
 
 
@@ -522,13 +547,13 @@ class ENVIRONMENT_ROLLOUT {
 
   void get_obj_info_(Eigen::Vector3d &pos,
                      Eigen::Matrix3d &Rot,
-                     Eigen::Vector3d &lin_vel,
-                     Eigen::Vector3d &ang_vel
+                     raisim::Vec<3> &lin_vel,
+                     raisim::Vec<3> &ang_vel
                      ) {
     pos = Obj_->getPosition();
     Rot = Obj_->getOrientation().e();
-    lin_vel = Obj_->getLinearVelocity();
-    ang_vel = Obj_->getAngularVelocity();
+    Obj_->getLinearVelocity(lin_vel);
+    Obj_->getAngularVelocity(ang_vel);
   }
 
   void get_robot_info_(Eigen::Ref<EigenVec> gc,
@@ -537,16 +562,26 @@ class ENVIRONMENT_ROLLOUT {
 
   }
 
-  void subStep_Rollout() {
+  Eigen::VectorXd get_target_pos() {
+    return command_Obj_Pos_;
+  }
+
+  void subStep_Rollout(int idx) {
 //#pragma omp parallel for schedule(auto)
-    for (int i=0; i<n_samples; i++) {
-      Low_controller_batch_[i]->updateHistory();
-      world_batch_[i]->integrate1();
-      world_batch_[i]->integrate2();
-      Low_controller_batch_[i]->updateStateVariable();
-      controller_batch_[i]->updateStateVariables();
-      controller_batch_[i]->accumulateRewards(curriculumFactor_, command_);
-    }
+    Low_controller_batch_[idx]->updateHistory();
+    world_batch_[idx]->integrate1();
+    world_batch_[idx]->integrate2();
+    Low_controller_batch_[idx]->updateStateVariable();
+    controller_batch_[idx]->updateStateVariables();
+    controller_batch_[idx]->accumulateRewards(curriculumFactor_, command_);
+//    for (int i=0; i<n_samples; i++) {
+//      Low_controller_batch_[i]->updateHistory();
+//      world_batch_[i]->integrate1();
+//      world_batch_[i]->integrate2();
+//      Low_controller_batch_[i]->updateStateVariable();
+//      controller_batch_[i]->updateStateVariables();
+//      controller_batch_[i]->accumulateRewards(curriculumFactor_, command_);
+//    }
   }
 
   void subStep() {
@@ -563,16 +598,18 @@ class ENVIRONMENT_ROLLOUT {
 
   }
 
-  void observe_Rollout(Eigen::Ref<EigenRowMajorMat> ob) {
-//#pragma omp parallel for schedule(auto)
+  void observe_Rollout(Eigen::Ref<EigenRowMajorMat> &ob) {
+#pragma omp parallel for schedule(auto)
     for (int i=0; i<n_samples; i++) {
-    controller_batch_[i]->updateObservation(true,
-                                            command_,
-                                            heightMap_,
-                                            gen_,
-                                            normDist_);
-    controller_batch_[i]->getObservation(obScaled_);
-    ob.row(i) = obScaled_.cast<float>();
+      Eigen::VectorXd Observation;
+      controller_batch_[i]->updateObservation(true,
+                                              command_,
+                                              heightMap_,
+                                              gen_,
+                                              normDist_);
+
+      controller_batch_[i]->getObservation(Observation);
+      ob.row(i) = Observation.cast<float>();
     }
   }
 
@@ -594,12 +631,13 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void curriculumUpdate() {
-    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
+//    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
     curriculumFactor_ = std::pow(curriculumFactor_, curriculumDecayFactor_);
     /// create heightmap
     updateObstacle(true);
     Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
     controller_0.updateClassifyvector(temp);
+#pragma omp parallel for schedule(auto)
     for(int i = 0; i<n_samples; i++) {
       controller_batch_[i]->updateClassifyvector(temp);
     }
@@ -619,17 +657,13 @@ class ENVIRONMENT_ROLLOUT {
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
     controller_0.getState(gc, gv);
-    RSINFO(gc)
-    RSINFO(gv)
   }
 
-  void getRolloutState(Eigen::Ref<EigenRowMajorMat> gc, Eigen::Ref<EigenRowMajorMat> gv) {
-//#pragma omp parallel for schedule(auto)
+  void getState_Rollout(Eigen::Ref<EigenRowMajorMat> gc, Eigen::Ref<EigenRowMajorMat> gv) {
+#pragma omp parallel for schedule(auto)
     for (int i = 0; i<n_samples; i++) {
       controller_batch_[i]->getState(gc.row(i), gv.row(i));
     }
-    RSINFO(gc)
-    RSINFO(gv)
   }
 
  protected:
@@ -653,7 +687,7 @@ class ENVIRONMENT_ROLLOUT {
   Eigen::Vector3d command_;
   bool visualizable_ = false;
   bool is_discrete_ = false;
-  int object_type = 0;
+  int object_type = 2;
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_0;
   ArticulatedSystem * raibo_0;
@@ -664,10 +698,11 @@ class ENVIRONMENT_ROLLOUT {
   RandomObjectGenerator objectGenerator_;
   raisim::RGBCamera* rgbCameras[1];
   raisim::DepthCamera* depthCameras[1];
-
+  int historyNum_;
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
   raisim::SingleBodyObject *Obj_, *Manipulate_;
+  std::vector<raisim::Visuals *> predict_Obj_batch_;
   raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_, *command_ball_, *com_pos_, *com_noisify_;
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
@@ -679,6 +714,28 @@ class ENVIRONMENT_ROLLOUT {
   double object_radius;
   int radial_ = 0;
   int tangential_ = 0;
+  int nHorizon_ = 0;
+
+  /// For Controller History
+  std::vector<Eigen::VectorXd> obj_info_history;
+  std::vector<Eigen::VectorXd> state_info_history;
+  std::vector<Eigen::VectorXd> action_info_history;
+  std::vector<Eigen::VectorXd> dynamics_info_history;
+
+  /// For Low Controller History
+  Eigen::VectorXd joint_position_history;
+  Eigen::VectorXd joint_velocity_history;
+  Eigen::VectorXd prevAction;
+  Eigen::VectorXd prevprevAction;
+
+  /// For Object Info
+  Eigen::Vector3d pos;
+  Eigen::Matrix3d Rot;
+  raisim::Vec<3> lin_vel = {0, 0, 0};
+  raisim::Vec<3> ang_vel = {0, 0, 0};
+  Eigen::Matrix3d inertia;
+  Eigen::Vector3d com;
+
 
   thread_local static std::mt19937 gen_;
   thread_local static std::normal_distribution<double> normDist_;

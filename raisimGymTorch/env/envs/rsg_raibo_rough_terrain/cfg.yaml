@@ -3,7 +3,7 @@ seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
 name: "Test"
 environment:
-  Rollout: False
+  Rollout: True
   discrete_action: False
   seed: 2
   render: True
@@ -16,6 +16,7 @@ environment:
   max_time: 15.0
   entropy_coeff: 1e-2
   nSamples_: 300
+  nHorizon_: 10
   discrete:
     radial: 1
     tangential: 72
@@ -47,8 +48,9 @@ environment:
 
 MPPI:
   nSamples_: 300
-  nHorizon_: 20
+  nHorizon_: 10
   gamma_: 1e-1
+  use_dynamics_: False
 
 encoder:
   proprioceptivelatentDim_: 16
@@ -70,6 +72,7 @@ architecture:
     pro_encoder_net: [128, 64] # 9 x 4
     ext_encoder_net: [256, 128, 64] # 25 x 4
     act_encoder_net: [32, 32] # 2 x 4
+    module_dim: 32
 
   estimator:
     net: [64, 64]

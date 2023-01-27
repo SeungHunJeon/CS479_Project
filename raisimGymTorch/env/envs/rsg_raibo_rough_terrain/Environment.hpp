@@ -405,7 +405,7 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float& terminalReward) {
-    return controller_.isTerminalState(terminalReward);
+//    return controller_.isTerminalState(terminalReward);
     return false;
   }
 

@@ -52,54 +52,95 @@ int main(int argc, char *argv[]) {
       break;
   }
   config_str.pop_back();
-  VectorizedEnvironment<ENVIRONMENT> vecEnv(resourceDir, config_str);
-  VectorizedEnvironment<ENVIRONMENT_ROLLOUT> vecEnvRollout(resourceDir, config_str);
-  vecEnvRollout.init();
-  vecEnv.init();
+
+
 
   Yaml::Node config;
   Yaml::Parse(config, config_str);
 
-  EigenRowMajorMat observation(config["num_envs"].template As<int>(), vecEnv.getObDim());
-  EigenRowMajorMat action(config["num_envs"].template As<int>(), vecEnv.getActionDim());
-  EigenVec reward(config["num_envs"].template As<int>(), 1);
-  EigenBoolVec dones(config["num_envs"].template As<int>(), 1);
-  action.setZero();
+  bool isRollout = config["Rollout"].template As<bool>();
+  if(isRollout)
+  {
+    VectorizedEnvironment<ENVIRONMENT_ROLLOUT> vecEnvRollout(resourceDir, config_str);
+    vecEnvRollout.init();
 
-  Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
-  Eigen::Ref<EigenVec> reward_ref(reward);
-  Eigen::Ref<EigenBoolVec> dones_ref(dones);
-  vecEnv.reset();
-  vecEnv.step(action_ref, reward_ref, dones_ref);
-  vecEnv.observe(ob_ref);
+    EigenRowMajorMat observation(config["num_envs"].template As<int>(), vecEnvRollout.getObDim());
+    EigenRowMajorMat action(config["num_envs"].template As<int>(), vecEnvRollout.getActionDim());
+    EigenVec reward(config["num_envs"].template As<int>(), 1);
+    EigenBoolVec dones(config["num_envs"].template As<int>(), 1);
+    action.setZero();
 
-  vecEnvRollout.reset();
-  vecEnvRollout.step(action_ref, reward_ref, dones_ref);
-  vecEnvRollout.observe(ob_ref);
+    Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
+    Eigen::Ref<EigenVec> reward_ref(reward);
+    Eigen::Ref<EigenBoolVec> dones_ref(dones);
 
-  vecEnv.reset();
-  vecEnv.step(action_ref, reward_ref, dones_ref);
-  vecEnv.observe(ob_ref);
+    vecEnvRollout.reset();
+    vecEnvRollout.step(action_ref, reward_ref, dones_ref);
+    vecEnvRollout.observe(ob_ref);
 
-  vecEnv.curriculumUpdate();
-  vecEnv.reset();
-  vecEnv.step(action_ref, reward_ref, dones_ref);
-  vecEnv.observe(ob_ref);
+    vecEnvRollout.reset();
+    vecEnvRollout.step(action_ref, reward_ref, dones_ref);
+    vecEnvRollout.observe(ob_ref);
 
-  vecEnv.curriculumUpdate();
-  vecEnv.reset();
-  vecEnv.step(action_ref, reward_ref, dones_ref);
-  vecEnv.observe(ob_ref);
+    vecEnvRollout.curriculumUpdate();
+    vecEnvRollout.reset();
+    vecEnvRollout.step(action_ref, reward_ref, dones_ref);
+    vecEnvRollout.observe(ob_ref);
+  }
 
-  vecEnv.curriculumUpdate();
-  vecEnv.reset();
-  vecEnv.step(action_ref, reward_ref, dones_ref);
-  vecEnv.observe(ob_ref);
+  else
+  {
+    VectorizedEnvironment<ENVIRONMENT> vecEnv(resourceDir, config_str);
+    vecEnv.init();
 
-  vecEnv.curriculumUpdate();
-  vecEnv.reset();
-  vecEnv.step(action_ref, reward_ref, dones_ref);
-  vecEnv.observe(ob_ref);
+    EigenRowMajorMat observation(config["num_envs"].template As<int>(), vecEnv.getObDim());
+    EigenRowMajorMat action(config["num_envs"].template As<int>(), vecEnv.getActionDim());
+    EigenVec reward(config["num_envs"].template As<int>(), 1);
+    EigenBoolVec dones(config["num_envs"].template As<int>(), 1);
+    action.setZero();
+
+    Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
+    Eigen::Ref<EigenVec> reward_ref(reward);
+    Eigen::Ref<EigenBoolVec> dones_ref(dones);
+
+    vecEnv.reset();
+    vecEnv.step(action_ref, reward_ref, dones_ref);
+    vecEnv.observe(ob_ref);
+
+    vecEnv.reset();
+    vecEnv.step(action_ref, reward_ref, dones_ref);
+    vecEnv.observe(ob_ref);
+
+    vecEnv.curriculumUpdate();
+    vecEnv.reset();
+    vecEnv.step(action_ref, reward_ref, dones_ref);
+    vecEnv.observe(ob_ref);
+
+    vecEnv.curriculumUpdate();
+    vecEnv.reset();
+    vecEnv.step(action_ref, reward_ref, dones_ref);
+    vecEnv.observe(ob_ref);
+
+    vecEnv.curriculumUpdate();
+    vecEnv.reset();
+    vecEnv.step(action_ref, reward_ref, dones_ref);
+    vecEnv.observe(ob_ref);
+
+    vecEnv.curriculumUpdate();
+    vecEnv.reset();
+    vecEnv.step(action_ref, reward_ref, dones_ref);
+    vecEnv.observe(ob_ref);
+
+  }
+
+
+
+
+
+
+
+
+
 
   return 0;
 }

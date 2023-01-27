@@ -228,25 +228,28 @@ class RandomObjectGenerator {
     width_ratio_2_ = width_ratio_2;
   }
 
-  raisim::SingleBodyObject* generateObject(raisim::World* world, const double &mass)
+  raisim::SingleBodyObject* generateObject(raisim::World* world, const double &mass, int &idx)
   {
     switch (object_shape_) {
       case ObjectShape::BALL:
       {
-//        return world->addSphere(radius_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
-        return world->addSphere(radius_, mass, "object");
+        auto Obj = world->addSphere(radius_, mass, "object");
+        Obj->setName("Object");
+        return Obj;
       }
 
       case ObjectShape::Cylinder:
       {
-//        return world->addCylinder(radius_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
-        return world->addCylinder(radius_, height_, mass, "object");
+        auto Obj = world->addCylinder(radius_, height_, mass, "object");
+        Obj->setName("Object");
+        return Obj;
       }
 
       case ObjectShape::BOX:
       {
-//        return world->addBox(width1_, width2_, height_, 1, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
-        return world->addBox(width1_, width2_, height_, mass, "object");
+        auto Obj = world->addBox(width1_, width2_, height_, mass, "object");
+        Obj->setName("Object");
+        return Obj;
       }
     }
   }
@@ -273,7 +276,9 @@ class RandomObjectGenerator {
         classify_vector << 1, 0, 0, 0;
         geometry << 2*radius_, 2*radius_, 2*radius_;
 //        return world->addSphere(radius_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
-        return world->addSphere(radius_, mass, "object");
+        auto Obj = world->addSphere(radius_, mass, "object");
+        Obj->setName("Object");
+        return Obj;
       }
 
 
@@ -286,7 +291,10 @@ class RandomObjectGenerator {
         classify_vector << 0, 1, 0, 0;
         geometry << 2*radius_, 2*radius_, height_;
 //        return world->addCylinder(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
-        return world->addCylinder(radius_, height_, mass, "object");
+        auto Obj = world->addCylinder(radius_, height_, mass, "object");
+        Obj->setName("Object");
+
+        return Obj;
       }
 
 
@@ -301,7 +309,10 @@ class RandomObjectGenerator {
         classify_vector << 0, 0, 1, 0;
         geometry << width1_, width2_, height_;
 //        return world->addBox(width1_, width2_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
-        return world->addBox(width1_, width2_, height_, mass, "object");
+        auto Obj = world->addBox(width1_, width2_, height_, mass, "object");
+        Obj->setName("Object");
+
+        return Obj;
       }
 
 

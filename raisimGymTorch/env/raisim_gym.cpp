@@ -80,7 +80,13 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
       .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getColorImage)
       .def("synchronize", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::synchronize)
       .def("step_Rollout", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::step_Rollout)
-      .def("getRolloutState", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getRolloutState);
+      .def("getState_Rollout", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::getState_Rollout)
+      .def("get_target_pos", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::get_target_pos)
+      .def("get_obj_pos", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::get_obj_pos)
+      .def("observe_Rollout", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::observe_Rollout)
+      .def("predict_obj_update", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::predict_obj_update)
+
+      ;
 
   py::class_<NormalSampler>(m, "NormalSampler")
       .def(py::init<int>(), py::arg("dim"))

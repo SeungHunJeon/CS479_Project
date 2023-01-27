@@ -32,13 +32,19 @@ cfg = YAML().load(open(task_path + "/cfg.yaml", 'r'))
 n_samples = cfg['MPPI']['nSamples_']
 n_horizon = cfg['MPPI']['nHorizon_']
 gamma = cfg['MPPI']['gamma_']
+use_dynamics = cfg['MPPI']['use_dynamics_']
 
 # create environment from the configuration file
 cfg['environment']['num_envs'] = 1 + n_samples
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
 
-env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+is_rollout = cfg['environment']['Rollout']
+
+if (is_rollout):
+    env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain_ROLLOUT(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+else:
+    env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 # shortcuts
 ob_dim = env.num_obs
@@ -178,6 +184,25 @@ else:
                                                                                cfg['seed']),
                              device)
 
+    Encoder_Rollout = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
+                                                              hidden_dim=hidden_dim,
+                                                              ext_dim=ext_dim,
+                                                              pro_dim=pro_dim,
+                                                              act_dim=act_dim,
+                                                              dyn_dim=dynamics_dim,
+                                                              hist_num=historyNum,
+                                                              batch_num=batchNum,
+                                                              device=device,
+                                                              num_env=n_samples,
+                                                              is_decouple=is_decouple), device=device)
+
+    actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
+                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
+                                                                               n_samples,
+                                                                               1.0,
+                                                                               NormalSampler(act_dim),
+                                                                               cfg['seed']),
+                             device)
 
     actor.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
     actor.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
@@ -191,13 +216,14 @@ else:
     env.turn_on_visualization()
 
     traj_sampler = mppi.MPPI(dynamics=obj_f_dynamics,
-                             encoder=Encoder,
-                             actor=actor,
+                             encoder=Encoder_Rollout,
+                             actor=actor_Rollout,
                              environment=env,
                              n_samples=n_samples,
                              horizon=n_horizon,
                              gamma=gamma,
-                             device=device)
+                             device=device,
+                             use_dynamics=use_dynamics)
 
     for i in range (int(int(iteration_number) / 100)):
         env.curriculum_callback()
@@ -209,42 +235,62 @@ else:
         env.reset()
         Encoder.architecture.reset()
         Encoder_ROA.architecture.reset()
+        if(is_rollout):
+            target_pos = env.get_target_pos()
         for step in range(total_steps):
             with torch.no_grad():
-                obs = env.observe(False)
+                if(is_rollout == False):
+                    obs = env.observe(False)
+                    obs_ROA = get_obs_ROA(Encoder, obs)
+                    latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+                    action_ll, actions_log_prob = actor.sample(latent_ROA)
+                    success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
+                    env.step_visualize_success(action_ll, success)
 
-                # env.synchronize()
+                if (is_rollout == True):
+                    obs = env.observe(False)
+                    obs_ROA = get_obs_ROA(Encoder, obs)
+                    latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+                    cur_pos = env.get_obj_pos()
+                    cur_observation = env.observe_Rollout(False)
+                    action_rollout, predict_states = traj_sampler.compute_rollout(goal_state=target_pos, cur_state=cur_pos, cur_observation=cur_observation)
+                    env.predict_obj_update(predict_states.numpy())
+                    env.step_visualize(action_rollout.numpy())
+                    env.synchronize()
 
-                # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
-                obs_ROA = get_obs_ROA(Encoder, obs)
+                    # gc = np.array([1]*19, dtype=np.float32)
+                    # gv = np.array([1]*18, dtype=np.float32)
+                    # env.get_state(gc, gv)
+                    # print(gc)
+                    # print(gv)
 
-                latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+                    # gc_batch = np.ones((n_samples,19), dtype=np.float32)
+                    # gv_batch = np.ones((n_samples,18), dtype=np.float32)
+                    # env.get_state_rollout(gc_batch, gv_batch)
+                    # print(gc_batch)
+                    # print(gv_batch)
 
-                action_ll, actions_log_prob = actor.sample(latent_ROA)
+                    """
+                    Encoder 넣을 때 적절한 시기에 clone해서 넣어줘야 할 듯 ? LSTM이라
+                    """
 
-                success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
-                # print(action_ll)
-                env.step_visualize_success(action_ll, success)
-                # gc = np.array([1]*19, dtype=np.float32)
-                # gv = np.array([1]*18, dtype=np.float32)
-                # env.get_state(gc, gv)
-                # env.synchronize()
-                # print(gc)
-                # print(gv)
-                # gc_batch = np.ones((300,19), dtype=np.float32)
-                # gv_batch = np.ones((300,18), dtype=np.float32)
-                # env.get_rollout_state(gc_batch, gv_batch)
-                # print(gc_batch)
-                # print(gv_batch)
+
+
+                    # gc_batch = np.ones((n_samples,19), dtype=np.float32)
+                    # gv_batch = np.ones((n_samples,18), dtype=np.float32)
+                    # env.get_state_rollout(gc_batch, gv_batch)
+                    # print(gc_batch)
+                    # print(gv_batch)
+
                 # success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                 # TODO add MPPI here
                 '''
                 action_traj = MPPI(state, e, o)
                 '''
-        success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
+        # success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
         # success_sum = torch.sum(success, dim=0) / success.shape(0)
         # print(success_sum)
-        success_batch.append(success)
+        # success_batch.append(success)
     success_batch = torch.cat(success_batch, dim=0)
     print(torch.sum(success_batch, dim=0))
 

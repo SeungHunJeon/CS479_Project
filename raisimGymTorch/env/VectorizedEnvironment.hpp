@@ -49,7 +49,8 @@ class VectorizedEnvironment {
       environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && 0 == 0, 0));
       environments_.back()->setSimulationTimeStep(simDt);
       environments_.back()->setControlTimeStep(conDt, low_conDt);
-      environments_[0]->Low_controller_create();
+      if(!is_rollout_)
+        environments_[0]->Low_controller_create();
 
       for (int i = 1; i < num_envs_; i++) {
         environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0, i));
@@ -107,6 +108,14 @@ class VectorizedEnvironment {
 //    }
 //
 //  }
+
+  void observe_Rollout(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics=false) {
+    environments_[0]->observe_Rollout(ob);
+  }
+
+  Eigen::VectorXd get_target_pos() {
+    return environments_[0]->get_target_pos();
+  }
 
   void observe(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics=false) {
 #pragma omp parallel for schedule(auto)
@@ -168,13 +177,16 @@ class VectorizedEnvironment {
     environments_[0]->getState(gc, gv);
   }
 
-  void getRolloutState(Eigen::Ref<EigenRowMajorMat> gc, Eigen::Ref<EigenRowMajorMat> gv) {
-    environments_[0]->getRolloutState(gc, gv);
+  void getState_Rollout(Eigen::Ref<EigenRowMajorMat> gc, Eigen::Ref<EigenRowMajorMat> gv) {
+    environments_[0]->getState_Rollout(gc, gv);
+  }
+
+  void predict_obj_update(Eigen::Ref<EigenRowMajorMat> predict_state_batch) {
+    environments_[0]->predict_obj_update(predict_state_batch);
   }
 
   void step_Rollout(Eigen::Ref<EigenRowMajorMat> &action) {
-    for (int i = 0; i < num_envs_; i++)
-      perAgentStep_Rollout(i, action, false);
+    perAgentStep_Rollout(0, action, false);
   }
 
   void step(Eigen::Ref<EigenRowMajorMat> &action,
@@ -250,6 +262,10 @@ class VectorizedEnvironment {
     }
   }
 
+  void get_obj_pos (Eigen::Ref<EigenRowMajorMat> &obj_pos) {
+    environments_[0]->get_obj_pos(obj_pos);
+  }
+
   void setSimulationTimeStep(double dt) {
     for (auto *env: environments_)
       env->setSimulationTimeStep(dt);
@@ -298,6 +314,7 @@ class VectorizedEnvironment {
                            bool visualize) {
     environments_[agentId]->rollout_step(action, visualize);
   }
+
 
   inline void perAgentStep(int agentId,
                            Eigen::Ref<EigenRowMajorMat> &action,

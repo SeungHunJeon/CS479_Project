@@ -29,6 +29,8 @@ class RaisimGymVecEnv:
         self.count = 0.0
         self.mean = np.zeros(self.num_obs, dtype=np.float32)
         self.var = np.zeros(self.num_obs, dtype=np.float32)
+        self.obj_pos = np.zeros([cfg['nSamples_'], 3], dtype=np.float32)
+        self._observation_Rollout = np.zeros([cfg['nSamples_'], self.num_obs], dtype=np.float32)
 
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
@@ -52,6 +54,9 @@ class RaisimGymVecEnv:
     def step_visualize(self, action):
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
+
+    def predict_obj_update(self, predict_state_batch):
+        self.wrapper.predict_obj_update(predict_state_batch)
 
     def step_visualize_success(self, action, success):
         self.wrapper.step_visualize_success(action, self._reward, self._done, self._success)
@@ -80,6 +85,10 @@ class RaisimGymVecEnv:
         np.savetxt(mean_file_name, self.mean)
         np.savetxt(var_file_name, self.var)
 
+
+    def observe_Rollout(self, update_statistics=False):
+        self.wrapper.observe_Rollout(self._observation_Rollout, update_statistics)
+        return self._observation_Rollout.copy()
     def observe(self, update_statistics=True):
         self.wrapper.observe(self._observation, update_statistics)
         return self._observation
@@ -117,8 +126,14 @@ class RaisimGymVecEnv:
     def get_state(self, gc, gv):
         self.wrapper.getState(gc, gv)
 
-    def get_rollout_state(self, gc, gv):
-        self.wrapper.getRolloutState(gc, gv)
+    def get_target_pos(self):
+        return self.wrapper.get_target_pos()
+
+    def get_obj_pos(self):
+        self.wrapper.get_obj_pos(self.obj_pos)
+        return self.obj_pos.copy()
+    def get_state_rollout(self, gc, gv):
+        self.wrapper.getState_Rollout(gc, gv)
 
     def synchronize(self):
         self.wrapper.synchronize()

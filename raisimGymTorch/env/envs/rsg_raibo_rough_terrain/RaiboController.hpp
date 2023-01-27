@@ -208,15 +208,14 @@ class RaiboController {
   /// Simdt
   void updateStateVariables() {
     is_success_ = false;
-
     raibo_->getState(gc_, gv_);
     jointVelocity_ = gv_.tail(nJoints_);
-
     raisim::Vec<4> quat;
     quat[0] = gc_[3];
     quat[1] = gc_[4];
     quat[2] = gc_[5];
     quat[3] = gc_[6];
+
     raisim::quatToRotMat(quat, baseRot_);
     bodyLinVel_ = baseRot_.e().transpose() * gv_.segment(0, 3);
     bodyAngVel_ = baseRot_.e().transpose() * gv_.segment(3, 3);
@@ -233,7 +232,6 @@ class RaiboController {
       }
     }
 
-    /// Object info
 
     Obj_->getPosition(Obj_Pos_);
     Obj_->getLinearVelocity(Obj_Vel_);
@@ -242,6 +240,7 @@ class RaiboController {
 
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
     Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+
 
     if(obj_to_target.head(2).norm() < 0.05)
       is_success_ = true;
@@ -262,11 +261,10 @@ class RaiboController {
 
     dist_temp_ = ee_to_obj.head(2).norm() + 1e-8;
     pos_temp_ = ee_to_obj.head(2) * (1.0/dist_temp_);
-//    RSINFO(pos_temp_)
     Obj_Info_.segment(0, 2) << pos_temp_;
     dist_temp_min_ = std::min(2.0, dist_temp_);
     Obj_Info_.segment(2, 1) << dist_temp_min_;
-//    RSINFO(dist_temp_)
+
 
     dist_temp_ = obj_to_target.head(2).norm() + 1e-8;
     pos_temp_ = obj_to_target.head(2) * (1.0/dist_temp_);
@@ -275,43 +273,29 @@ class RaiboController {
     dist_temp_min_ = std::min(2.0, dist_temp_);
     Obj_Info_.segment(5, 1) << dist_temp_min_;
 
+
     dist_temp_ = ee_to_target.head(2).norm() + 1e-8;
     pos_temp_ = ee_to_target.head(2) * (1.0/dist_temp_);
 
     Obj_Info_.segment(6, 2) << pos_temp_;
     dist_temp_min_ = std::min(2.0, dist_temp_);
     Obj_Info_.segment(8, 1) << dist_temp_min_;
-
     Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
-
     Obj_Info_.segment(12, 3) << baseRot_.e().transpose() * Obj_AVel_.e();
-
     Obj_Info_.segment(15,3) = Obj_->getOrientation().e().row(2);
-
     Obj_Info_.segment(18,3) = Obj_->getOrientation().e().row(1);
-
     Obj_Info_.segment(21,4) = classify_vector_;
-
     Obj_Info_.segment(25,3) = obj_geometry_;
-
     Obj_Info_.segment(28, 1) << Obj_->getMass();
-
     Obj_Info_.segment(29, 3) << Obj_->getCom().e();
-
     Obj_Info_.segment(32,3) = Obj_->getInertiaMatrix_B().row(0);
-
     Obj_Info_.segment(35,3) = Obj_->getInertiaMatrix_B().row(1);
-
     Obj_Info_.segment(38,3) = Obj_->getInertiaMatrix_B().row(2);
-
     Obj_Info_.segment(41,1) << friction_;
-
     Obj_Info_.segment(42,1) << static_cast<double>(is_contact);
-
 
     ///
     dynamics_Info_ << (command_Obj_Pos_ - Obj_Pos_.e()).head(2);
-//    RSINFO(dynamics_Info_)
 
     /// height map
     controlFrameX_ =
@@ -432,6 +416,17 @@ class RaiboController {
 
   Eigen::VectorXd get_noisify_com_pos() {
     return Obj_Pos_.e() + Obj_->getCom().e();
+  }
+
+  void reset_Rollout(Eigen::Vector3d command_obj_pos_, Eigen::Vector3d obj_geometry, double friction) {
+    raibo_->getState(gc_, gv_);
+    is_success_ = false;
+    is_achieved = true;
+    command_Obj_Pos_ = command_obj_pos_;
+    obj_geometry_ = obj_geometry;
+    friction_ = friction;
+
+    std::fill(success_batch_.begin(), success_batch_.end(), false);
   }
 
   void reset(std::mt19937 &gen_,
@@ -655,7 +650,10 @@ class RaiboController {
   }
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) { gc = gc_.cast<float>(); gv = gv_.cast<float>(); }
-  void setState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {raibo_->setState(gc.cast<double>(), gv.cast<double>());}
+  void setState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
+    raibo_->setState(gc.cast<double>(), gv.cast<double>());
+    gc_ = gc.cast<double>();
+    gv_ = gv.cast<double>();}
 
   static void setSimDt(double dt) {
     RSFATAL_IF(fabs(dt - simDt_) > 1e-12, "sim dt is fixed to " << simDt_)
