@@ -266,7 +266,7 @@ for update in range(iteration_number, 1000000):
 
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
-    actor.distribution.enforce_minimum_std((torch.ones(2)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
+    actor.distribution.enforce_minimum_std((torch.ones(act_dim)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
     # actor.distribution.enforce_minimum_std((torch.ones(1)*(0.06*math.exp(-0.0002*update) + 0.04)).to(device))
     actor.update()
 

@@ -17,6 +17,7 @@
 #include "RaiboController.hpp"
 #include "RandomHeightMapGenerator.hpp"
 #include "../../../../default_controller_demo/module/controller/raibot_position_controller_sim_2/raibot_position_controller_sim_2.hpp"
+#include "../../../../default_controller_demo/module/controller/raibot_default_controller/raibot_default_controller.hpp"
 #include "RandomObjectGenerator.hpp"
 
 namespace raisim {
@@ -177,17 +178,27 @@ class ENVIRONMENT_ROLLOUT {
 
   ~ENVIRONMENT_ROLLOUT() { if (server_) server_->killServer(); }
 
-  void adapt_Low_controller (controller::raibotPositionController controller) {
+  void adapt_Low_velocity_controller (controller::raibotDefaultController controller) {
 //    Low_controller_ = controller;
 //    Low_controller_.init(&world_);
 //    Low_controller_.test();
   }
 
-  controller::raibotPositionController get_Low_controller () {
+  void adapt_Low_position_controller (controller::raibotPositionController controller) {
+//    Low_controller_ = controller;
+//    Low_controller_.init(&world_);
+//    Low_controller_.test();
+  }
+
+  controller::raibotPositionController get_Low_position_controller () {
     return Low_controller_0;
   }
 
-  void Low_controller_create () {
+  controller::raibotDefaultController get_Low_velocity_controller () {
+    return Low_velocity_controller_0;
+  }
+
+  void Low_controller_create (bool is_position_goal) {
 //    Low_controller_0.create(&world_);
 //    Low_controller_0.init(&world_);
 //    std::cout << "create test L " << std::endl;
@@ -694,6 +705,8 @@ class ENVIRONMENT_ROLLOUT {
   std::vector<RaiboController *> controller_batch_;
   controller::raibotPositionController Low_controller_0;
   std::vector<controller::raibotPositionController *> Low_controller_batch_;
+  controller::raibotDefaultController Low_velocity_controller_0;
+  std::vector<controller::raibotDefaultController *> Low_velocity_controller_batch_;
   Eigen::VectorXd jointDGain_, jointPGain_;
   RandomObjectGenerator objectGenerator_;
   raisim::RGBCamera* rgbCameras[1];
@@ -715,6 +728,7 @@ class ENVIRONMENT_ROLLOUT {
   int radial_ = 0;
   int tangential_ = 0;
   int nHorizon_ = 0;
+  bool is_position_goal_;
 
   /// For Controller History
   std::vector<Eigen::VectorXd> obj_info_history;

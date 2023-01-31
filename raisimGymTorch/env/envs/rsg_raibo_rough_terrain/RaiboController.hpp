@@ -66,6 +66,8 @@ class RaiboController {
     nominalConfig_.setZero(nJoints_);
     nominalConfig_ << 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672, 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672;
 
+
+
     Obj_ = obj;
     /// foot scan config
 
@@ -128,7 +130,7 @@ class RaiboController {
         1.1, /// friction
         0.5, /// contact
         Eigen::VectorXd::Constant(actionDim_, 0.0), /// For action
-        0.0, 0.0, 0.0; /// For dynamics
+        0.0, 0.0; /// For dynamics
     }
 
     for (int i=0; i<historyNum_+1 ; i++) {
@@ -154,7 +156,7 @@ class RaiboController {
         0.2, /// friction
         0.5,
         Eigen::VectorXd::Constant(actionDim_, 0.5), /// for aciton
-        1.0, 1.0, 1.0; /// for dynamics
+        1.0, 1.0; /// for dynamics
     }
 
     footIndices_.push_back(raibo_->getBodyIdx("LF_SHANK"));
@@ -324,6 +326,7 @@ class RaiboController {
 
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
     Eigen::VectorXf position;
+//    RSINFO(action)
     if(is_discrete_)
       position = action_converter(action.cast<double>()).cast<float>().cwiseQuotient(actionStd_.cast<float>());
     else
@@ -332,7 +335,10 @@ class RaiboController {
     Eigen::VectorXd current_pos_ = raibo_->getBasePosition().e();
     position += actionMean_.cast<float>();
     pre_command_ = command_;
-    command_ = {position(0), position(1), 0};
+    if(is_position_goal)
+      command_ = {position(0), position(1), 0};
+    else
+      command_ = {position(0), position(1), position(2)};
     desired_pos_ = baseRot_.e() * command_.cast<double>();
     desired_pos_ += current_pos_;
     desired_pos_(2) = 0;
@@ -541,8 +547,8 @@ class RaiboController {
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_, actionDim_)
     = actionInfoHistory_.back();
 
-    obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_, actionDim_)
-    = actionInfoHistory_.back();
+    obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_+actionDim_, dynamicsDim_)
+    = dynamicsInfoHistory_.back();
 
   }
 
@@ -668,7 +674,7 @@ class RaiboController {
   raisim::ArticulatedSystem *raibo_;
   std::vector<size_t> footIndices_, footFrameIndicies_, armIndices_;
   Eigen::VectorXd nominalConfig_;
-  static constexpr int actionDim_ = 2; /// output dim : joint action 12 + task space action 6 + gain dim 4
+  static constexpr int actionDim_ = 3; /// output dim : joint action 12 + task space action 6 + gain dim 4
   static constexpr size_t historyLength_ = 14;
 
   int proprioceptiveDim_ = 9;
@@ -678,11 +684,12 @@ class RaiboController {
   int dynamicsDim_ = 2;
   int obBlockDim_ = 0;
 
-  static constexpr size_t obDim_ = 280;
+  static constexpr size_t obDim_ = 285;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
-  static constexpr double simDt_ = .001;
+//  static constexpr double simDt_ = .001;
+  static constexpr double simDt_ = .00025;
   static constexpr int gcDim_ = 19;
   static constexpr int gvDim_ = 18;
   static constexpr int nPosHist_ = 3;
@@ -712,6 +719,7 @@ class RaiboController {
   double desired_dist_;
   bool is_achieved = true;
   bool is_discrete_ = false;
+  bool is_position_goal = false;
   const int success_batch_num_ = 50;
   std::vector<bool> success_batch_;
   double dist_temp_;
@@ -734,7 +742,7 @@ class RaiboController {
   std::vector<Eigen::Vector2d> command_library_;
 
   // control variables
-  static constexpr double conDt_ = 0.25;
+  static constexpr double conDt_ = 0.2;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_;
   Eigen::VectorXd actionTarget_;

@@ -48,6 +48,8 @@ class raibotPositionController {
       }
     }
 
+
+    RSINFO(obsMean_)
 //    std::cout << "obs Mean : " <<  obsMean_ << std::endl;
 
     if (obsVariance_file.is_open()) {

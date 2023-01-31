@@ -37,10 +37,12 @@ class VectorizedEnvironment {
     omp_set_num_threads(THREAD_COUNT);
     num_envs_ = cfg_["num_envs"].template As<int>();
     double simDt, conDt, low_conDt;
-    READ_YAML(double, simDt, cfg_["simulation_dt"])
+    READ_YAML(bool, is_position_goal_, cfg_["position_goal"])
     READ_YAML(double, conDt, cfg_["control_dt"])
+    READ_YAML(double, simDt, cfg_["simulation_dt"])
     READ_YAML(double, low_conDt, cfg_["low_level_control_dt"])
     READ_YAML(bool, is_rollout_, cfg_["Rollout"])
+
 
     if(is_rollout_)
       num_envs_ = 1;
@@ -50,11 +52,14 @@ class VectorizedEnvironment {
       environments_.back()->setSimulationTimeStep(simDt);
       environments_.back()->setControlTimeStep(conDt, low_conDt);
       if(!is_rollout_)
-        environments_[0]->Low_controller_create();
+        environments_[0]->Low_controller_create(is_position_goal_);
 
       for (int i = 1; i < num_envs_; i++) {
         environments_.push_back(new ChildEnvironment(resourceDir_, cfg_, render_ && i == 0, i));
-        environments_[i]->adapt_Low_controller(environments_[0]->get_Low_controller());
+        if(is_position_goal_)
+          environments_[i]->adapt_Low_position_controller(environments_[0]->get_Low_position_controller());
+        else
+          environments_[i]->adapt_Low_velocity_controller(environments_[0]->get_Low_velocity_controller());
         environments_.back()->setSimulationTimeStep(simDt);
         environments_.back()->setControlTimeStep(conDt, low_conDt);
       }
@@ -348,6 +353,7 @@ class VectorizedEnvironment {
   EigenVec recentMean_, recentVar_, delta_;
   EigenVec epsilon;
   bool is_rollout_;
+  bool is_position_goal_;
 
 };
 

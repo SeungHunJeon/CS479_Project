@@ -1,19 +1,22 @@
 record_video: no
 seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
-name: "Test"
+name: "Velocity Command"
 environment:
-  Rollout: True
+  Rollout: False
+  position_goal: False
   discrete_action: False
   seed: 2
   render: True
   num_envs: 300
   eval_every_n: 200
   num_threads: 30
-  simulation_dt: 0.001
-  control_dt: 0.25
-  low_level_control_dt: 0.005
-  max_time: 15.0
+#  simulation_dt: 0.001
+  simulation_dt: 0.00025
+  control_dt: 0.2
+#  low_level_control_dt: 0.005
+  low_level_control_dt: 0.01
+  max_time: 10.0
   entropy_coeff: 1e-2
   nSamples_: 300
   nHorizon_: 10
@@ -34,6 +37,7 @@ environment:
     initial_factor: .2
     decay_factor: 0.97
   hierarchical: True
+
   dimension:
     proprioceptiveDim_: 9
     exteroceptiveDim_: 43
@@ -41,7 +45,7 @@ environment:
     dynamicsDim_: 2
     historyNum_: 5
     actionhistoryNum_: 6
-    actionDim_: 2
+    actionDim_: 3
 
   ROA_dimension:
     exteroceptiveDim_: 28

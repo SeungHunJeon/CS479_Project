@@ -17,6 +17,7 @@
 #include "RaiboController.hpp"
 #include "RandomHeightMapGenerator.hpp"
 #include "../../../../default_controller_demo/module/controller/raibot_position_controller_sim_2/raibot_position_controller_sim_2.hpp"
+#include "../../../../default_controller_demo/module/controller/raibot_default_controller/raibot_default_controller.hpp"
 #include "RandomObjectGenerator.hpp"
 
 namespace raisim {
@@ -33,6 +34,7 @@ class ENVIRONMENT {
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
     READ_YAML(bool, is_discrete_, cfg["discrete_action"])
+    READ_YAML(bool, is_position_goal, cfg["position_goal"])
 
     if(is_discrete_) {
       READ_YAML(int, radial_, cfg["discrete"]["radial"])
@@ -141,33 +143,59 @@ class ENVIRONMENT {
 
   ~ENVIRONMENT() { if (server_) server_->killServer(); }
 
-  void adapt_Low_controller (controller::raibotPositionController controller) {
+  void adapt_Low_position_controller (controller::raibotPositionController controller) {
+
     Low_controller_ = controller;
     Low_controller_.init(&world_);
-    Low_controller_.test();
+//    Low_controller_.test();
   }
 
-  controller::raibotPositionController get_Low_controller () {
+  void adapt_Low_velocity_controller (controller::raibotDefaultController controller) {
+    Low_controller_2_ = controller;
+    Low_controller_2_.init(&world_);
+  }
+
+
+  void Low_controller_create (bool is_position_goal) {
+    if (is_position_goal) {
+      Low_controller_.init(&world_);
+      Low_controller_.create(&world_);
+
+      RSINFO("create_test")
+//    Low_controller_.test();
+    }
+
+    else {
+      Low_controller_2_.init(&world_);
+      Low_controller_2_.create(&world_);
+      RSINFO("create_test")
+    }
+  }
+
+  controller::raibotPositionController get_Low_position_controller () {
     return Low_controller_;
   }
 
-  void Low_controller_create () {
-    Low_controller_.create(&world_);
-    Low_controller_.init(&world_);
-    std::cout << "create test L " << std::endl;
-    Low_controller_.test();
+  controller::raibotDefaultController get_Low_velocity_controller () {
+    return Low_controller_2_;
   }
 
   void init () { }
   void close () { }
   void setSimulationTimeStep(double dt)
   { controller_.setSimDt(dt);
-    Low_controller_.setSimDt(dt);
+    if(is_position_goal)
+      Low_controller_.setSimDt(dt);
+    else
+      Low_controller_2_.setSimDt(dt);
     world_.setTimeStep(dt);
   }
   void setControlTimeStep(double dt, double low_dt) {
     controller_.setConDt(dt);
-    Low_controller_.setConDt(low_dt);}
+    if(is_position_goal)
+      Low_controller_.setConDt(low_dt);
+    else
+      Low_controller_2_.setConDt(low_dt);}
   void turnOffVisualization() { server_->hibernate(); }
   void turnOnVisualization() { server_->wakeup(); }
   void startRecordingVideo(const std::string& videoName ) { server_->startRecordingVideo(videoName); }
@@ -177,7 +205,7 @@ class ENVIRONMENT {
 
   void hard_reset () {
     friction = 1.1 + 0.2*curriculumFactor_ * normDist_(gen_);
-    if (friction < 0.6)
+    if (friction < 0.8)
       friction = 1.1;
     world_.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
 
@@ -197,9 +225,18 @@ class ENVIRONMENT {
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
     controller_.reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
-    Low_controller_.reset(&world_);
-    controller_.updateStateVariables();
-    Low_controller_.updateStateVariable();
+    if(is_position_goal) {
+      Low_controller_.reset(&world_);
+      controller_.updateStateVariables();
+      Low_controller_.updateStateVariable();
+    }
+
+    else {
+      Low_controller_2_.reset(&world_);
+      controller_.updateStateVariables();
+    }
+
+
 
   }
 
@@ -211,8 +248,11 @@ class ENVIRONMENT {
     Eigen::Vector3f command;
 
     command = controller_.advance(&world_, action);
-    Low_controller_.setCommand(command);
-
+//    RSINFO(command)
+    if(is_position_goal)
+      Low_controller_.setCommand(command);
+    else
+      Low_controller_2_.setCommand(command);
 
 //    if (controller_.is_achieved)
 //    {
@@ -222,7 +262,8 @@ class ENVIRONMENT {
 
     if(visualizable_)
     {
-      target_pos_->setPosition(Low_controller_.getTargetPosition());
+      if(is_position_goal)
+        target_pos_->setPosition(Low_controller_.getTargetPosition());
       command_ball_->setPosition(controller_.get_desired_pos());
       com_pos_->setPosition(controller_.get_com_pos());
       com_noisify_->setPosition(controller_.get_noisify_com_pos());
@@ -240,15 +281,18 @@ class ENVIRONMENT {
         controller_.updateHistory();
         controller_.update_actionHistory(&world_, action, curriculumFactor_);
       }
-      Low_controller_.updateObservation(&world_);
-      Low_controller_.advance(&world_);
+      if(is_position_goal) {
+        Low_controller_.updateObservation(&world_);
+        Low_controller_.advance(&world_);
+      }
+
 
       /// Simulation frequency
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
         subStep();
         if(visualize)
-//          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+//          std::this_thread::sleep_for(std::chrono::microseconds(250));
 
         if(isTerminalState(dummy)) {
           howManySteps++;
@@ -324,75 +368,80 @@ class ENVIRONMENT {
     return image;
   }
 
-  void get_Controller_History(std::vector<Eigen::VectorXd> &obj_info_history,
-                              std::vector<Eigen::VectorXd> &state_info_history,
-                              std::vector<Eigen::VectorXd> &action_info_history,
-                              std::vector<Eigen::VectorXd> &dynamics_info_history) {
-    controller_.get_History(obj_info_history,
-                            state_info_history,
-                            action_info_history,
-                            dynamics_info_history);
-  }
-
-  void get_Low_Controller_History(Eigen::VectorXd &joint_position_history,
-                                  Eigen::VectorXd &joint_velocity_history,
-                                  Eigen::VectorXd &prevAction,
-                                  Eigen::VectorXd &prevprevAction) {
-    Low_controller_.getJointPositionHistory(joint_position_history);
-    Low_controller_.getJointVelocityHistory(joint_velocity_history);
-    Low_controller_.getPrevAction(prevAction);
-    Low_controller_.getPrevPrevAction(prevprevAction);
-  }
-
-  void get_obj_info_(Eigen::Vector3d &pos,
-                     Eigen::Matrix3d &Rot,
-                     Eigen::Vector3d &lin_vel,
-                     Eigen::Vector3d &ang_vel,
-                     Eigen::Matrix3d &inertia,
-                     double &mass,
-                     Eigen::Vector3d &com,
-                     double &ratio,
-                     double &height_ratio,
-                     double &width_ratio_1,
-                     double &width_ratio_2,
-                     double &_friction
-                     ) {
-    pos = Obj_->getPosition();
-    Rot = Obj_->getOrientation().e();
-    lin_vel = Obj_->getLinearVelocity();
-    ang_vel = Obj_->getAngularVelocity();
-    inertia = Obj_->getInertiaMatrix_B();
-    mass = Obj_->getMass();
-    com = Obj_->getBodyToComPosition_rs().e();
-    objectGenerator_.get_ratio(ratio, height_ratio, width_ratio_1, width_ratio_2);
-    _friction = friction;
-  }
-
-  void export_info_(Eigen::Ref<EigenVec> gc,
-                    Eigen::Ref<EigenVec> gv) {
-    controller_.getState(gc, gv);
-//    get_obj_info_();
-
-  }
-
-  void back_to_previous() {
-    /// controller previous observation : obScaled_
-    ///
-  }
+//  void get_Controller_History(std::vector<Eigen::VectorXd> &obj_info_history,
+//                              std::vector<Eigen::VectorXd> &state_info_history,
+//                              std::vector<Eigen::VectorXd> &action_info_history,
+//                              std::vector<Eigen::VectorXd> &dynamics_info_history) {
+//    controller_.get_History(obj_info_history,
+//                            state_info_history,
+//                            action_info_history,
+//                            dynamics_info_history);
+//  }
+//
+//  void get_Low_Controller_History(Eigen::VectorXd &joint_position_history,
+//                                  Eigen::VectorXd &joint_velocity_history,
+//                                  Eigen::VectorXd &prevAction,
+//                                  Eigen::VectorXd &prevprevAction) {
+//    Low_controller_.getJointPositionHistory(joint_position_history);
+//    Low_controller_.getJointVelocityHistory(joint_velocity_history);
+//    Low_controller_.getPrevAction(prevAction);
+//    Low_controller_.getPrevPrevAction(prevprevAction);
+//  }
+//
+//  void get_obj_info_(Eigen::Vector3d &pos,
+//                     Eigen::Matrix3d &Rot,
+//                     Eigen::Vector3d &lin_vel,
+//                     Eigen::Vector3d &ang_vel,
+//                     Eigen::Matrix3d &inertia,
+//                     double &mass,
+//                     Eigen::Vector3d &com,
+//                     double &ratio,
+//                     double &height_ratio,
+//                     double &width_ratio_1,
+//                     double &width_ratio_2,
+//                     double &_friction
+//                     ) {
+//    pos = Obj_->getPosition();
+//    Rot = Obj_->getOrientation().e();
+//    lin_vel = Obj_->getLinearVelocity();
+//    ang_vel = Obj_->getAngularVelocity();
+//    inertia = Obj_->getInertiaMatrix_B();
+//    mass = Obj_->getMass();
+//    com = Obj_->getBodyToComPosition_rs().e();
+//    objectGenerator_.get_ratio(ratio, height_ratio, width_ratio_1, width_ratio_2);
+//    _friction = friction;
+//  }
+//
+//  void export_info_(Eigen::Ref<EigenVec> gc,
+//                    Eigen::Ref<EigenVec> gv) {
+//    controller_.getState(gc, gv);
+////    get_obj_info_();
+//
+//  }
+//
+//  void back_to_previous() {
+//    /// controller previous observation : obScaled_
+//    ///
+//  }
 
   void subStep() {
     if(controller_.is_success()) {
       Obj_->setAppearance("0, 0, 1, 0.7");
     }
 
-    Low_controller_.updateHistory();
+    if(is_position_goal)
+      Low_controller_.updateHistory();
+
+    else
+      Low_controller_2_.advance(&world_);
 
 
     world_.integrate1();
     if(server_) server_->lockVisualizationServerMutex();
     world_.integrate2();
     if(server_) server_->unlockVisualizationServerMutex();
-    Low_controller_.updateStateVariable();
+    if(is_position_goal)
+      Low_controller_.updateStateVariable();
     controller_.updateStateVariables();
     controller_.accumulateRewards(curriculumFactor_, command_);
 
@@ -447,6 +496,7 @@ class ENVIRONMENT {
   }
 
  protected:
+  bool is_position_goal = true;
   const double obj_mass = 2.0;
   double friction = 1.1;
   static constexpr int nJoints_ = 12;
@@ -470,6 +520,7 @@ class ENVIRONMENT {
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_;
   controller::raibotPositionController Low_controller_;
+  controller::raibotDefaultController Low_controller_2_;
   Eigen::VectorXd jointDGain_, jointPGain_;
   RandomObjectGenerator objectGenerator_;
   raisim::RGBCamera* rgbCameras[1];

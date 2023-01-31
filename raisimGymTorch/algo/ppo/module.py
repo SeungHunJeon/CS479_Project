@@ -313,7 +313,7 @@ class MLP(nn.Module):
             elif(self.discrete == False):
                 norm = (torch.norm(output, dim=-1)+1e-8).unsqueeze(-1)
                 output = torch.div(output, norm)
-                output = output * 3 * torch.sigmoid(norm)
+                output = output * 2 * torch.sigmoid(norm)
 
         return output
 
