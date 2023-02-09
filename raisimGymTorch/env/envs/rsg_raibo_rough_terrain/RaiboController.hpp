@@ -250,7 +250,7 @@ class RaiboController {
     std::rotate(success_batch_.begin(), success_batch_.begin()+1, success_batch_.end());
     success_batch_[success_batch_num_ - 1] = is_success_;
 
-    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - ee_Pos_w_.e());
     ee_to_obj(2) = 0;
     obj_to_target(2) = 0;
     ee_to_target(2) = 0;
@@ -583,7 +583,7 @@ class RaiboController {
 
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
     Eigen::Vector3d obj_to_target (command_Obj_Pos_ - Obj_Pos_.e());
-    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - ee_Pos_w_.e());
     ee_to_obj(2) = 0;
     obj_to_target(2) = 0;
     ee_to_target(2) = 0;

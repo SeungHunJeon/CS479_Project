@@ -276,7 +276,7 @@ class ENVIRONMENT {
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
       /// per 0.02 sec, update history
-      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.historyNum_))
+      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.historyNum_) == 0)
       {
         controller_.updateHistory();
         controller_.update_actionHistory(&world_, action, curriculumFactor_);
