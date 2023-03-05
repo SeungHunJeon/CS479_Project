@@ -28,15 +28,16 @@ class ENVIRONMENT_ROLLOUT {
 
   explicit ENVIRONMENT_ROLLOUT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable, int id) :
       visualizable_(visualizable) {
+    RSINFO(1)
     setSeed(id);
-
     READ_YAML(double, curriculumFactor_, cfg["curriculum"]["initial_factor"])
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
     READ_YAML(bool, is_discrete_, cfg["discrete_action"])
     READ_YAML(int, n_samples, cfg["nSamples_"])
-    READ_YAML(int, historyNum_, cfg["dimension"]["historyNum_"])
+//    READ_YAML(int, historyNum_, cfg["dimension"]["historyNum_"])
     READ_YAML(int, nHorizon_, cfg["nHorizon_"])
+    READ_YAML(bool, is_position_goal, cfg["position_goal"])
 
     if(is_discrete_) {
       READ_YAML(int, radial_, cfg["discrete"]["radial"])
@@ -46,6 +47,7 @@ class ENVIRONMENT_ROLLOUT {
     world_batch_.resize(n_samples);
     controller_batch_.resize(n_samples);
     Low_controller_batch_.resize(n_samples);
+    Low_velocity_controller_batch_.resize(n_samples);
 
     /// set curriculum
     simulation_dt_ = RaiboController::getSimDt();
@@ -57,8 +59,6 @@ class ENVIRONMENT_ROLLOUT {
     raibo_0 = world_0.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
     raibo_0->setName("robot");
     raibo_0->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-    raibo_0->getCollisionBody("arm_link/0").setCollisionGroup(raisim::COLLISION(1));
-    raibo_0->getCollisionBody("arm_link/0").setCollisionMask(raisim::COLLISION(1));
 
     Obj_ = objectGenerator_.generateObject(&world_0, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, obj_mass_, 0.5, 0.55, 1.0, 1.0);
@@ -72,7 +72,7 @@ class ENVIRONMENT_ROLLOUT {
     /// get robot data
     gcDim_ = int(raibo_0->getGeneralizedCoordinateDim());
     gvDim_ = int(raibo_0->getDOF());
-
+    RSINFO(1)
     /// initialize containers
     gc_init_.setZero(gcDim_);
     gv_init_.setZero(gvDim_);
@@ -99,7 +99,7 @@ class ENVIRONMENT_ROLLOUT {
     action_info_history.resize(historyNum_);
     dynamics_info_history.resize(historyNum_);
     predict_Obj_batch_.resize(nHorizon_);
-
+    RSINFO(1)
     joint_position_history.setZero(nJoints_ * 14);
     joint_velocity_history.setZero(nJoints_ * 14);
     prevAction.setZero(nJoints_);
@@ -109,14 +109,25 @@ class ENVIRONMENT_ROLLOUT {
     controller_0.setRewardConfig(cfg);
     command_Obj_Pos_ << 2, 2, command_object_height_/2;
 
-    Low_controller_0.create(&world_0);
-    Low_controller_0.init(&world_0);
+    if(is_position_goal)
+    {
+      Low_controller_0.init(&world_0);
+      Low_controller_0.create(&world_0);
+    }
 
+    else
+    {
+      Low_velocity_controller_0.init(&world_0);
+      Low_velocity_controller_0.create(&world_0);
+    }
+
+    RSINFO(1)
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i<n_samples; i++) {
       raisim::World *world = new raisim::World;
       RaiboController *controller = new RaiboController;
-      controller::raibotPositionController *low_controller = new controller::raibotPositionController;
+
+      *controller = controller_0;
 
       world->addGround(0.0, "ground");
       world->setDefaultMaterial(1.1, 0.0, 0.01);
@@ -125,8 +136,6 @@ class ENVIRONMENT_ROLLOUT {
       auto raibo = world->addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
       raibo->setName("robot");
       raibo->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-      raibo->getCollisionBody("arm_link/0").setCollisionGroup(raisim::COLLISION(1));
-      raibo->getCollisionBody("arm_link/0").setCollisionMask(raisim::COLLISION(1));
 
       /// Object spawn
       auto Obj = objectGenerator_.generateObject(world, obj_mass_, i);
@@ -140,14 +149,26 @@ class ENVIRONMENT_ROLLOUT {
       raibo->setGeneralizedForce(Eigen::VectorXd::Zero(gvDim_));
 
       // Reward coefficients
-      controller->setRewardConfig(cfg);
+//      controller->setRewardConfig(cfg);
 
-      *low_controller = Low_controller_0;
-      low_controller->init(world);
+      if(is_position_goal)
+      {
+        controller::raibotPositionController *low_controller = new controller::raibotPositionController;
+        *low_controller = Low_controller_0;
+        low_controller->init(world);
+        Low_controller_batch_[i] = low_controller;
+      }
+
+      else
+      {
+        controller::raibotDefaultController *low_controller = new controller::raibotDefaultController;
+        *low_controller = Low_velocity_controller_0;
+        low_controller->init(world);
+        Low_velocity_controller_batch_[i] = low_controller;
+      }
 
       world_batch_[i] = world;
       controller_batch_[i] = controller;
-      Low_controller_batch_[i] = low_controller;
 
     }
 
@@ -178,16 +199,12 @@ class ENVIRONMENT_ROLLOUT {
 
   ~ENVIRONMENT_ROLLOUT() { if (server_) server_->killServer(); }
 
+  /// Adapt doesn't need in Rollout env
   void adapt_Low_velocity_controller (controller::raibotDefaultController controller) {
-//    Low_controller_ = controller;
-//    Low_controller_.init(&world_);
-//    Low_controller_.test();
   }
 
+  /// Adapt doesn't need in Rollout env
   void adapt_Low_position_controller (controller::raibotPositionController controller) {
-//    Low_controller_ = controller;
-//    Low_controller_.init(&world_);
-//    Low_controller_.test();
   }
 
   controller::raibotPositionController get_Low_position_controller () {
@@ -198,35 +215,60 @@ class ENVIRONMENT_ROLLOUT {
     return Low_velocity_controller_0;
   }
 
+  /// Create doesn't need in rollout env
   void Low_controller_create (bool is_position_goal) {
-//    Low_controller_0.create(&world_);
-//    Low_controller_0.init(&world_);
-//    std::cout << "create test L " << std::endl;
-//    Low_controller_0.test();
   }
 
   void init () { }
   void close () { }
   void setSimulationTimeStep(double dt)
   { controller_0.setSimDt(dt);
-    Low_controller_0.setSimDt(dt);
     world_0.setTimeStep(dt);
+    if(is_position_goal)
+    {
+      Low_controller_0.setSimDt(dt);
 #pragma omp parallel for schedule(auto)
-    for(int i = 0; i<n_samples; i++) {
-      world_batch_[i]->setTimeStep(dt);
-      controller_batch_[i]->setSimDt(dt);
-      Low_controller_batch_[i]->setSimDt(dt);
+      for(int i = 0; i<n_samples; i++) {
+        world_batch_[i]->setTimeStep(dt);
+        controller_batch_[i]->setSimDt(dt);
+        Low_controller_batch_[i]->setSimDt(dt);
+      }
     }
 
+    else
+    {
+      Low_velocity_controller_0.setSimDt(dt);
+#pragma omp parallel for schedule(auto)
+      for(int i = 0; i<n_samples; i++) {
+        world_batch_[i]->setTimeStep(dt);
+        controller_batch_[i]->setSimDt(dt);
+        Low_velocity_controller_batch_[i]->setSimDt(dt);
+      }
+    }
   }
+
   void setControlTimeStep(double dt, double low_dt) {
     controller_0.setConDt(dt);
-    Low_controller_0.setConDt(low_dt);
+    if(is_position_goal)
+    {
+      Low_controller_0.setConDt(low_dt);
 #pragma omp parallel for schedule(auto)
-    for(int i = 0; i<n_samples; i++) {
-      controller_batch_[i]->setConDt(dt);
-      Low_controller_batch_[i]->setConDt(low_dt);
+      for(int i = 0; i<n_samples; i++) {
+        controller_batch_[i]->setConDt(dt);
+        Low_controller_batch_[i]->setConDt(low_dt);
+      }
     }
+
+    else
+    {
+      Low_velocity_controller_0.setConDt(low_dt);
+#pragma omp parallel for schedule(auto)
+      for(int i = 0; i<n_samples; i++) {
+        controller_batch_[i]->setConDt(dt);
+        Low_velocity_controller_batch_[i]->setConDt(low_dt);
+      }
+    }
+
 
   }
   void turnOffVisualization() { server_->hibernate(); }
@@ -260,18 +302,38 @@ class ENVIRONMENT_ROLLOUT {
     if(curriculumFactor_ > 0.4)
       hard_reset_Rollout();
     /// set the state
+    if(is_position_goal)
+    {
 #pragma omp parallel for schedule(auto)
-    for (int i =0; i< n_samples; i++) {
-      auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
-      objectGenerator_.Inertial_Randomize(obj);
-      auto raibo = reinterpret_cast<ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
-      raibo->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-      controller_batch_[i]->reset_Rollout(command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+      for (int i =0; i< n_samples; i++) {
+        auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
+        objectGenerator_.Inertial_Randomize(obj);
+        auto raibo = reinterpret_cast<ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
+        raibo->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
+        controller_batch_[i]->reset_Rollout(command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
 //      controller_batch_[i]->reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
-      Low_controller_batch_[i]->reset(world_batch_[i]);
-      controller_batch_[i]->updateStateVariables();
-      Low_controller_batch_[i]->updateStateVariable();
+        Low_controller_batch_[i]->reset(world_batch_[i]);
+        controller_batch_[i]->updateStateVariables();
+        Low_controller_batch_[i]->updateStateVariable();
+      }
     }
+
+    else
+    {
+#pragma omp parallel for schedule(auto)
+      for (int i =0; i< n_samples; i++) {
+        auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
+        objectGenerator_.Inertial_Randomize(obj);
+        auto raibo = reinterpret_cast<ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
+        raibo->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
+        controller_batch_[i]->reset_Rollout(command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+//      controller_batch_[i]->reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+        Low_velocity_controller_batch_[i]->reset(world_batch_[i]);
+        controller_batch_[i]->updateStateVariables();
+//        Low_velocity_controller_batch_[i]->updateStateVariable();
+      }
+    }
+
 
   }
 
@@ -283,9 +345,20 @@ class ENVIRONMENT_ROLLOUT {
     /// set the state
     raibo_0->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
     controller_0.reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
-    Low_controller_0.reset(&world_0);
-    controller_0.updateStateVariables();
-    Low_controller_0.updateStateVariable();
+    if(is_position_goal)
+    {
+      Low_controller_0.reset(&world_0);
+      controller_0.updateStateVariables();
+      Low_controller_0.updateStateVariable();
+    }
+
+    else
+    {
+      Low_velocity_controller_0.reset(&world_0);
+      controller_0.updateStateVariables();
+//      Low_velocity_controller_0.updateStateVariable();
+    }
+
 
     reset_Rollout();
     synchronize();
@@ -293,33 +366,34 @@ class ENVIRONMENT_ROLLOUT {
 
 
   void rollout_step(Eigen::Ref<EigenRowMajorMat> &action, bool b) {
+    if(is_position_goal) {
 #pragma omp parallel for schedule(auto)
-    for (int i = 0; i<n_samples; i++) {
-      Eigen::Vector3f command;
+      for (int i = 0; i<n_samples; i++) {
+        Eigen::Vector3f command;
 
-      command = controller_batch_[i]->advance(world_batch_[i], action.row(i));
-      Low_controller_batch_[i]->setCommand(command);
+        command = controller_batch_[i]->advance(world_batch_[i], action.row(i));
+        Low_controller_batch_[i]->setCommand(command);
 
-      float dummy;
-      int howManySteps;
-      int lowlevelSteps;
+        float dummy;
+        int howManySteps;
+        int lowlevelSteps;
 
-      /// Low level frequency
-      for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
+        /// Low level frequency
+        for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
-        /// per 0.02 sec, update history
-        if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_batch_[i]->historyNum_))
-        {
-          controller_batch_[i]->updateHistory();
-          controller_batch_[i]->update_actionHistory(world_batch_[i], action, curriculumFactor_);
-        }
-        Low_controller_batch_[i]->updateObservation(world_batch_[i]);
-        Low_controller_batch_[i]->advance(world_batch_[i]);
+          /// per 0.02 sec, update history
+          if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_batch_[i]->historyNum_))
+          {
+            controller_batch_[i]->updateHistory();
+            controller_batch_[i]->update_actionHistory(world_batch_[i], action, curriculumFactor_);
+          }
+          Low_controller_batch_[i]->updateObservation(world_batch_[i]);
+          Low_controller_batch_[i]->advance(world_batch_[i]);
 
-        /// Simulation frequency
-        for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
+          /// Simulation frequency
+          for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
-          subStep_Rollout(i);
+            subStep_Rollout(i);
 //          if(visualize)
 //          std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
@@ -327,9 +401,49 @@ class ENVIRONMENT_ROLLOUT {
 //              howManySteps++;
 //              break;
 //            }
+          }
         }
       }
     }
+
+    else {
+#pragma omp parallel for schedule(auto)
+      for (int i = 0; i<n_samples; i++) {
+        Eigen::Vector3f command;
+
+        command = controller_batch_[i]->advance(world_batch_[i], action.row(i));
+        Low_velocity_controller_batch_[i]->setCommand(command);
+
+        float dummy;
+        int howManySteps;
+        int lowlevelSteps;
+
+        /// Low level frequency
+        for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
+
+          /// per 0.02 sec, update history
+          if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_batch_[i]->historyNum_))
+          {
+            controller_batch_[i]->updateHistory();
+            controller_batch_[i]->update_actionHistory(world_batch_[i], action, curriculumFactor_);
+          }
+
+          /// Simulation frequency
+          for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
+
+            subStep_Rollout(i);
+//          if(visualize)
+//          std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+//            if(isTerminalState(dummy)) {
+//              howManySteps++;
+//              break;
+//            }
+          }
+        }
+      }
+    }
+
   }
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
@@ -338,8 +452,10 @@ class ENVIRONMENT_ROLLOUT {
     Eigen::Vector3f command;
 
     command = controller_0.advance(&world_0, action);
-    Low_controller_0.setCommand(command);
-
+    if(is_position_goal)
+      Low_controller_0.setCommand(command);
+    else
+      Low_velocity_controller_0.setCommand(command);
 
 //    if (controller_.is_achieved)
 //    {
@@ -349,7 +465,8 @@ class ENVIRONMENT_ROLLOUT {
 
     if(visualizable_)
     {
-      target_pos_->setPosition(Low_controller_0.getTargetPosition());
+      if(is_position_goal)
+        target_pos_->setPosition(Low_controller_0.getTargetPosition());
       command_ball_->setPosition(controller_0.get_desired_pos());
       com_pos_->setPosition(controller_0.get_com_pos());
       com_noisify_->setPosition(controller_0.get_noisify_com_pos());
@@ -367,8 +484,10 @@ class ENVIRONMENT_ROLLOUT {
         controller_0.updateHistory();
         controller_0.update_actionHistory(&world_0, action, curriculumFactor_);
       }
-      Low_controller_0.updateObservation(&world_0);
-      Low_controller_0.advance(&world_0);
+      if(is_position_goal) {
+        Low_controller_0.updateObservation(&world_0);
+        Low_controller_0.advance(&world_0);
+      }
 
       /// Simulation frequency
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
@@ -442,26 +561,9 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void synchronize() {
-
-
-
-
-
     /// For Robot info
     Eigen::VectorXf gc(raibo_0->getGeneralizedCoordinateDim());
     Eigen::VectorXf gv(raibo_0->getDOF());
-
-
-
-    get_Controller_History(obj_info_history,
-                           state_info_history,
-                           action_info_history,
-                           dynamics_info_history);
-
-    get_Low_Controller_History(joint_position_history,
-                               joint_velocity_history,
-                               prevAction,
-                               prevprevAction);
 
     get_obj_info_(pos,
                   Rot,
@@ -474,32 +576,47 @@ class ENVIRONMENT_ROLLOUT {
 
     Eigen::VectorXd gc_double = gc.cast<double>();
     Eigen::VectorXd gv_double = gv.cast<double>();
+    if(is_position_goal)
+    {
 #pragma omp parallel for schedule(auto)
-    for (int i=0; i<n_samples; i++) {
-      controller_batch_[i]->set_History(obj_info_history,
-                                        state_info_history,
-                                        action_info_history,
-                                        dynamics_info_history);
-      Low_controller_batch_[i]->setJointPositionHistory(joint_position_history);
-      Low_controller_batch_[i]->setJointVelocityHistory(joint_velocity_history);
-      Low_controller_batch_[i]->setPrevAction(prevAction);
-      Low_controller_batch_[i]->setPrevPrevAction(prevprevAction);
+      for (int i=0; i<n_samples; i++) {
+        *controller_batch_[i] = controller_0;
+        *Low_controller_batch_[i] = Low_controller_0;
 
-      auto raibo = reinterpret_cast<raisim::ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
-      raibo->setState(gc_double, gv_double);
+        auto raibo = reinterpret_cast<raisim::ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
+        raibo->setState(gc_double, gv_double);
 
-      auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
-      obj->setPosition(pos);
-      obj->setOrientation(Rot);
-      obj->setLinearVelocity(lin_vel);
-      obj->setAngularVelocity(ang_vel);
+        auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
+        obj->setPosition(pos);
+        obj->setOrientation(Rot);
+        obj->setLinearVelocity(lin_vel);
+        obj->setAngularVelocity(ang_vel);
 
-      controller_batch_[i]->updateStateVariables();
-      Low_controller_batch_[i]->updateStateVariable();
+        controller_batch_[i]->updateStateVariables();
+        Low_controller_batch_[i]->updateStateVariable();
+      }
     }
 
+    else
+    {
+#pragma omp parallel for schedule(auto)
+      for (int i=0; i<n_samples; i++) {
+        *controller_batch_[i] = controller_0;
+        *Low_velocity_controller_batch_[i] = Low_velocity_controller_0;
 
+        auto raibo = reinterpret_cast<raisim::ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
+        raibo->setState(gc_double, gv_double);
 
+        auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
+        obj->setPosition(pos);
+        obj->setOrientation(Rot);
+        obj->setLinearVelocity(lin_vel);
+        obj->setAngularVelocity(ang_vel);
+
+        controller_batch_[i]->updateStateVariables();
+//        Low_velocity_controller_batch_[i]->updateStateVariable();
+      }
+    }
   }
 
   void predict_obj_update(Eigen::Ref<EigenRowMajorMat> &predict_state_batch) {
@@ -535,27 +652,6 @@ class ENVIRONMENT_ROLLOUT {
     return image;
   }
 
-
-  void get_Controller_History(std::vector<Eigen::VectorXd> &obj_info_history,
-                              std::vector<Eigen::VectorXd> &state_info_history,
-                              std::vector<Eigen::VectorXd> &action_info_history,
-                              std::vector<Eigen::VectorXd> &dynamics_info_history) {
-    controller_0.get_History(obj_info_history,
-                            state_info_history,
-                            action_info_history,
-                            dynamics_info_history);
-  }
-
-  void get_Low_Controller_History(Eigen::VectorXd &joint_position_history,
-                                  Eigen::VectorXd &joint_velocity_history,
-                                  Eigen::VectorXd &prevAction,
-                                  Eigen::VectorXd &prevprevAction) {
-    Low_controller_0.getJointPositionHistory(joint_position_history);
-    Low_controller_0.getJointVelocityHistory(joint_velocity_history);
-    Low_controller_0.getPrevAction(prevAction);
-    Low_controller_0.getPrevPrevAction(prevprevAction);
-  }
-
   void get_obj_info_(Eigen::Vector3d &pos,
                      Eigen::Matrix3d &Rot,
                      raisim::Vec<3> &lin_vel,
@@ -579,31 +675,31 @@ class ENVIRONMENT_ROLLOUT {
 
   void subStep_Rollout(int idx) {
 //#pragma omp parallel for schedule(auto)
-    Low_controller_batch_[idx]->updateHistory();
+    if(is_position_goal)
+      Low_controller_batch_[idx]->updateHistory();
+    else
+      Low_velocity_controller_batch_[idx]->advance(world_batch_[idx]);
     world_batch_[idx]->integrate1();
     world_batch_[idx]->integrate2();
-    Low_controller_batch_[idx]->updateStateVariable();
+    if(is_position_goal)
+      Low_controller_batch_[idx]->updateStateVariable();
     controller_batch_[idx]->updateStateVariables();
     controller_batch_[idx]->accumulateRewards(curriculumFactor_, command_);
-//    for (int i=0; i<n_samples; i++) {
-//      Low_controller_batch_[i]->updateHistory();
-//      world_batch_[i]->integrate1();
-//      world_batch_[i]->integrate2();
-//      Low_controller_batch_[i]->updateStateVariable();
-//      controller_batch_[i]->updateStateVariables();
-//      controller_batch_[i]->accumulateRewards(curriculumFactor_, command_);
-//    }
   }
 
   void subStep() {
-    Low_controller_0.updateHistory();
+    if(is_position_goal)
+      Low_controller_0.updateHistory();
 
+    else
+      Low_velocity_controller_0.advance(&world_0);
 
     world_0.integrate1();
     if(server_) server_->lockVisualizationServerMutex();
     world_0.integrate2();
     if(server_) server_->unlockVisualizationServerMutex();
-    Low_controller_0.updateStateVariable();
+    if(is_position_goal)
+      Low_controller_0.updateStateVariable();
     controller_0.updateStateVariables();
     controller_0.accumulateRewards(curriculumFactor_, command_);
 
@@ -678,6 +774,7 @@ class ENVIRONMENT_ROLLOUT {
   }
 
  protected:
+  bool is_position_goal = true;
   double obj_mass_ = 3.0;
   double friction = 1.1;
   static constexpr int nJoints_ = 12;
@@ -711,7 +808,7 @@ class ENVIRONMENT_ROLLOUT {
   RandomObjectGenerator objectGenerator_;
   raisim::RGBCamera* rgbCameras[1];
   raisim::DepthCamera* depthCameras[1];
-  int historyNum_;
+  int historyNum_ = 5;
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
   raisim::SingleBodyObject *Obj_, *Manipulate_;
@@ -728,7 +825,6 @@ class ENVIRONMENT_ROLLOUT {
   int radial_ = 0;
   int tangential_ = 0;
   int nHorizon_ = 0;
-  bool is_position_goal_;
 
   /// For Controller History
   std::vector<Eigen::VectorXd> obj_info_history;

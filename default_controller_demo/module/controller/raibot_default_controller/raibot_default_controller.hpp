@@ -16,15 +16,14 @@ class raibotDefaultController {
  public:
   bool create(raisim::World *world) {
 
-
     char tmp[256];
     getcwd(tmp, 256);
 
     std::string current_path = tmp;
 
-    std::string network_path = current_path + "/../../../../default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
+//    std::string network_path = current_path + "/../../../../default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
 
-//    std::string network_path = "/home/oem/workspace/default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
+    std::string network_path = "/home/oem/workspace/raisimGymForRaisin/default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
     actor_.readParamFromTxt(network_path + "/actor.txt");
     estimator_.readParamFromTxt(network_path + "/estimator.txt");
 
@@ -48,8 +47,6 @@ class raibotDefaultController {
         obsMean_(i) = std::stof(in_line);
       }
     }
-
-    std::cout << obsMean_ << std::endl;
 
     if (obsVariance_file.is_open()) {
       for (int i = 0; i < obsVariance_.size(); ++i) {
@@ -105,8 +102,6 @@ class raibotDefaultController {
 
     /// normalize the obs
     obs_ = raibotController_.getObservation().cast<float>();
-
-//    RSINFO(obsMean_)
 
     for (int i = 0; i < obs_.size(); ++i) {
       obs_(i) = (obs_(i) - obsMean_(i)) / std::sqrt(obsVariance_(i) + 1e-8);

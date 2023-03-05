@@ -156,7 +156,7 @@ class RaiboPositionController {
 //    }
   }
 
-  const Eigen::VectorXd& getObservation() {
+  Eigen::VectorXd& getObservation() {
     obNormed_ = (obDouble_ - obMean_).cwiseQuotient(obStd_);
     return obNormed_;
   }
@@ -243,7 +243,7 @@ class RaiboPositionController {
 //    Eigen::Vector3d targetRel = (target + pos_0) - posXyz;
     Eigen::Vector3d targetRel = target - posXyz;
     Eigen::Vector3d targetRelBody = baseRot_.e().transpose() * targetRel;
-    const double dist = targetRelBody.norm();
+    double dist = targetRelBody.norm();
     targetRelBody *= 1./targetRelBody.head<2>().norm();
 
     /// command

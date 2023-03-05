@@ -275,7 +275,7 @@ class ENVIRONMENT {
     /// Low level frequency
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
-      /// per 0.02 sec, update history
+      /// level frequency times 5.
       if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.historyNum_) == 0)
       {
         controller_.updateHistory();
@@ -291,8 +291,8 @@ class ENVIRONMENT {
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
         subStep();
-        if(visualize)
-//          std::this_thread::sleep_for(std::chrono::microseconds(250));
+//        if(visualize)
+//          std::this_thread::sleep_for(std::chrono::microseconds(200));
 
         if(isTerminalState(dummy)) {
           howManySteps++;

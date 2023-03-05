@@ -35,13 +35,16 @@ gamma = cfg['MPPI']['gamma_']
 use_dynamics = cfg['MPPI']['use_dynamics_']
 
 # create environment from the configuration file
-cfg['environment']['num_envs'] = 1 + n_samples
+# cfg['environment']['num_envs'] = 1 + n_samples
+cfg['environment']['num_envs'] = 1
+
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
-
+print(1)
 is_rollout = cfg['environment']['Rollout']
-
+#
 if (is_rollout):
+    print(1)
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain_ROLLOUT(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 else:
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])

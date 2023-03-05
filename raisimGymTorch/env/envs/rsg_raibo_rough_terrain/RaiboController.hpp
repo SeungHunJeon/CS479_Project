@@ -56,6 +56,8 @@ namespace raisim {
 
 class RaiboController {
  public:
+  RaiboController() {};
+
   inline bool create(raisim::World *world, raisim::SingleBodyObject *obj) {
     raibo_ = reinterpret_cast<raisim::ArticulatedSystem *>(world->getObject("robot"));
     gc_.setZero(raibo_->getGeneralizedCoordinateDim());
@@ -720,7 +722,7 @@ class RaiboController {
   bool is_achieved = true;
   bool is_discrete_ = false;
   bool is_position_goal = false;
-  const int success_batch_num_ = 50;
+  int success_batch_num_ = 50;
   std::vector<bool> success_batch_;
   double dist_temp_;
   double friction_ = 1.1;
