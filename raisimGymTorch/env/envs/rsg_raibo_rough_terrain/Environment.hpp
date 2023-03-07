@@ -147,7 +147,6 @@ class ENVIRONMENT {
 
     Low_controller_ = controller;
     Low_controller_.init(&world_);
-//    Low_controller_.test();
   }
 
   void adapt_Low_velocity_controller (controller::raibotDefaultController controller) {
@@ -162,7 +161,6 @@ class ENVIRONMENT {
       Low_controller_.create(&world_);
 
       RSINFO("create_test")
-//    Low_controller_.test();
     }
 
     else {
@@ -244,11 +242,9 @@ class ENVIRONMENT {
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
-//    controller_.updateObservation(true, command_, heightMap_, gen_, normDist_);
     Eigen::Vector3f command;
 
     command = controller_.advance(&world_, action);
-//    RSINFO(command)
     if(is_position_goal)
       Low_controller_.setCommand(command);
     else
@@ -285,6 +281,8 @@ class ENVIRONMENT {
         Low_controller_.updateObservation(&world_);
         Low_controller_.advance(&world_);
       }
+      else
+        Low_controller_2_.advance(&world_);
 
 
       /// Simulation frequency
@@ -431,9 +429,9 @@ class ENVIRONMENT {
 
     if(is_position_goal)
       Low_controller_.updateHistory();
-
-    else
-      Low_controller_2_.advance(&world_);
+//
+//    else
+//      Low_controller_2_.advance(&world_);
 
 
     world_.integrate1();

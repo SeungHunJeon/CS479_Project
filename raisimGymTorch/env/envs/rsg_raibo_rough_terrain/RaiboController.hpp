@@ -62,8 +62,6 @@ class RaiboController {
     raibo_ = reinterpret_cast<raisim::ArticulatedSystem *>(world->getObject("robot"));
     gc_.setZero(raibo_->getGeneralizedCoordinateDim());
     gv_.setZero(raibo_->getDOF());
-//    gc_.resize(raibo_->getGeneralizedCoordinateDim());
-//    gv_.resize(raibo_->getDOF());
     jointVelocity_.resize(nJoints_);
     nominalConfig_.setZero(nJoints_);
     nominalConfig_ << 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672, 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672;
@@ -183,6 +181,7 @@ class RaiboController {
     classify_vector_.setZero(4);
     classify_vector_ << 1, 0, 0, 0;
     pre_command_.setZero();
+    prepre_command_.setZero();
 
     success_batch_.resize(success_batch_num_);
 
@@ -336,6 +335,7 @@ class RaiboController {
 
     Eigen::VectorXd current_pos_ = raibo_->getBasePosition().e();
     position += actionMean_.cast<float>();
+    prepre_command_ = pre_command_;
     pre_command_ = command_;
     if(is_position_goal)
       command_ = {position(0), position(1), 0};
@@ -393,28 +393,6 @@ class RaiboController {
 
     else
       actionInfoHistory_[actionNum_ - 1] = action.cast<double>();
-//    actionTarget_ = action.cast<double>();
-//
-//    jointTarget_.head(nlegJoints_) << actionTarget_.head(nlegJoints_).cwiseProduct(actionStd_.head(nlegJoints_));
-//    jointTarget_.head(nlegJoints_) += actionMean_.head(nlegJoints_);
-//
-//    pTarget_.segment(7,nlegJoints_) = jointTarget_.head(nlegJoints_);
-//    raibo_->setPdTarget(pTarget_, vTarget_);
-
-    /// Variable impedance control
-//    Eigen::VectorXd PDgainTarget_, PDgainTarget_exp_;
-//    PDgainTarget_.setZero(nVargain_);
-//    PDgainTarget_exp_.setZero(nVargain_);
-//    PDgainTarget_ = actionTarget_.tail(nVargain_).cwiseProduct(actionStd_.tail(nVargain_));
-//    PDgainTarget_exp_ = PDgainTarget_.array().exp();
-//    PDgainTarget_ = actionMean_.tail(nVargain_).cwiseProduct(PDgainTarget_exp_);
-
-//    posPgain_ = PDgainTarget_[0];
-//    posDgain_ = PDgainTarget_[1];
-//    oriPgain_ = PDgainTarget_[2];
-//    oriDgain_ = PDgainTarget_[3];
-
-//    smoothReward_ = curriculumFactor * smoothRewardCoeff_ * (prevprevAction_ + jointTarget_ - 2 * previousAction_).squaredNorm();
     return true;
   }
 
@@ -447,6 +425,8 @@ class RaiboController {
     is_success_ = false;
     is_achieved = true;
     friction_ = friction;
+    pre_command_.setZero();
+    prepre_command_.setZero();
     // history
     for (int i = 0; i < historyNum_; i++)
     {
@@ -470,15 +450,17 @@ class RaiboController {
     stepData_[1] = stayObjectReward_;
     stepData_[2] = towardTargetReward_;
     stepData_[3] = stayTargetReward_;
-    stepData_[4] = commandReward_;
+    stepData_[4] = commandsmoothReward_;
     stepData_[5] = torqueReward_;
     stepData_[6] = stayObjectHeadingReward_;
+    stepData_[7] = commandsmooth2Reward_;
 
     towardObjectReward_ = 0.;
     stayObjectReward_ = 0.;
     towardTargetReward_ = 0.;
     stayTargetReward_ = 0.;
-    commandReward_ = 0.;
+    commandsmoothReward_ = 0.;
+    commandsmooth2Reward_ = 0.;
     torqueReward_ = 0.;
     stayObjectHeadingReward_ = 0.;
 
@@ -491,27 +473,7 @@ class RaiboController {
     if(std::find(success_batch_.begin(), success_batch_.end(), false) == success_batch_.end())
       return true;
 
-//    /// if the contact body is not feet
-//    for (auto &contact: raibo_->getContacts())
-//    {
-//      if (contact.getlocalBodyIndex() == armIndices_.front())
-//      {
-//        continue;
-//      }
-//
-////      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end() || contact.isSelfCollision())
-//      if (std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex()) == footIndices_.end())
-//        return true;
-//
-//    }
-
-
-
     terminalReward = 0.f;
-//    Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
-//    if (obj_to_target.norm() < 0.03)
-//      terminalReward = 0.1;
-
 
 
     return false;
@@ -567,7 +529,8 @@ class RaiboController {
     READ_YAML(double, stayObjectRewardCoeff_, cfg["reward"]["stayObjectRewardCoeff_"])
     READ_YAML(double, towardTargetRewardCoeff_, cfg["reward"]["towardTargetRewardCoeff_"])
     READ_YAML(double, stayTargetRewardCoeff_, cfg["reward"]["stayTargetRewardCoeff_"])
-    READ_YAML(double, commandRewardCoeff_, cfg["reward"]["commandRewardCoeff_"])
+    READ_YAML(double, commandsmoothRewardCoeff_, cfg["reward"]["commandsmoothRewardCoeff_"])
+    READ_YAML(double, commandsmooth2RewardCoeff_, cfg["reward"]["commandsmooth2RewardCoeff_"])
     READ_YAML(double, torqueRewardCoeff_, cfg["reward"]["torque_reward_coeff"])
     READ_YAML(double, stayObjectHeadingRewardCoeff_, cfg["reward"]["stayObjectHeadingRewardCoeff_"])
   }
@@ -614,10 +577,12 @@ class RaiboController {
     stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
 
     double commandReward_tmp = std::max(5., static_cast<double>(command_.norm()));
-    double command_smooth = (command_ - pre_command_).norm();
+    double command_smooth = (command_ - pre_command_).squaredNorm();
+    double command_smooth2 = (command_ - 2*pre_command_ + prepre_command_).squaredNorm();
 
 //    double remnant_dist =
-    commandReward_ += cf * commandRewardCoeff_ * simDt_ * exp(-command_smooth);
+    commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
+    commandsmoothReward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
 
     torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
 
@@ -691,7 +656,7 @@ class RaiboController {
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
 //  static constexpr double simDt_ = .001;
-  static constexpr double simDt_ = .00025;
+  static constexpr double simDt_ = .0025;
   static constexpr int gcDim_ = 19;
   static constexpr int gvDim_ = 18;
   static constexpr int nPosHist_ = 3;
@@ -716,7 +681,7 @@ class RaiboController {
   Eigen::VectorXd historyTempMemory_2;
   std::array<bool, 4> footContactState_;
   raisim::Mat<3, 3> baseRot_;
-  Eigen::Vector3f command_, pre_command_;
+  Eigen::Vector3f command_, pre_command_, prepre_command_;
   Eigen::Vector3d desired_pos_;
   double desired_dist_;
   bool is_achieved = true;
@@ -762,7 +727,8 @@ class RaiboController {
   double towardTargetRewardCoeff_ = 0., towardTargetReward_ = 0.;
   double stayTargetRewardCoeff_ = 0., stayTargetReward_ = 0.;
   double terminalRewardCoeff_ = 0.0;
-  double commandRewardCoeff_ = 0., commandReward_ = 0.;
+  double commandsmoothRewardCoeff_ = 0., commandsmoothReward_ = 0.;
+  double commandsmooth2RewardCoeff_ = 0., commandsmooth2Reward_ = 0.;
   double torqueRewardCoeff_ = 0., torqueReward_ = 0.;
   double stayObjectHeadingReward_ = 0., stayObjectHeadingRewardCoeff_ = 0.;
 

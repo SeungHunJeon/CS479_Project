@@ -99,7 +99,6 @@ class ENVIRONMENT_ROLLOUT {
     action_info_history.resize(historyNum_);
     dynamics_info_history.resize(historyNum_);
     predict_Obj_batch_.resize(nHorizon_);
-    RSINFO(1)
     joint_position_history.setZero(nJoints_ * 14);
     joint_velocity_history.setZero(nJoints_ * 14);
     prevAction.setZero(nJoints_);
@@ -121,7 +120,6 @@ class ENVIRONMENT_ROLLOUT {
       Low_velocity_controller_0.create(&world_0);
     }
 
-    RSINFO(1)
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i<n_samples; i++) {
       raisim::World *world = new raisim::World;
@@ -179,7 +177,7 @@ class ENVIRONMENT_ROLLOUT {
       server_->focusOn(raibo_0);
       std::cout << "Launch Server !!" << std::endl;
       command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, command_object_height_, 1, 0, 0, 0.5);
-#pragma omp parallel for schedule(auto)
+//#pragma omp parallel for schedule(auto)
       for (int i = 0; i<nHorizon_; i++) {
         auto Obj = server_->addVisualSphere("Predict_Obj_" + std::to_string(i), 0.2, 0.4, 0.4, 0.8, 0.6);
         predict_Obj_batch_[i] = Obj;
@@ -520,7 +518,7 @@ class ENVIRONMENT_ROLLOUT {
     world_0.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_0, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, obj_mass_, 0.5, 0.55, 1.0, 1.0);
-    Obj_->setAppearance("0, 1, 0, 1.0");
+    Obj_->setAppearance("0, 1, 0, 0.3");
     controller_0.updateObject(Obj_);
     object_height = objectGenerator_.get_height();
 

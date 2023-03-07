@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
+import time
 class MPPI():
 
     def __init__(self,
@@ -116,7 +117,10 @@ class MPPI():
             # next_observation_batch = self.env.step_rollout(actions)
 
             # Rollout
+            toc = time.time()
             self.env.step_rollout(actions)
+            tic = time.time()
+            print("time consuming for step rollout : ", tic-toc)
             next_observation_batch = self.env.observe_Rollout(False)
             next_state_batch = self.env.get_obj_pos()
 

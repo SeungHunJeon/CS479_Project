@@ -84,10 +84,10 @@ bool raibotDefaultController::reset(raisim::World *world) {
 }
 
 bool raibotDefaultController::advance(raisim::World *world) {
-  if(clk_ % int(control_dt_ / communication_dt_ + 1e-10) == 0) {
-    raibotController_.updateObservation(world);
-    raibotController_.advance(world, obsScalingAndGetAction().head(12));
-  }
+//  if(clk_ % int(control_dt_ / communication_dt_ + 1e-10) == 0) {
+  raibotController_.updateObservation(world);
+  raibotController_.advance(world, obsScalingAndGetAction().head(12));
+//  }
 
   clk_++;
   return true;

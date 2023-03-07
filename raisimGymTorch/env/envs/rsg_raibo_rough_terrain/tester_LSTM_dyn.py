@@ -48,7 +48,7 @@ if (is_rollout):
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain_ROLLOUT(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 else:
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-
+print(2)
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
@@ -249,14 +249,19 @@ else:
                     action_ll, actions_log_prob = actor.sample(latent_ROA)
                     success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                     env.step_visualize_success(action_ll, success)
+                    print(action_ll)
 
                 if (is_rollout == True):
                     obs = env.observe(False)
                     obs_ROA = get_obs_ROA(Encoder, obs)
                     latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
                     cur_pos = env.get_obj_pos()
+                    tic = time.time()
                     cur_observation = env.observe_Rollout(False)
+
                     action_rollout, predict_states = traj_sampler.compute_rollout(goal_state=target_pos, cur_state=cur_pos, cur_observation=cur_observation)
+                    toc = time.time()
+                    print("time consuming : ", toc - tic)
                     env.predict_obj_update(predict_states.numpy())
                     env.step_visualize(action_rollout.numpy())
                     env.synchronize()
