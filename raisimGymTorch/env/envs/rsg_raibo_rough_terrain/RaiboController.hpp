@@ -172,7 +172,8 @@ class RaiboController {
                     "stayObject_rew",
                     "towardTarget_rew",
                     "stayTarget_rew",
-                    "command_rew",
+                    "commandsmooth_rew",
+                    "commandsmooth2_rew",
                     "torque_rew",
                     "stayObject_heading_rew"};
     stepData_.resize(stepDataTag_.size());
@@ -451,9 +452,10 @@ class RaiboController {
     stepData_[2] = towardTargetReward_;
     stepData_[3] = stayTargetReward_;
     stepData_[4] = commandsmoothReward_;
-    stepData_[5] = torqueReward_;
-    stepData_[6] = stayObjectHeadingReward_;
-    stepData_[7] = commandsmooth2Reward_;
+    stepData_[5] = commandsmooth2Reward_;
+    stepData_[6] = torqueReward_;
+    stepData_[7] = stayObjectHeadingReward_;
+
 
     towardObjectReward_ = 0.;
     stayObjectReward_ = 0.;

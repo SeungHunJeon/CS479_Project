@@ -21,9 +21,9 @@ class raibotDefaultController {
 
     std::string current_path = tmp;
 
-//    std::string network_path = current_path + "/../../../../default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
+    std::string network_path = current_path + "/../../../../default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
 
-    std::string network_path = "/home/oem/workspace/raisimGymForRaisin/default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
+//    std::string network_path = "/home/oem/workspace/raisimGymForRaisin/default_controller_demo/module/controller/raibot_default_controller/network/network_100000";
     actor_.readParamFromTxt(network_path + "/actor.txt");
     estimator_.readParamFromTxt(network_path + "/estimator.txt");
 
