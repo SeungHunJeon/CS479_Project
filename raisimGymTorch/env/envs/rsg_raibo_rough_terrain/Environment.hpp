@@ -290,7 +290,7 @@ class ENVIRONMENT {
 
         subStep();
 //        if(visualize)
-//          std::this_thread::sleep_for(std::chrono::microseconds(200));
+//          std::this_thread::sleep_for(std::chrono::microseconds(1000));
 
         if(isTerminalState(dummy)) {
           howManySteps++;

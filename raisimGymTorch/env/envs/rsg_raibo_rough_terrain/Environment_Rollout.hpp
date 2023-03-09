@@ -343,19 +343,11 @@ class ENVIRONMENT_ROLLOUT {
     /// set the state
     raibo_0->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
     controller_0.reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
-    if(is_position_goal)
-    {
-      Low_controller_0.reset(&world_0);
-      controller_0.updateStateVariables();
-      Low_controller_0.updateStateVariable();
-    }
 
-    else
-    {
-      Low_velocity_controller_0.reset(&world_0);
-      controller_0.updateStateVariables();
-//      Low_velocity_controller_0.updateStateVariable();
-    }
+    Low_velocity_controller_0.reset(&world_0);
+    controller_0.updateStateVariables();
+    Low_velocity_controller_0.updateObservation(&world_0);
+
 
 
     reset_Rollout();
@@ -364,47 +356,6 @@ class ENVIRONMENT_ROLLOUT {
 
 
   void rollout_step(Eigen::Ref<EigenRowMajorMat> &action, bool b) {
-    if(is_position_goal) {
-#pragma omp parallel for schedule(auto)
-      for (int i = 0; i<n_samples; i++) {
-        Eigen::Vector3f command;
-
-        command = controller_batch_[i]->advance(world_batch_[i], action.row(i));
-        Low_controller_batch_[i]->setCommand(command);
-
-        float dummy;
-        int howManySteps;
-        int lowlevelSteps;
-
-        /// Low level frequency
-        for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
-
-          /// per 0.02 sec, update history
-          if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_batch_[i]->historyNum_))
-          {
-            controller_batch_[i]->updateHistory();
-            controller_batch_[i]->update_actionHistory(world_batch_[i], action, curriculumFactor_);
-          }
-          Low_controller_batch_[i]->updateObservation(world_batch_[i]);
-          Low_controller_batch_[i]->advance(world_batch_[i]);
-
-          /// Simulation frequency
-          for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
-
-            subStep_Rollout(i);
-//          if(visualize)
-//          std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-//            if(isTerminalState(dummy)) {
-//              howManySteps++;
-//              break;
-//            }
-          }
-        }
-      }
-    }
-
-    else {
 #pragma omp parallel for schedule(auto)
       for (int i = 0; i<n_samples; i++) {
         Eigen::Vector3f command;
@@ -426,6 +377,8 @@ class ENVIRONMENT_ROLLOUT {
             controller_batch_[i]->update_actionHistory(world_batch_[i], action, curriculumFactor_);
           }
 
+          Low_velocity_controller_batch_[i]->advance(world_batch_[i]);
+
           /// Simulation frequency
           for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
@@ -438,7 +391,6 @@ class ENVIRONMENT_ROLLOUT {
 //              break;
 //            }
           }
-        }
       }
     }
 
@@ -486,6 +438,9 @@ class ENVIRONMENT_ROLLOUT {
         Low_controller_0.updateObservation(&world_0);
         Low_controller_0.advance(&world_0);
       }
+
+      else
+        Low_velocity_controller_0.advance(&world_0);
 
       /// Simulation frequency
       for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
@@ -563,23 +518,34 @@ class ENVIRONMENT_ROLLOUT {
     Eigen::VectorXf gc(raibo_0->getGeneralizedCoordinateDim());
     Eigen::VectorXf gv(raibo_0->getDOF());
 
+    get_Controller_History(obj_info_history,
+                           state_info_history,
+                           action_info_history,
+                           dynamics_info_history);
+
     get_obj_info_(pos,
                   Rot,
                   lin_vel,
                   ang_vel
                   );
 
+    auto actor = Low_velocity_controller_0.export_actor();
+    auto estimator = Low_velocity_controller_0.export_estimator();
+
     get_robot_info_(gc,
                     gv);
 
     Eigen::VectorXd gc_double = gc.cast<double>();
     Eigen::VectorXd gv_double = gv.cast<double>();
-    if(is_position_goal)
-    {
+
 #pragma omp parallel for schedule(auto)
       for (int i=0; i<n_samples; i++) {
-        *controller_batch_[i] = controller_0;
-        *Low_controller_batch_[i] = Low_controller_0;
+        controller_batch_[i]->set_History(obj_info_history,
+                                          state_info_history,
+                                          action_info_history,
+                                          dynamics_info_history);
+
+        Low_velocity_controller_batch_[i]->update_model(actor, estimator);
 
         auto raibo = reinterpret_cast<raisim::ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
         raibo->setState(gc_double, gv_double);
@@ -591,30 +557,8 @@ class ENVIRONMENT_ROLLOUT {
         obj->setAngularVelocity(ang_vel);
 
         controller_batch_[i]->updateStateVariables();
-        Low_controller_batch_[i]->updateStateVariable();
+        Low_velocity_controller_batch_[i]->updateObservation(world_batch_[i]);
       }
-    }
-
-    else
-    {
-#pragma omp parallel for schedule(auto)
-      for (int i=0; i<n_samples; i++) {
-        *controller_batch_[i] = controller_0;
-        *Low_velocity_controller_batch_[i] = Low_velocity_controller_0;
-
-        auto raibo = reinterpret_cast<raisim::ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
-        raibo->setState(gc_double, gv_double);
-
-        auto obj = reinterpret_cast<SingleBodyObject *>(world_batch_[i]->getObject("Object"));
-        obj->setPosition(pos);
-        obj->setOrientation(Rot);
-        obj->setLinearVelocity(lin_vel);
-        obj->setAngularVelocity(ang_vel);
-
-        controller_batch_[i]->updateStateVariables();
-//        Low_velocity_controller_batch_[i]->updateStateVariable();
-      }
-    }
   }
 
   void predict_obj_update(Eigen::Ref<EigenRowMajorMat> &predict_state_batch) {
@@ -650,6 +594,16 @@ class ENVIRONMENT_ROLLOUT {
     return image;
   }
 
+  void get_Controller_History(std::vector<Eigen::VectorXd> &obj_info_history,
+                              std::vector<Eigen::VectorXd> &state_info_history,
+                              std::vector<Eigen::VectorXd> &action_info_history,
+                              std::vector<Eigen::VectorXd> &dynamics_info_history) {
+    controller_0.get_History(obj_info_history,
+                             state_info_history,
+                             action_info_history,
+                             dynamics_info_history);
+  }
+
   void get_obj_info_(Eigen::Vector3d &pos,
                      Eigen::Matrix3d &Rot,
                      raisim::Vec<3> &lin_vel,
@@ -675,8 +629,8 @@ class ENVIRONMENT_ROLLOUT {
 //#pragma omp parallel for schedule(auto)
     if(is_position_goal)
       Low_controller_batch_[idx]->updateHistory();
-    else
-      Low_velocity_controller_batch_[idx]->advance(world_batch_[idx]);
+//    else
+//      Low_velocity_controller_batch_[idx]->advance(world_batch_[idx]);
     world_batch_[idx]->integrate1();
     world_batch_[idx]->integrate2();
     if(is_position_goal)
@@ -689,8 +643,8 @@ class ENVIRONMENT_ROLLOUT {
     if(is_position_goal)
       Low_controller_0.updateHistory();
 
-    else
-      Low_velocity_controller_0.advance(&world_0);
+//    else
+//      Low_velocity_controller_0.advance(&world_0);
 
     world_0.integrate1();
     if(server_) server_->lockVisualizationServerMutex();

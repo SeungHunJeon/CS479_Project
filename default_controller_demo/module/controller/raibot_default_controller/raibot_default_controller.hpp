@@ -128,6 +128,11 @@ class raibotDefaultController {
 
     return action;
   };
+
+  void updateObservation(raisim::World *world) {
+    raibotController_.updateObservation(world);
+  }
+
   bool advance(raisim::World *world) {
     raibotController_.updateObservation(world);
     raibotController_.advance(world, obsScalingAndGetAction().head(12));
@@ -137,6 +142,24 @@ class raibotDefaultController {
   };
   void setCommand(const Eigen::Ref<raisim::EigenVec>& command) {
     raibotController_.setCommand(command);
+  }
+
+
+  void update_model (raisim::nn::LSTM_MLP<float, 41, 12, raisim::nn::ActivationType::leaky_relu> actor,
+                     raisim::nn::LSTM_MLP<float, 30, 8, raisim::nn::ActivationType::leaky_relu> estimator)
+  {
+    actor_ = actor;
+    estimator_ = estimator;
+  }
+
+  raisim::nn::LSTM_MLP<float, 41, 12, raisim::nn::ActivationType::leaky_relu> export_actor ()
+  {
+    return actor_;
+  }
+
+  raisim::nn::LSTM_MLP<float, 30, 8, raisim::nn::ActivationType::leaky_relu> export_estimator ()
+  {
+    return estimator_;
   }
 
  private:

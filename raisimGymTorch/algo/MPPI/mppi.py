@@ -7,13 +7,15 @@ class MPPI():
     def __init__(self,
                  dynamics,
                  encoder,
+                 encoder_ROA,
                  actor,
                  environment,
                  n_samples,
                  horizon,
                  gamma,
                  device,
-                 use_dynamics):
+                 use_dynamics,
+                 inertial_dim):
 
         self.dynamics = dynamics
         self.n_samples = n_samples
@@ -23,6 +25,8 @@ class MPPI():
         self.cur_latent = None
         self.cur_state = None
         self.encoder = encoder
+        self.encoder_ROA = encoder_ROA
+        self.encoder_ROA_Rollout = encoder_ROA
         self.env = environment
         self.criteria = nn.MSELoss()
         self.gamma = gamma
@@ -31,7 +35,7 @@ class MPPI():
         self.best_cost = 10000
         self.best_actions = None
         self.best_future_states = None
-
+        self.inertial_dim = inertial_dim
     def smoothing_actions(self, action_batch, return_batch):
 
         smoothed_action = None
@@ -45,7 +49,7 @@ class MPPI():
                                 (self.encoder.architecture.block_dim)*i:
                                 (self.encoder.architecture.block_dim)*i
                                 + self.encoder.architecture.pro_dim
-                                + self.encoder.architecture.ext_dim])
+                                + self.encoder.architecture.ext_dim - self.inertial_dim])
 
         if isinstance(filtered_obs[0], np.ndarray):
             filtered_obs = np.concatenate(filtered_obs, axis=-1)
@@ -65,7 +69,7 @@ class MPPI():
         """
         action sampling from uniform distribution
         """
-        sampled_action = 6 * (np.random.rand(self.n_samples, 2).astype(np.float32) - 0.5)
+        # sampled_action = 6 * (np.random.rand(self.n_samples, 2).astype(np.float32) - 0.5)
         """
         action sampling from uniform distribution & rejection through current policy
         """
@@ -80,7 +84,7 @@ class MPPI():
         return sampled_action
 
     def cost_function(self, goal_state_batch, state_batch):
-        dist = torch.square(goal_state_batch - state_batch)
+        dist = torch.square(goal_state_batch[...,:2] - state_batch[...,:2])
         dist=dist.mean(dim=[0,-1])
         cost_batch = dist
         print(torch.min(cost_batch))
@@ -106,14 +110,19 @@ class MPPI():
         cur_state_batch = self.cur_state
         cur_observation_batch = self.cur_observation
         filtered_obs = self.filter_for_encode_from_obs(cur_observation_batch)
-        cur_latent_batch = self.encoder.evaluate(filtered_obs)
-
+        cur_latent_batch = self.encoder_ROA.evaluate(filtered_obs)
+        # self.encoder_ROA_Rollout = self.encoder_ROA
         for i in range(self.horizon):
             actions = self.sampling_actions(cur_latent_batch)
             total_action_batch.append(torch.Tensor(actions))
 
             # Dynamics model
-            # next_state_batch = self.dynamics.predict(cur_state_batch, actions, cur_latent_batch)
+            # dynamics_input = torch.Tensor(np.concatenate([actions, cur_latent_batch], axis=-1))
+            # predicted_state = self.dynamics.predict(dynamics_input)
+            # print(predicted_state.shape)
+            # predicted_state_z = torch.Tensor(np.zeros([300])).unsqueeze(-1)
+            # predicted_state = torch.cat([predicted_state, predicted_state_z],dim=-1)
+            # next_state_batch = predicted_state + cur_state_batch
             # next_observation_batch = self.env.step_rollout(actions)
 
             # Rollout
@@ -127,7 +136,7 @@ class MPPI():
             total_state_batch.append(torch.Tensor(next_state_batch))
             cur_state_batch = next_state_batch
             cur_observation_batch = next_observation_batch
-            cur_latent_batch = self.encoder.evaluate(self.filter_for_encode_from_obs(cur_observation_batch))
+            cur_latent_batch = self.encoder_ROA.evaluate(self.filter_for_encode_from_obs(cur_observation_batch))
 
         # I don't know exact dimension ..
         total_state_batch = torch.stack(total_state_batch, dim=0)

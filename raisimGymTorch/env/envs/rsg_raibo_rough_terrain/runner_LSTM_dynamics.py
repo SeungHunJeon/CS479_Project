@@ -62,11 +62,11 @@ pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
 dynamics_dim = cfg['environment']['dimension']['dynamicsDim_']
-ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
+ROA_ext_dim = ext_dim - inertial_dim
 
 # shortcuts
 act_dim = env.num_acts
-Encoder_ob_dim = historyNum * (pro_dim + ext_dim)
+Encoder_ob_dim = historyNum * (pro_dim + ext_dim + act_dim)
 
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
@@ -74,7 +74,7 @@ batchNum = cfg['LSTM']['batchNum_']
 is_decouple = cfg['LSTM']['is_decouple_']
 
 # ROA Encoding
-ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim)
+ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])

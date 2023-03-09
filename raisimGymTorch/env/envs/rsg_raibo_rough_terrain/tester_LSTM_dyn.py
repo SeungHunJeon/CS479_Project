@@ -187,17 +187,17 @@ else:
                                                                                cfg['seed']),
                              device)
 
-    Encoder_Rollout = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
-                                                              hidden_dim=hidden_dim,
-                                                              ext_dim=ext_dim,
-                                                              pro_dim=pro_dim,
-                                                              act_dim=act_dim,
-                                                              dyn_dim=dynamics_dim,
-                                                              hist_num=historyNum,
-                                                              batch_num=batchNum,
-                                                              device=device,
-                                                              num_env=n_samples,
-                                                              is_decouple=is_decouple), device=device)
+    Encoder_Rollout = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
+                                                                      hidden_dim=hidden_dim,
+                                                                      ext_dim=ROA_ext_dim,
+                                                                      pro_dim=pro_dim,
+                                                                      act_dim=act_dim,
+                                                                      dyn_dim=dynamics_dim,
+                                                                      hist_num=historyNum,
+                                                                      device=device,
+                                                                      batch_num=batchNum,
+                                                                      num_env = n_samples,
+                                                                      is_decouple=is_decouple), device=device)
 
     actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
@@ -207,6 +207,9 @@ else:
                                                                                cfg['seed']),
                              device)
 
+    Encoder_Rollout.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
+    actor_Rollout.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
+    actor_Rollout.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
     actor.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
     actor.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
@@ -219,14 +222,16 @@ else:
     env.turn_on_visualization()
 
     traj_sampler = mppi.MPPI(dynamics=obj_f_dynamics,
-                             encoder=Encoder_Rollout,
+                             encoder=Encoder,
+                             encoder_ROA=Encoder_Rollout,
                              actor=actor_Rollout,
                              environment=env,
                              n_samples=n_samples,
                              horizon=n_horizon,
                              gamma=gamma,
                              device=device,
-                             use_dynamics=use_dynamics)
+                             use_dynamics=use_dynamics,
+                             inertial_dim=inertial_dim)
 
     for i in range (int(int(iteration_number) / 100)):
         env.curriculum_callback()
@@ -249,17 +254,19 @@ else:
                     action_ll, actions_log_prob = actor.sample(latent_ROA)
                     success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                     env.step_visualize_success(action_ll, success)
+
                     print(action_ll)
 
                 if (is_rollout == True):
-                    obs = env.observe(False)
-                    obs_ROA = get_obs_ROA(Encoder, obs)
-                    latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+                    # obs = env.observe(False)
+                    # obs_ROA = get_obs_ROA(Encoder, obs)
+                    # latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
                     cur_pos = env.get_obj_pos()
                     tic = time.time()
                     cur_observation = env.observe_Rollout(False)
 
                     action_rollout, predict_states = traj_sampler.compute_rollout(goal_state=target_pos, cur_state=cur_pos, cur_observation=cur_observation)
+                    env.synchronize()
                     toc = time.time()
                     print("time consuming : ", toc - tic)
                     env.predict_obj_update(predict_states.numpy())

@@ -63,7 +63,7 @@ encoder:
 
 LSTM:
   is_decouple_: False
-  hiddendim_: 52
+  hiddendim_: 55
   batchNum_: 1
 
 architecture:

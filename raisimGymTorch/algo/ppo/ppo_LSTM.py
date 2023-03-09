@@ -221,19 +221,18 @@ class PPO:
     def filter_for_encode_from_obs(self, obs_batch):
         filtered_obs = []
         for i in range(self.num_history_batch):
+            # filtered_obs.append(obs_batch[...,
+            #                     (self.encoder.architecture.block_dim)*i:
+            #                     (self.encoder.architecture.block_dim)*i
+            #                     + self.encoder.architecture.pro_dim
+            #                     + self.encoder.architecture.ext_dim])
+
             filtered_obs.append(obs_batch[...,
                                 (self.encoder.architecture.block_dim)*i:
                                 (self.encoder.architecture.block_dim)*i
                                 + self.encoder.architecture.pro_dim
-                                + self.encoder.architecture.ext_dim])
-
-            # filtered_obs.append(obs_batch[...,
-            #                     (self.encoder.architecture.block_dim)*i
-            #                     + self.encoder.architecture.pro_dim
-            #                     + self.encoder.architecture.ext_dim
-            #                     + self.encoder.architecture.act_dim:
-            #                     (self.encoder.architecture.block_dim)*i
-            #                     + self.encoder.architecture.block_dim])
+                                + self.encoder.architecture.ext_dim
+                                + self.encoder.architecture.act_dim])
 
         if isinstance(filtered_obs[0], numpy.ndarray):
             filtered_obs = numpy.concatenate(filtered_obs, axis=-1)
@@ -288,14 +287,15 @@ class PPO:
                                  + self.encoder.architecture.pro_dim
                                  + self.encoder.architecture.ext_dim - self.inertial_dim])
 
-            # # Get action part of observation
-            # obs_ROA_batch.append(obs_batch[...,
-            #                      (self.encoder.architecture.block_dim)*i
-            #                      + self.encoder.architecture.pro_dim
-            #                      + self.encoder.architecture.ext_dim
-            #                      + self.encoder.architecture.act_dim:
-            #                      (self.encoder.architecture.block_dim)*i
-            #                      + self.encoder.architecture.block_dim])
+            # Get action part of observation
+            obs_ROA_batch.append(obs_batch[...,
+                                 (self.encoder.architecture.block_dim)*i
+                                 + self.encoder.architecture.pro_dim
+                                 + self.encoder.architecture.ext_dim:
+                                 (self.encoder.architecture.block_dim)*i
+                                 + self.encoder.architecture.pro_dim
+                                 + self.encoder.architecture.ext_dim
+                                 + self.encoder.architecture.act_dim])
 
         # Distillate the true inertial parameter (oracle)
 
