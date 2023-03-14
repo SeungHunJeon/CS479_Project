@@ -218,7 +218,9 @@ for update in range(iteration_number, 1000000):
             'Inertial_estimator': Estimator.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
             'obj_f_dynamics_state_dict': obj_f_dynamics.architecture.state_dict(),
-            'obs_f_dynamics_state_dict': obs_f_dynamics.architecture.state_dict()
+            'obs_f_dynamics_state_dict': obs_f_dynamics.architecture.state_dict(),
+            'latent_f_dynamics_state_dict': latent_f_dynamics.architecture.state_dict(),
+            'Decoder_state_dict': Decoder.architecture.state_dict()
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
         data_size = 0
