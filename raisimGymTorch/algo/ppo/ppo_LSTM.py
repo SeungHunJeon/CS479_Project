@@ -16,8 +16,10 @@ class PPO:
                  actor,
                  critic,
                  encoder,
+                 decoder,
                  obj_f_dynamics,
                  obs_f_dyanmics,
+                 latent_f_dynamics,
                  obs_shape,
                  num_envs,
                  num_transitions_per_env,
@@ -55,6 +57,8 @@ class PPO:
         self.estimator = estimator
         self.obj_f_dynamics = obj_f_dynamics
         self.obs_f_dynamics = obs_f_dyanmics
+        self.latent_f_dynamics = latent_f_dynamics
+        self.decoder = decoder
 
         if shuffle_batch:
             self.batch_sampler = self.storage.mini_batch_generator_shuffle
@@ -68,9 +72,11 @@ class PPO:
                                      *self.encoder_ROA.parameters(),
                                      # *self.estimator.parameters(),
                                      # *self.obs_f_dynamics.parameters()
+                                     *self.decoder.parameters()
                                      ], lr=learning_rate)
 
-        self.dynamics_optimizer = optim.Adam([*self.obj_f_dynamics.parameters()],
+        self.dynamics_optimizer = optim.Adam([*self.obj_f_dynamics.parameters(),
+                                              *self.latent_f_dynamics.parameters()],
                                              lr=learning_rate)
 
         # remove estimator
@@ -130,6 +136,12 @@ class PPO:
         # Entropy
         self.entropy_mean = None
 
+        # latent f dynamics loss
+        self.latent_f_dyn_loss = None
+
+        # Decoder loss
+        self.decoder_loss = None
+
     def act(self, actor_obs):
         self.actor_obs = actor_obs
         with torch.inference_mode():
@@ -169,11 +181,60 @@ class PPO:
         self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
 
-    # def filter_for_obs_f_dynamics_from_obs(self, obs_batch, latent_batch):
-    #     obs_f_dynamics_obs = []
-    #
-    #     return obs_f_dynamics_obs
-    def filter_for_obj_f_dynamics_from_obs(self, obs_batch, latent_batch):
+    def filter_for_decoder_from_obs(self, obs_batch, latent_batch):
+
+        decoder_output = []
+
+        decoder_input = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
+
+        decoder_output.append(obs_batch[..., self.encoder.architecture.block_dim * (self.num_history_batch - 1)
+                                            :
+                                            self.encoder.architecture.block_dim * (self.num_history_batch - 1)
+                                            + self.encoder.architecture.pro_dim
+                                            + self.encoder.architecture.ext_dim
+                                            - self.inertial_dim])
+
+        decoder_output.append(obs_batch[..., self.encoder.architecture.block_dim * (self.num_history_batch - 1)
+                                            + self.encoder.architecture.pro_dim
+                                            + self.encoder.architecture.ext_dim
+                                            :
+                                            self.encoder.architecture.block_dim * (self.num_history_batch - 1)
+                                            + self.encoder.architecture.pro_dim
+                                            + self.encoder.architecture.ext_dim
+                                            + self.encoder.architecture.act_dim])
+
+        decoder_output = torch.cat(decoder_output, dim=-1)
+
+        return decoder_input, decoder_output
+
+
+    def filter_for_latent_f_dynamics_from_obs(self, obs_batch, latent_batch_):
+        latent_f_dynamics_input = []
+
+        latent_batch = latent_batch_.clone().detach()
+
+        latent_batch = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
+
+        latent_batch_input = latent_batch[:-1, ...]
+
+        latent_predict_true = latent_batch[1:, ...]
+
+        action_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
+                                          - self.encoder.architecture.act_dim
+                                          - self.encoder.architecture.dyn_info_dim
+                                          - self.encoder.architecture.dyn_predict_dim:
+                                          self.encoder.architecture.block_dim * self.num_history_batch
+                                          - self.encoder.architecture.dyn_info_dim
+                                          - self.encoder.architecture.dyn_predict_dim]
+
+        latent_f_dynamics_input.append(latent_batch_input)
+        latent_f_dynamics_input.append(action_batch_f)
+
+        latent_f_dynamics_input = torch.cat(latent_f_dynamics_input, dim=-1)
+
+        return latent_f_dynamics_input, latent_predict_true
+
+    def filter_for_obj_f_dynamics_from_obs(self, obs_batch, latent_batch_):
 
         # TODO -> whether
         if(self.encoder.architecture.is_decouple):
@@ -189,11 +250,11 @@ class PPO:
         #                                   - self.encoder.architecture.act_dim:
         #                                   self.encoder.architecture.block_dim]
 
-        obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim
+        obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
                                           - self.encoder.architecture.act_dim
                                           - self.encoder.architecture.dyn_info_dim
                                           - self.encoder.architecture.dyn_predict_dim:
-                                          self.encoder.architecture.block_dim
+                                          self.encoder.architecture.block_dim * self.num_history_batch
                                           - self.encoder.architecture.dyn_predict_dim]
 
         # obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.dyn_dim + self.encoder.architecture.act_dim)
@@ -201,6 +262,8 @@ class PPO:
         obs_batch_f = obs_batch_f.reshape(-1, (self.encoder.architecture.act_dim + self.encoder.architecture.dyn_info_dim))
 
         obj_f_dynamics_obs.append(obs_batch_f)
+
+        latent_batch = latent_batch_.clone().detach()
 
         latent_batch = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
 
@@ -212,13 +275,14 @@ class PPO:
 
         obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
 
-        obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim
+        obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim * self.num_history_batch
                                                - self.encoder.architecture.dyn_predict_dim:
-                                               self.encoder.architecture.block_dim]).clone().detach()
+                                               self.encoder.architecture.block_dim * self.num_history_batch]).clone().detach()
 
         obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_predict_dim)
 
         return obj_f_dynamics_obs, obj_f_dynamics_true
+
     def filter_for_encode_from_obs(self, obs_batch):
         filtered_obs = []
         for i in range(self.num_history_batch):
@@ -341,6 +405,8 @@ class PPO:
         self.estimator_loss = 0
         self.obj_f_dynamics_loss = 0
         self.entropy_mean = 0
+        self.latent_f_dyn_loss = 0
+        self.decoder_loss = 0
 
         self.lambda_ROA = pow(self.lambda_ROA, self.lambdaDecayFactor)
         print(self.lambda_ROA)
@@ -366,6 +432,10 @@ class PPO:
                 latent_ROA_d = latent_ROA.clone().detach()
 
                 obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent)
+
+                latent_f_dyn_input, latent_f_dyn_predict_true = self.filter_for_latent_f_dynamics_from_obs(obs_batch, latent)
+
+                decoder_input, decoder_output_true = self.filter_for_decoder_from_obs(obs_batch, latent)
 
                 # estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
@@ -416,6 +486,14 @@ class PPO:
 
                 obj_f_dynamics_loss = self.criteria(obj_f_dyn_predict, obj_f_dyn_true)
 
+                latent_f_dyn_predict = self.latent_f_dynamics.evaluate(latent_f_dyn_input)
+
+                latent_f_dyn_loss = self.criteria(latent_f_dyn_predict, latent_f_dyn_predict_true)
+
+                decoder_predict = self.decoder.evaluate(decoder_input)
+
+                decoder_loss = self.criteria(decoder_output_true, decoder_predict)
+
                 # Value function loss
                 if self.use_clipped_value_loss:
                     value_clipped = current_values_batch + (value_batch - current_values_batch).clamp(-self.clip_param,
@@ -429,7 +507,9 @@ class PPO:
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
                        + lambda_loss_ROA \
                        + loss_ROA \
-                       + obj_f_dynamics_loss
+                       + obj_f_dynamics_loss \
+                       + latent_f_dyn_loss \
+                       + decoder_loss
                        # + estimator_loss
 
                 # dynamics_loss = obj_f_dynamics_loss
@@ -440,16 +520,17 @@ class PPO:
                 self.optimizer.zero_grad()
                 self.dynamics_optimizer.zero_grad()
                 loss.backward()
-                # dynamics_loss.backward()
 
                 nn.utils.clip_grad_norm_([*self.actor.parameters(),
                                           *self.critic.parameters(),
                                           *self.encoder.parameters(),
                                           *self.encoder_ROA.parameters(),
+                                          *self.decoder.parameters()
                                           # *self.estimator.parameters(),
                                           ], self.max_grad_norm)
 
-                nn.utils.clip_grad_norm_([*self.obj_f_dynamics.parameters()]
+                nn.utils.clip_grad_norm_([*self.obj_f_dynamics.parameters(),
+                                          *self.latent_f_dynamics.parameters()]
                                          ,self.max_grad_norm)
 
                 # remove estimator
@@ -469,6 +550,8 @@ class PPO:
                     self.estimator_loss += estimator_loss.item()
                     self.obj_f_dynamics_loss += obj_f_dynamics_loss.item()
                     self.entropy_mean = (self.entropy_coef * entropy_batch.mean()).item()
+                    self.latent_f_dyn_loss += latent_f_dyn_loss.item()
+                    self.decoder_loss += decoder_loss.item()
 
         if log_this_iteration:
             num_updates = self.num_learning_epochs * self.num_mini_batches
@@ -479,5 +562,7 @@ class PPO:
             self.estimator_loss /= num_updates
             self.obj_f_dynamics_loss /= num_updates
             self.entropy_mean /= num_updates
+            self.obj_f_dynamics_loss /= num_updates
+            self.decoder_loss /= num_updates
 
         return mean_value_loss, mean_surrogate_loss, locals()

@@ -100,6 +100,22 @@ obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_
                                                      dynamics_predict_dim),
                                       device=device)
 
+latent_f_dynamics_input_dim = hidden_dim + act_dim
+
+latent_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
+                                                     nn.LeakyReLU,
+                                                     latent_f_dynamics_input_dim,
+                                                     hidden_dim),
+                                      device=device)
+
+
+
+Decoder = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['Decoder']['net'],
+                                                        nn.LeakyReLU,
+                                                        hidden_dim,
+                                                        int(ROA_Encoder_ob_dim/historyNum)),
+                                         device=device)
+
 Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                 nn.LeakyReLU,
                                                 int(Encoder_ob_dim/historyNum),
@@ -150,8 +166,10 @@ num_mini_batches = 1
 ppo = PPO.PPO(actor=actor,
               critic=critic,
               encoder=Encoder,
+              decoder=Decoder,
               obj_f_dynamics=obj_f_dynamics,
               obs_f_dyanmics=obs_f_dynamics,
+              latent_f_dynamics=latent_f_dynamics,
               num_envs=cfg['environment']['num_envs'],
               obs_shape=[env.num_obs],
               num_transitions_per_env=n_steps,
@@ -288,6 +306,8 @@ for update in range(iteration_number, 1000000):
         data_log['PPO/estimator_loss'] = ppo.estimator_loss
         data_log['PPO/obj_f_dynamics_loss'] = ppo.obj_f_dynamics_loss
         data_log['PPO/entropy'] = ppo.entropy_mean
+        data_log['PPO/latent_f_dynamics_loss'] = ppo.latent_f_dyn_loss
+        data_log['PPO/obs_decoder_loss'] = ppo.decoder_loss
 
         for id, data_name in enumerate(data_tags):
             data_log[data_name + '/mean'] = data_mean[id]

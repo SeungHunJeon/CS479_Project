@@ -85,5 +85,11 @@ architecture:
   obj_f_dynamics:
     net: [256, 128, 64]
 
+  latent_f_dynamics:
+    net: [512, 256, 128]
+
   obs_f_dynamics:
     net: [256, 128]
+
+  Decoder:
+    net: [512, 256, 128]
