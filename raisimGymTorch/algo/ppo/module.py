@@ -152,12 +152,13 @@ class Transformer_Encoder(nn.Module):
 #         return self.architecture.input_shape
 
 class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_dim, act_dim, hist_num, batch_num, num_env, is_decouple, device):
+    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_env, is_decouple, device):
         super(LSTM, self).__init__()
         self.ext_dim = ext_dim
         self.pro_dim = pro_dim
         self.act_dim = act_dim
-        self.dyn_dim = dyn_dim
+        self.dyn_info_dim = dyn_info_dim
+        self.dyn_predict_dim = dyn_predict_dim
         self.hist_num = hist_num
         self.device = device
         self.hidden_dim = hidden_dim
@@ -172,7 +173,7 @@ class LSTM(nn.Module):
         else:
             self.input_dim = input_dim*self.hist_num
 
-        self.block_dim = ext_dim + pro_dim + dyn_dim + act_dim
+        self.block_dim = ext_dim + pro_dim + dyn_info_dim + dyn_predict_dim + act_dim
 
         self.lstm = nn.LSTM(input_size=self.input_dim,
                             hidden_size=self.hidden_dim,

@@ -40,9 +40,10 @@ environment:
 
   dimension:
     proprioceptiveDim_: 9
-    exteroceptiveDim_: 43
+    exteroceptiveDim_: 36
     inertialparamDim_: 15
-    dynamicsDim_: 2
+    dynamicsInfoDim_: 6
+    dynamicsPredictDim_: 5
     historyNum_: 5
     actionhistoryNum_: 6
     actionDim_: 3
@@ -63,7 +64,7 @@ encoder:
 
 LSTM:
   is_decouple_: False
-  hiddendim_: 55
+  hiddendim_: 48
   batchNum_: 1
 
 architecture:

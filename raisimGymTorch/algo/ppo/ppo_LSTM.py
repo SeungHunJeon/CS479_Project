@@ -67,9 +67,12 @@ class PPO:
                                      *self.encoder.parameters(),
                                      *self.encoder_ROA.parameters(),
                                      # *self.estimator.parameters(),
-                                     *self.obj_f_dynamics.parameters()
                                      # *self.obs_f_dynamics.parameters()
                                      ], lr=learning_rate)
+
+        self.dynamics_optimizer = optim.Adam([*self.obj_f_dynamics.parameters()],
+                                             lr=learning_rate)
+
         # remove estimator
         # self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], lr=learning_rate)
         self.device = device
@@ -187,14 +190,15 @@ class PPO:
         #                                   self.encoder.architecture.block_dim]
 
         obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim
-                                          - self.encoder.architecture.dyn_dim
-                                          - self.encoder.architecture.act_dim:
+                                          - self.encoder.architecture.act_dim
+                                          - self.encoder.architecture.dyn_info_dim
+                                          - self.encoder.architecture.dyn_predict_dim:
                                           self.encoder.architecture.block_dim
-                                          - self.encoder.architecture.dyn_dim]
+                                          - self.encoder.architecture.dyn_predict_dim]
 
         # obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.dyn_dim + self.encoder.architecture.act_dim)
 
-        obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.act_dim)
+        obs_batch_f = obs_batch_f.reshape(-1, (self.encoder.architecture.act_dim + self.encoder.architecture.dyn_info_dim))
 
         obj_f_dynamics_obs.append(obs_batch_f)
 
@@ -209,13 +213,10 @@ class PPO:
         obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
 
         obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim
-                                               - self.encoder.architecture.dyn_dim:
-                                               self.encoder.architecture.block_dim]
-            - obs_batch[:-1, :, self.encoder.architecture.block_dim
-                               - self.encoder.architecture.dyn_dim:
-                               self.encoder.architecture.block_dim]).clone().detach()
+                                               - self.encoder.architecture.dyn_predict_dim:
+                                               self.encoder.architecture.block_dim]).clone().detach()
 
-        obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_dim)
+        obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_predict_dim)
 
         return obj_f_dynamics_obs, obj_f_dynamics_true
     def filter_for_encode_from_obs(self, obs_batch):
@@ -431,20 +432,25 @@ class PPO:
                        + obj_f_dynamics_loss
                        # + estimator_loss
 
-
+                # dynamics_loss = obj_f_dynamics_loss
 
                 # Add kl divergence term to normalize the latent vector
 
                 # Gradient step
                 self.optimizer.zero_grad()
+                self.dynamics_optimizer.zero_grad()
                 loss.backward()
+                # dynamics_loss.backward()
 
                 nn.utils.clip_grad_norm_([*self.actor.parameters(),
                                           *self.critic.parameters(),
                                           *self.encoder.parameters(),
                                           *self.encoder_ROA.parameters(),
                                           # *self.estimator.parameters(),
-                                          *self.obj_f_dynamics.parameters()], self.max_grad_norm)
+                                          ], self.max_grad_norm)
+
+                nn.utils.clip_grad_norm_([*self.obj_f_dynamics.parameters()]
+                                         ,self.max_grad_norm)
 
                 # remove estimator
                 # nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], self.max_grad_norm)
@@ -452,7 +458,7 @@ class PPO:
 
 
                 self.optimizer.step()
-
+                self.dynamics_optimizer.step()
                 # self.plot_grad_flow(self.encoder[0].architecture.named_parameters())
 
                 if log_this_iteration:

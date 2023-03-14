@@ -98,6 +98,7 @@ class ENVIRONMENT_ROLLOUT {
     state_info_history.resize(historyNum_);
     action_info_history.resize(historyNum_);
     dynamics_info_history.resize(historyNum_);
+    dynamics_predict_history.resize(historyNum_);
     predict_Obj_batch_.resize(nHorizon_);
     joint_position_history.setZero(nJoints_ * 14);
     joint_velocity_history.setZero(nJoints_ * 14);
@@ -521,7 +522,8 @@ class ENVIRONMENT_ROLLOUT {
     get_Controller_History(obj_info_history,
                            state_info_history,
                            action_info_history,
-                           dynamics_info_history);
+                           dynamics_info_history,
+                           dynamics_predict_history);
 
     get_obj_info_(pos,
                   Rot,
@@ -543,7 +545,8 @@ class ENVIRONMENT_ROLLOUT {
         controller_batch_[i]->set_History(obj_info_history,
                                           state_info_history,
                                           action_info_history,
-                                          dynamics_info_history);
+                                          dynamics_info_history,
+                                          dynamics_predict_history);
 
         Low_velocity_controller_batch_[i]->update_model(actor, estimator);
 
@@ -597,11 +600,13 @@ class ENVIRONMENT_ROLLOUT {
   void get_Controller_History(std::vector<Eigen::VectorXd> &obj_info_history,
                               std::vector<Eigen::VectorXd> &state_info_history,
                               std::vector<Eigen::VectorXd> &action_info_history,
-                              std::vector<Eigen::VectorXd> &dynamics_info_history) {
+                              std::vector<Eigen::VectorXd> &dynamics_info_history,
+                              std::vector<Eigen::VectorXd> &dynamics_predict_history) {
     controller_0.get_History(obj_info_history,
                              state_info_history,
                              action_info_history,
-                             dynamics_info_history);
+                             dynamics_info_history,
+                             dynamics_predict_history);
   }
 
   void get_obj_info_(Eigen::Vector3d &pos,
@@ -783,6 +788,7 @@ class ENVIRONMENT_ROLLOUT {
   std::vector<Eigen::VectorXd> state_info_history;
   std::vector<Eigen::VectorXd> action_info_history;
   std::vector<Eigen::VectorXd> dynamics_info_history;
+  std::vector<Eigen::VectorXd> dynamics_predict_history;
 
   /// For Low Controller History
   Eigen::VectorXd joint_position_history;

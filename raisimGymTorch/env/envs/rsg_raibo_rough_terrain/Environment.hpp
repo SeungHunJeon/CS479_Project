@@ -49,19 +49,6 @@ class ENVIRONMENT {
     raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
     raibo_->setName("robot");
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
-//    raibo_->getCollisionBody("arm_link/0").setCollisionGroup(raisim::COLLISION(1));
-//    raibo_->getCollisionBody("arm_link/0").setCollisionMask(raisim::COLLISION(1));
-
-//    auto depthSensor1 = raibo_->getSensor<raisim::DepthCamera>("depth_camera_front_camera_parent:depth");
-//    depthSensor1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
-//    auto rgbCamera1 = raibo_->getSensor<raisim::RGBCamera>("depth_camera_front_camera_parent:color");
-//    rgbCamera1->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
-
-//    depthCameras[0] = depthSensor1;
-//    rgbCameras[0] = rgbCamera1;
-
-//    raibo_->ignoreCollisionBetween(raibo_->getBodyIdx("base"), )
-
     /// Object spawn
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, obj_mass, 0.5, 0.55, 1.0, 1.0);
@@ -69,13 +56,8 @@ class ENVIRONMENT {
     object_height = objectGenerator_.get_height();
     Obj_->setPosition(2, 2, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
-
-//    Manipulate_ = world_.addCylinder(0.1, 0.5, 1, "default", raisim::COLLISION(2), raisim::COLLISION(1)|raisim::COLLISION(2));
-
-
     /// create controller
     controller_.create(&world_, Obj_);
-//    Low_controller_.create(&world_);
 
     /// set curriculum
     simulation_dt_ = RaiboController::getSimDt();
@@ -119,10 +101,6 @@ class ENVIRONMENT {
     command_set.push_back({-1.5, 0});
     command_set.push_back({0, 1.5});
     command_set.push_back({0, -1.5});
-
-
-    if (is_discrete_)
-      controller_.update_discrete_command_lib(radial_, tangential_);
 
     // visualize if it is the first environment
     if (visualizable_) {
@@ -366,62 +344,6 @@ class ENVIRONMENT {
     return image;
   }
 
-//  void get_Controller_History(std::vector<Eigen::VectorXd> &obj_info_history,
-//                              std::vector<Eigen::VectorXd> &state_info_history,
-//                              std::vector<Eigen::VectorXd> &action_info_history,
-//                              std::vector<Eigen::VectorXd> &dynamics_info_history) {
-//    controller_.get_History(obj_info_history,
-//                            state_info_history,
-//                            action_info_history,
-//                            dynamics_info_history);
-//  }
-//
-//  void get_Low_Controller_History(Eigen::VectorXd &joint_position_history,
-//                                  Eigen::VectorXd &joint_velocity_history,
-//                                  Eigen::VectorXd &prevAction,
-//                                  Eigen::VectorXd &prevprevAction) {
-//    Low_controller_.getJointPositionHistory(joint_position_history);
-//    Low_controller_.getJointVelocityHistory(joint_velocity_history);
-//    Low_controller_.getPrevAction(prevAction);
-//    Low_controller_.getPrevPrevAction(prevprevAction);
-//  }
-//
-//  void get_obj_info_(Eigen::Vector3d &pos,
-//                     Eigen::Matrix3d &Rot,
-//                     Eigen::Vector3d &lin_vel,
-//                     Eigen::Vector3d &ang_vel,
-//                     Eigen::Matrix3d &inertia,
-//                     double &mass,
-//                     Eigen::Vector3d &com,
-//                     double &ratio,
-//                     double &height_ratio,
-//                     double &width_ratio_1,
-//                     double &width_ratio_2,
-//                     double &_friction
-//                     ) {
-//    pos = Obj_->getPosition();
-//    Rot = Obj_->getOrientation().e();
-//    lin_vel = Obj_->getLinearVelocity();
-//    ang_vel = Obj_->getAngularVelocity();
-//    inertia = Obj_->getInertiaMatrix_B();
-//    mass = Obj_->getMass();
-//    com = Obj_->getBodyToComPosition_rs().e();
-//    objectGenerator_.get_ratio(ratio, height_ratio, width_ratio_1, width_ratio_2);
-//    _friction = friction;
-//  }
-//
-//  void export_info_(Eigen::Ref<EigenVec> gc,
-//                    Eigen::Ref<EigenVec> gv) {
-//    controller_.getState(gc, gv);
-////    get_obj_info_();
-//
-//  }
-//
-//  void back_to_previous() {
-//    /// controller previous observation : obScaled_
-//    ///
-//  }
-
   void subStep() {
     if(controller_.is_success()) {
       Obj_->setAppearance("0, 0, 1, 0.7");
@@ -429,10 +351,6 @@ class ENVIRONMENT {
 
     if(is_position_goal)
       Low_controller_.updateHistory();
-//
-//    else
-//      Low_controller_2_.advance(&world_);
-
 
     world_.integrate1();
     if(server_) server_->lockVisualizationServerMutex();
@@ -504,7 +422,7 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 0.5;
+  double bound_ratio = 0.3;
   raisim::ArticulatedSystem* raibo_;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;

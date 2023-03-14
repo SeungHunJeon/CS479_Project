@@ -61,7 +61,8 @@ actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
-dynamics_dim = cfg['environment']['dimension']['dynamicsDim_']
+dynamics_info_dim = cfg['environment']['dimension']['dynamicsInfoDim_']
+dynamics_predict_dim = cfg['environment']['dimension']['dynamicsPredictDim_']
 ROA_ext_dim = ext_dim - inertial_dim
 
 # shortcuts
@@ -91,12 +92,12 @@ obs_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obs_f_
                                                      pro_dim + ROA_ext_dim),
                                       device=device)
 
-obj_f_dynamics_input_dim = hidden_dim + act_dim
+obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_info_dim
 
 obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
                                                      nn.LeakyReLU,
                                                      obj_f_dynamics_input_dim,
-                                                     dynamics_dim),
+                                                     dynamics_predict_dim),
                                       device=device)
 
 Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
@@ -109,7 +110,8 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           ext_dim=ROA_ext_dim,
                                                           pro_dim=pro_dim,
                                                           act_dim=act_dim,
-                                                          dyn_dim=dynamics_dim,
+                                                          dyn_info_dim=dynamics_info_dim,
+                                                          dyn_predict_dim=dynamics_predict_dim,
                                                           hist_num=historyNum,
                                                           device=device,
                                                           batch_num=batchNum,
@@ -121,7 +123,8 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_
                           ext_dim=ext_dim,
                           pro_dim=pro_dim,
                           act_dim=act_dim,
-                          dyn_dim=dynamics_dim,
+                          dyn_info_dim=dynamics_info_dim,
+                          dyn_predict_dim=dynamics_predict_dim,
                           hist_num=historyNum,
                           batch_num=batchNum,
                           device=device,
