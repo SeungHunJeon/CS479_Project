@@ -8,7 +8,7 @@ environment:
   discrete_action: False
   seed: 2
   render: False
-  num_envs: 300
+  num_envs: 1
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.0025
@@ -42,7 +42,7 @@ environment:
     proprioceptiveDim_: 9
     exteroceptiveDim_: 36
     inertialparamDim_: 15
-    dynamicsInfoDim_: 6
+    dynamicsInfoDim_: 39
     dynamicsPredictDim_: 5
     historyNum_: 5
     actionhistoryNum_: 6

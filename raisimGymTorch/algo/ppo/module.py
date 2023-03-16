@@ -173,7 +173,7 @@ class LSTM(nn.Module):
         else:
             self.input_dim = input_dim*self.hist_num
 
-        self.block_dim = ext_dim + pro_dim + dyn_info_dim + dyn_predict_dim + act_dim
+        self.block_dim = ext_dim + pro_dim + dyn_info_dim + act_dim
 
         self.lstm = nn.LSTM(input_size=self.input_dim,
                             hidden_size=self.hidden_dim,
@@ -314,7 +314,7 @@ class MLP(nn.Module):
             elif(self.discrete == False):
                 norm = (torch.norm(output, dim=-1)+1e-8).unsqueeze(-1)
                 output = torch.div(output, norm)
-                output = output * 3.0 * torch.sigmoid(norm)
+                output = output * 2.5 * torch.sigmoid(norm)
 
         return output
 

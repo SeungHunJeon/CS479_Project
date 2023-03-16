@@ -221,11 +221,9 @@ class PPO:
 
         action_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
                                           - self.encoder.architecture.act_dim
-                                          - self.encoder.architecture.dyn_info_dim
-                                          - self.encoder.architecture.dyn_predict_dim:
+                                          - self.encoder.architecture.dyn_info_dim:
                                           self.encoder.architecture.block_dim * self.num_history_batch
-                                          - self.encoder.architecture.dyn_info_dim
-                                          - self.encoder.architecture.dyn_predict_dim]
+                                          - self.encoder.architecture.dyn_info_dim]
 
         latent_f_dynamics_input.append(latent_batch_input)
         latent_f_dynamics_input.append(action_batch_f)
@@ -237,49 +235,70 @@ class PPO:
     def filter_for_obj_f_dynamics_from_obs(self, obs_batch, latent_batch_):
 
         # TODO -> whether
-        if(self.encoder.architecture.is_decouple):
+        # if(self.encoder.architecture.is_decouple):
+        #
+        #     obs_batch = obs_batch.permute((1,0,2))
+        #     obs_batch = obs_batch.reshape((self.num_envs, -1, int(obs_batch.shape[-1] / self.num_history_batch)))
+        #     obs_batch = obs_batch.permute((1,0,2))
 
-            obs_batch = obs_batch.permute((1,0,2))
-            obs_batch = obs_batch.reshape((self.num_envs, -1, int(obs_batch.shape[-1] / self.num_history_batch)))
-            obs_batch = obs_batch.permute((1,0,2))
-
-        obj_f_dynamics_obs = []
+        # obj_f_dynamics_obs = []
 
         # obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim
         #                                   - self.encoder.architecture.dyn_dim
         #                                   - self.encoder.architecture.act_dim:
         #                                   self.encoder.architecture.block_dim]
 
+        dyn_info = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
+                                       - self.encoder.architecture.dyn_info_dim:
+                                       self.encoder.architecture.block_dim * self.num_history_batch]
+
+        dyn_info = dyn_info.unsqueeze(-2)
+
+        Obj_Pos = dyn_info[..., :3]
+
+        ee_Pos = dyn_info[..., 3:6]
+
+        Obj_Vel = dyn_info[..., 6:9]
+
+
+
+        act_info = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
+                                       - self.encoder.architecture.act_dim
+                                       - self.encoder.architecture.dyn_info_dim:
+                                       self.encoder.architecture.block_dim * self.num_history_batch
+                                       - self.encoder.architecture.dyn_info_dim]
+
+
+
+
         obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
                                           - self.encoder.architecture.act_dim
-                                          - self.encoder.architecture.dyn_info_dim
-                                          - self.encoder.architecture.dyn_predict_dim:
-                                          self.encoder.architecture.block_dim * self.num_history_batch
-                                          - self.encoder.architecture.dyn_predict_dim]
+                                          - self.encoder.architecture.dyn_info_dim:
+                                          self.encoder.architecture.block_dim * self.num_history_batch]
 
         # obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.dyn_dim + self.encoder.architecture.act_dim)
 
-        obs_batch_f = obs_batch_f.reshape(-1, (self.encoder.architecture.act_dim + self.encoder.architecture.dyn_info_dim))
-
-        obj_f_dynamics_obs.append(obs_batch_f)
-
-        latent_batch = latent_batch_.clone().detach()
-
-        latent_batch = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
-
-        latent_batch = latent_batch[:-1, ...]
-
-        latent_batch = latent_batch.reshape((-1, self.encoder.architecture.hidden_dim))
-
-        obj_f_dynamics_obs.append(latent_batch)
-
-        obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
-
-        obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim * self.num_history_batch
-                                               - self.encoder.architecture.dyn_predict_dim:
-                                               self.encoder.architecture.block_dim * self.num_history_batch]).clone().detach()
-
-        obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_predict_dim)
+        # obs_batch_f = obs_batch_f.reshape(-1, (self.encoder.architecture.act_dim + self.encoder.architecture.dyn_info_dim))
+        #
+        # obj_f_dynamics_obs.append(obs_batch_f)
+        #
+        # latent_batch = latent_batch_.clone().detach()
+        #
+        # latent_batch = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
+        #
+        # latent_batch = latent_batch[:-1, ...]
+        #
+        # latent_batch = latent_batch.reshape((-1, self.encoder.architecture.hidden_dim))
+        #
+        # obj_f_dynamics_obs.append(latent_batch)
+        #
+        # obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
+        #
+        # obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim * self.num_history_batch
+        #                                        - self.encoder.architecture.dyn_predict_dim:
+        #                                        self.encoder.architecture.block_dim * self.num_history_batch]).clone().detach()
+        #
+        # obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_predict_dim)
 
         return obj_f_dynamics_obs, obj_f_dynamics_true
 

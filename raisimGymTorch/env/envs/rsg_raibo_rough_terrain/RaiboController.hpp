@@ -87,27 +87,28 @@ class RaiboController {
 
     Obj_Info_.setZero(exteroceptiveDim_);
     dynamics_Info_.setZero(dynamicsInfoDim_);
-    dynamics_predict_Info_.setZero(dynamicsPredictDim_);
 
     // Update History
     objectInfoHistory_.resize(historyNum_);
     stateInfoHistory_.resize(historyNum_);
     actionInfoHistory_.resize(actionNum_);
-    dynamicsInfoHistory_.resize(historyNum_);
-    dynamicsPredictInfoHistory_.resize(historyNum_);
+    dynamicsInfoHistory_.resize(actionNum_);
 
     for (int i =0; i<historyNum_; i++) {
       objectInfoHistory_[i].setZero(exteroceptiveDim_);
       stateInfoHistory_[i].setZero(proprioceptiveDim_);
-      dynamicsInfoHistory_[i].setZero(dynamicsInfoDim_);
-      dynamicsPredictInfoHistory_[i].setZero(dynamicsPredictDim_);
     }
 
     for (int i = 0; i<actionNum_; i++)
+    {
       actionInfoHistory_[i].setZero(actionDim_);
+      dynamicsInfoHistory_[i].setZero(dynamicsInfoDim_);
+    }
 
 
-    obBlockDim_ = proprioceptiveDim_ + exteroceptiveDim_ + actionDim_ + dynamicsInfoDim_ + dynamicsPredictDim_;
+    obBlockDim_ = proprioceptiveDim_ + exteroceptiveDim_ + actionDim_ + dynamicsInfoDim_;
+
+    RSFATAL_IF(obBlockDim_*actionNum_ != obDim_, "Dimension is fucking bull shit")
 
     for (int i=0; i<historyNum_+1 ; i++) {
       obMean_.segment((obBlockDim_)*i, obBlockDim_) <<
@@ -129,11 +130,19 @@ class RaiboController {
         1.1, /// friction
         0.5, /// contact
         Eigen::VectorXd::Constant(actionDim_, 0.0), /// For action
-        0.0, 0.0, 0.0, /// For dynamics Info (Lin vel)
-        0.0, 0.0, 0.0, /// For dynamics Info (Ang vel)
-        0.0, 0.0, /// For dynamics Predict Info (Position)
-        0.0, 0.0, 0.0; /// For dynamics Predict Info (Rotation)
-
+        0.0, 0.0, 0.0, /// For dynamics Info (Obj Pos)
+        0.0, 0.0, 0.0, /// For dynamics Info (EE Pos)
+        0, 0, 0, /// For dynamics Info (Obj Vel)
+        0, 0, 0, /// For dynamics Info (Robot Vel)
+        0, 0, 0, /// For dynamics Info (Obj Avel)
+        0, 0, 0, /// For dynamics Info (Robot Avel)
+        0, 0, 0, /// For dynamics Info (Obj Rot 0)
+        0, 0, 0, /// For dynamics Info (Obj Rot 1)
+        0, 0, 1.4, /// For dynamics Info (Obj Rot 2)
+        0, 0, 0, /// For dynamics Info (Robot Rot 0)
+        0, 0, 0, /// For dynamics Info (Robot Rot 1)
+        0, 0, 1.4, /// For dynamics Info (Robot Rot 2)
+        0, 0, 0; /// For dynamics Info (Geometry)
     }
 
     for (int i=0; i<historyNum_+1 ; i++) {
@@ -157,10 +166,19 @@ class RaiboController {
         0.2, /// friction
         0.5,
         Eigen::VectorXd::Constant(actionDim_, 0.5), /// for aciton
-        0.2, 0.2, 0.2, /// For dynamics Info (Lin vel)
-        0.2, 0.2, 0.2, /// For dynamics Info (Ang vel)
-        0.2, 0.2, /// For dynamics Predict Info (Position)
-        0.2, 0.2, 0.2; /// For dynamics Predict Info (Rotation)
+        0.4, 0.4, 0.3, /// For dynamics Info (Obj Pos)
+        0.4, 0.4, 0.3, /// For dynamics Info (EE Pos)
+        0.5, 0.5, 0.2, /// For dynamics Info (Obj Vel)
+        1.0, 1.0, 0.2, /// For dynamics Info (Robot Vel)
+        0.2, 0.2, 0.5, /// For dynamics Info (Obj Avel)
+        0.2, 0.2, 0.5, /// For dynamics Info (Robot Avel)
+        0.3, 0.3, 0.3, /// For dynamics Info (Obj Rot 0)
+        0.3, 0.3, 0.3, /// For dynamics Info (Obj Rot 1)
+        0.3, 0.3, 0.3, /// For dynamics Info (Obj Rot 2)
+        0.3, 0.3, 0.3, /// For dynamics Info (Robot Rot 0)
+        0.3, 0.3, 0.3, /// For dynamics Info (Robot Rot 1)
+        0.3, 0.3, 0.3, /// For dynamics Info (Robot Rot 2)
+        0.2, 0.2, 0.2; /// For dynamics Info (Geometry)
     }
 
     footIndices_.push_back(raibo_->getBodyIdx("LF_SHANK"));
@@ -190,10 +208,13 @@ class RaiboController {
 
     success_batch_.resize(success_batch_num_);
 
-    Obj_Rot_temp = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-    Obj_Pos_temp = {0, 0, 0};
+//    Obj_Rot_temp = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+//    Obj_Pos_temp = {0, 0, 0};
+//    baseRot_temp = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+//    Obj_Vel_temp = {0, 0, 0};
+//    Obj_Avel_temp = {0, 0, 0};
 
-
+    RSINFO(1)
     return true;
   };
 
@@ -213,13 +234,6 @@ class RaiboController {
 
     std::rotate(stateInfoHistory_.begin(), stateInfoHistory_.begin()+1, stateInfoHistory_.end());
     stateInfoHistory_[historyNum_ - 1] = stateInfo;
-
-    std::rotate(dynamicsInfoHistory_.begin(), dynamicsInfoHistory_.begin()+1, dynamicsInfoHistory_.end());
-    dynamicsInfoHistory_[historyNum_ - 1] = dynamics_Info_;
-
-    std::rotate(dynamicsPredictInfoHistory_.begin(), dynamicsPredictInfoHistory_.begin()+1, dynamicsPredictInfoHistory_.end());
-    dynamicsPredictInfoHistory_[historyNum_ - 1] = dynamics_predict_Info_;
-
   }
   /// Simdt
   void updateStateVariables() {
@@ -298,7 +312,10 @@ class RaiboController {
     Obj_Info_.segment(8, 1) << dist_temp_min_;
     Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
     Obj_Info_.segment(12, 3) << baseRot_.e().transpose() * Obj_AVel_.e();
-    Obj_Info_.segment(15,3) = Obj_->getOrientation().e().row(0);
+    // TODO
+    /// I think the orientation would be represented as relative orientation => rotation difference => cosine similarity has to be adapted
+    /// This representation means that each body frame's (robot, object) x axis vector
+    Obj_Info_.segment(15,3) = (baseRot_.e().row(0) - Obj_->getOrientation().e().row(0));
 //    Obj_Info_.segment(21,4) = classify_vector_;
     Obj_Info_.segment(18,3) = obj_geometry_;
     Obj_Info_.segment(21, 1) << Obj_->getMass();
@@ -309,18 +326,28 @@ class RaiboController {
     Obj_Info_.segment(34,1) << friction_;
     Obj_Info_.segment(35,1) << static_cast<double>(is_contact);
 
+
+
     /// Obj vel, avel, latent vector, action
-    dynamics_Info_ << Obj_Vel_.e(), Obj_AVel_.e();
-    dynamics_predict_Info_ << (Obj_Pos_.e() - Obj_Pos_temp.e()).head(2), LOG(Obj_Rot_.e() * Obj_Rot_temp.e());
+    dynamics_Info_ << Obj_Pos_.e(), ee_Pos_w_.e(),
+        Obj_Vel_.e(), gv_.segment(0,3),
+        Obj_AVel_.e(), gv_.segment(3,3),
+        Obj_Rot_.e().row(0), Obj_Rot_.e().row(1), Obj_Rot_.e().row(2),
+        baseRot_.e().row(0), baseRot_.e().row(1), baseRot_.e().row(2),
+        obj_geometry_;
+
+//    Obj_Pos_.e(), Obj_Rot_.e().row(0), Obj_Rot_.e().row(1),
+//    Obj_Rot_.e().row(2)
 //
+//    (baseRot_prev.e().transpose()*(Obj_Pos_.e() - Obj_Pos_prev.e())).head(2),
+//        baseRot_prev.e().transpose()*Obj_Rot_prev*LOG(Obj_Rot_.e() * Obj_Rot_prev.e()); /// LOG(*) : angular velocity
+
 //    RSINFO("Obj_Vel : " << Obj_Vel_.e())
 //    RSINFO("position difference : " << (Obj_Pos_.e() - Obj_Pos_temp.e()).head(2))
 //    RSINFO("OBJ AVEL : " << Obj_AVel_.e())
 //    RSINFO("Rotation difference : " <<  LOG(Obj_Rot_.e() * Obj_Rot_temp.e()))
 
-    /// update previous pos, orientation
-    Obj_Pos_temp = Obj_Pos_;
-    Obj_Rot_temp = Obj_Rot_;
+
     /// height map
     controlFrameX_ =
         {baseRot_[0], baseRot_[1], 0.}; /// body x axis projected on the world x-y plane, expressed in the world frame
@@ -364,6 +391,7 @@ class RaiboController {
     desired_pos_(2) = 0;
 
     is_achieved = false;
+
 //    desired_dist_ = (raibo_->getBasePosition().e() - current_pos_).norm();
     return command_;
   }
@@ -376,6 +404,10 @@ class RaiboController {
     /// action scaling
     std::rotate(actionInfoHistory_.begin(), actionInfoHistory_.begin()+1, actionInfoHistory_.end());
     actionInfoHistory_[actionNum_ - 1] = action.cast<double>();
+
+    std::rotate(dynamicsInfoHistory_.begin(), dynamicsInfoHistory_.begin()+1, dynamicsInfoHistory_.end());
+    dynamicsInfoHistory_[actionNum_ - 1] = dynamics_Info_;
+
     return true;
   }
 
@@ -424,7 +456,14 @@ class RaiboController {
       for (int j=0; j < actionDim_; j++)
         actionInfoHistory_[i](j) = normDist_(gen_) * 0.1;
 
+    for (int i = 0; i<actionNum_; i++)
+    {
+      dynamicsInfoHistory_[i].setZero(dynamicsInfoDim_);
+    }
+
     std::fill(success_batch_.begin(), success_batch_.end(), false);
+
+    RSINFO(1)
 
   }
 
@@ -459,7 +498,6 @@ class RaiboController {
 
     terminalReward = 0.f;
 
-
     return false;
   }
 
@@ -479,9 +517,7 @@ class RaiboController {
       obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_ + exteroceptiveDim_,
                         actionDim_) = actionInfoHistory_[i+1];
       obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_ + exteroceptiveDim_ + actionDim_,
-                        dynamicsInfoDim_) = dynamicsInfoHistory_[i];
-      obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_ + exteroceptiveDim_ + actionDim_ + dynamicsInfoDim_,
-                        dynamicsPredictDim_) = dynamicsPredictInfoHistory_[i];
+                        dynamicsInfoDim_) = dynamicsInfoHistory_[i+1];
     }
 
     // current state
@@ -499,10 +535,6 @@ class RaiboController {
 
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_+actionDim_, dynamicsInfoDim_)
     = dynamicsInfoHistory_.back();
-
-    obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_+actionDim_+dynamicsInfoDim_, dynamicsPredictDim_)
-    = dynamicsPredictInfoHistory_.back();
-
   }
 
   inline void checkConfig(const Yaml::Node &cfg) {
@@ -511,7 +543,6 @@ class RaiboController {
     READ_YAML(int, historyNum_, cfg["dimension"]["historyNum_"])
     READ_YAML(int, actionNum_, cfg["dimension"]["actionhistoryNum_"])
     READ_YAML(int, dynamicsInfoDim_, cfg["dimension"]["dynamicsInfoDim_"])
-    READ_YAML(int, dynamicsPredictDim_, cfg["dimension"]["dynamicsPredictDim_"])
   }
 
   inline void setRewardConfig(const Yaml::Node &cfg) {
@@ -554,7 +585,7 @@ class RaiboController {
 
     /// stay close to the object
     double stay_o = ee_to_obj.norm(); /// max : inf, min : 0
-    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 1, min : 0
+    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 0, min : -1
     stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
     stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
 
@@ -581,25 +612,21 @@ class RaiboController {
   void set_History(std::vector<Eigen::VectorXd> &obj_info_history,
                    std::vector<Eigen::VectorXd> &state_info_history,
                    std::vector<Eigen::VectorXd> &action_info_history,
-                   std::vector<Eigen::VectorXd> &dynamics_info_history,
-                   std::vector<Eigen::VectorXd> &dynamics_predict_info_history) {
+                   std::vector<Eigen::VectorXd> &dynamics_info_history) {
     objectInfoHistory_ = obj_info_history;
     stateInfoHistory_ = state_info_history;
     actionInfoHistory_ = action_info_history;
     dynamicsInfoHistory_ = dynamics_info_history;
-    dynamicsPredictInfoHistory_ = dynamics_predict_info_history;
   }
 
   void get_History(std::vector<Eigen::VectorXd> &obj_info_history,
                    std::vector<Eigen::VectorXd> &state_info_history,
                    std::vector<Eigen::VectorXd> &action_info_history,
-                   std::vector<Eigen::VectorXd> &dynamics_info_history,
-                   std::vector<Eigen::VectorXd> &dynamics_predict_info_history) {
+                   std::vector<Eigen::VectorXd> &dynamics_info_history) {
     obj_info_history = objectInfoHistory_;
     state_info_history = stateInfoHistory_;
     action_info_history = actionInfoHistory_;
     dynamics_info_history = dynamicsInfoHistory_;
-    dynamics_predict_info_history = dynamicsPredictInfoHistory_;
   }
 
   inline void setStandingMode(bool mode) { standingMode_ = mode; }
@@ -635,18 +662,18 @@ class RaiboController {
   raisim::ArticulatedSystem *raibo_;
   std::vector<size_t> footIndices_, footFrameIndicies_, armIndices_;
   Eigen::VectorXd nominalConfig_;
-  static constexpr int actionDim_ = 3; /// output dim : joint action 12 + task space action 6 + gain dim 4
+   /// output dim : joint action 12 + task space action 6 + gain dim 4
   static constexpr size_t historyLength_ = 14;
 
   int proprioceptiveDim_ = 9;
   int exteroceptiveDim_ = 36;
+  int dynamicsInfoDim_ = 39;
+  static constexpr int actionDim_ = 3;
   int historyNum_ = 4;
   int actionNum_ = 5;
-  int dynamicsInfoDim_ = 6;
-  int dynamicsPredictDim_ = 5;
   int obBlockDim_ = 0;
 
-  static constexpr size_t obDim_ = 295;
+  static constexpr size_t obDim_ = 435;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
@@ -673,7 +700,6 @@ class RaiboController {
   std::vector<Eigen::VectorXd> stateInfoHistory_;
   std::vector<Eigen::VectorXd> actionInfoHistory_;
   std::vector<Eigen::VectorXd> dynamicsInfoHistory_;
-  std::vector<Eigen::VectorXd> dynamicsPredictInfoHistory_;
   Eigen::VectorXd historyTempMemory_2;
   std::array<bool, 4> footContactState_;
   raisim::Mat<3, 3> baseRot_;
@@ -697,10 +723,7 @@ class RaiboController {
   Eigen::MatrixXd scanCos_;
   Eigen::VectorXd Obj_Info_;
   Eigen::VectorXd dynamics_Info_;
-  Eigen::VectorXd dynamics_predict_Info_;
   raisim::Vec<3> Obj_Pos_, Obj_Vel_, Obj_AVel_;
-  raisim::Vec<3> Obj_Pos_temp;
-  raisim::Mat<3,3> Obj_Rot_temp;
   raisim::Mat<3,3> Obj_Rot_, Tar_Rot_;
   raisim::Vec<3> ee_Pos_w_, ee_Vel_w_, ee_Avel_w_;
   raisim::Mat<3,3> eeRot_w_;
@@ -718,7 +741,6 @@ class RaiboController {
 
   // For testing
   bool is_success_ = false;
-
 
   // reward variables
   double towardObjectRewardCoeff_ = 0., towardObjectReward_ = 0.;

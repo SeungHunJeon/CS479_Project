@@ -63,12 +63,13 @@ actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
-dynamics_dim = cfg['environment']['dimension']['dynamicsDim_']
-ROA_ext_dim = cfg['environment']['ROA_dimension']['exteroceptiveDim_']
+dynamics_info_dim = cfg['environment']['dimension']['dynamicsInfoDim_']
+dynamics_predict_dim = cfg['environment']['dimension']['dynamicsPredictDim_']
+ROA_ext_dim = ext_dim - inertial_dim
 
 # shortcuts
 act_dim = env.num_acts
-Encoder_ob_dim = historyNum * (pro_dim + ext_dim)
+Encoder_ob_dim = historyNum * (pro_dim + ext_dim + act_dim)
 
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
@@ -76,7 +77,7 @@ batchNum = cfg['LSTM']['batchNum_']
 is_decouple = cfg['LSTM']['is_decouple_']
 
 # ROA Encoding
-ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim)
+ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
@@ -105,6 +106,14 @@ def get_obs_ROA(encoder, obs_batch):
                              + encoder.architecture.pro_dim
                              + encoder.architecture.ext_dim - inertial_dim])
 
+        obs_ROA_batch.append(obs_batch[...,
+                             (encoder.architecture.block_dim)*i
+                             + encoder.architecture.pro_dim
+                             + encoder.architecture.ext_dim:
+                             (encoder.architecture.block_dim)*i
+                             + encoder.architecture.pro_dim
+                             + encoder.architecture.ext_dim
+                             + encoder.architecture.act_dim])
 
     # estimator_true_data = (obs_batch[...,
     #                        (encoder.architecture.pro_dim +
@@ -142,13 +151,29 @@ else:
                                                          pro_dim + ROA_ext_dim),
                                           device=device)
 
-    obj_f_dynamics_input_dim = hidden_dim + act_dim
+    obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_info_dim
 
     obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
                                                          nn.LeakyReLU,
                                                          obj_f_dynamics_input_dim,
-                                                         dynamics_dim),
+                                                         dynamics_predict_dim),
                                           device=device)
+
+    latent_f_dynamics_input_dim = hidden_dim + act_dim
+
+    latent_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
+                                                            nn.LeakyReLU,
+                                                            latent_f_dynamics_input_dim,
+                                                            hidden_dim),
+                                             device=device)
+
+
+
+    Decoder = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['Decoder']['net'],
+                                                  nn.LeakyReLU,
+                                                  hidden_dim,
+                                                  int(ROA_Encoder_ob_dim/historyNum)),
+                                   device=device)
 
     Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                     nn.LeakyReLU,
@@ -160,7 +185,8 @@ else:
                                                                   ext_dim=ROA_ext_dim,
                                                                   pro_dim=pro_dim,
                                                                   act_dim=act_dim,
-                                                                  dyn_dim=dynamics_dim,
+                                                                  dyn_info_dim=dynamics_info_dim,
+                                                                  dyn_predict_dim=dynamics_predict_dim,
                                                                   hist_num=historyNum,
                                                                   device=device,
                                                                   batch_num=batchNum,
@@ -172,12 +198,14 @@ else:
                                                               ext_dim=ext_dim,
                                                               pro_dim=pro_dim,
                                                               act_dim=act_dim,
-                                                              dyn_dim=dynamics_dim,
+                                                              dyn_info_dim=dynamics_info_dim,
+                                                              dyn_predict_dim=dynamics_predict_dim,
                                                               hist_num=historyNum,
                                                               batch_num=batchNum,
                                                               device=device,
                                                               num_env=env.num_envs,
                                                               is_decouple=is_decouple), device=device)
+
 
     actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
@@ -192,11 +220,12 @@ else:
                                                                       ext_dim=ROA_ext_dim,
                                                                       pro_dim=pro_dim,
                                                                       act_dim=act_dim,
-                                                                      dyn_dim=dynamics_dim,
+                                                                      dyn_info_dim=dynamics_info_dim,
+                                                                      dyn_predict_dim=dynamics_predict_dim,
                                                                       hist_num=historyNum,
                                                                       device=device,
                                                                       batch_num=batchNum,
-                                                                      num_env = n_samples,
+                                                                      num_env=env.num_envs,
                                                                       is_decouple=is_decouple), device=device)
 
     actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
@@ -255,7 +284,7 @@ else:
                     success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                     env.step_visualize_success(action_ll, success)
 
-                    print(action_ll)
+                    # print(action_ll)
 
                 if (is_rollout == True):
                     # obs = env.observe(False)

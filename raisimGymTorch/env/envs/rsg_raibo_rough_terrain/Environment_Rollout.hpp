@@ -545,8 +545,7 @@ class ENVIRONMENT_ROLLOUT {
         controller_batch_[i]->set_History(obj_info_history,
                                           state_info_history,
                                           action_info_history,
-                                          dynamics_info_history,
-                                          dynamics_predict_history);
+                                          dynamics_info_history);
 
         Low_velocity_controller_batch_[i]->update_model(actor, estimator);
 
@@ -605,8 +604,7 @@ class ENVIRONMENT_ROLLOUT {
     controller_0.get_History(obj_info_history,
                              state_info_history,
                              action_info_history,
-                             dynamics_info_history,
-                             dynamics_predict_history);
+                             dynamics_info_history);
   }
 
   void get_obj_info_(Eigen::Vector3d &pos,

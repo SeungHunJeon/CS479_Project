@@ -49,7 +49,7 @@ if mode == 'retrain':
     cfg['environment']['curriculum']['initial_factor'] = 1
 
 env = VecEnv(RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-
+print("env create pass")
 
 # wandb name
 name = cfg['name']
@@ -191,7 +191,7 @@ ppo = PPO.PPO(actor=actor,
 
 iteration_number = 0
 
-wandb.init(group="jsh",project=task_name,name=name)
+# wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -317,7 +317,7 @@ for update in range(iteration_number, 1000000):
 
     end = time.time()
 
-    wandb.log(data_log)
+    # wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))

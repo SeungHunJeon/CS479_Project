@@ -193,7 +193,7 @@ class ENVIRONMENT {
 //    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
 
     object_type = 2;
-
+    RSINFO(1)
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
     if(curriculumFactor_ > 0.4)
@@ -208,7 +208,9 @@ class ENVIRONMENT {
     }
 
     else {
+      RSINFO(1)
       Low_controller_2_.reset(&world_);
+      RSINFO(1)
       controller_.updateStateVariables();
     }
 
@@ -223,6 +225,8 @@ class ENVIRONMENT {
     Eigen::Vector3f command;
 
     command = controller_.advance(&world_, action);
+    controller_.update_actionHistory(&world_, action, curriculumFactor_);
+
     if(is_position_goal)
       Low_controller_.setCommand(command);
     else
@@ -250,10 +254,9 @@ class ENVIRONMENT {
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
       /// level frequency times 5.
-      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.historyNum_) == 0)
+      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.actionDim_) == 0)
       {
         controller_.updateHistory();
-        controller_.update_actionHistory(&world_, action, curriculumFactor_);
       }
       if(is_position_goal) {
         Low_controller_.updateObservation(&world_);
