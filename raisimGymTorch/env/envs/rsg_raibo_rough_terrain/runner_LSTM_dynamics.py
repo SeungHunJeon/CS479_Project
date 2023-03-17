@@ -50,10 +50,10 @@ if mode == 'retrain':
 
 env = VecEnv(RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 print("env create pass")
-
 # wandb name
 name = cfg['name']
 task_name = cfg['task_name']
+
 
 # Encoding
 historyNum = cfg['environment']['dimension']['historyNum_']
@@ -62,6 +62,7 @@ pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
 dynamics_info_dim = cfg['environment']['dimension']['dynamicsInfoDim_']
+dynamics_input_dim = cfg['environment']['dimension']['dynamicsInputDim_']
 dynamics_predict_dim = cfg['environment']['dimension']['dynamicsPredictDim_']
 ROA_ext_dim = ext_dim - inertial_dim
 
@@ -83,16 +84,14 @@ total_steps = n_steps * env.num_envs
 
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
-
 obs_f_dynamics_input_dim = pro_dim + ROA_ext_dim + act_dim
-
 obs_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obs_f_dynamics']['net'],
                                                      nn.LeakyReLU,
                                                      obs_f_dynamics_input_dim,
                                                      pro_dim + ROA_ext_dim),
                                       device=device)
 
-obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_info_dim
+obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_input_dim
 
 obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
                                                      nn.LeakyReLU,
@@ -109,18 +108,15 @@ latent_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj
                                       device=device)
 
 
-
 Decoder = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['Decoder']['net'],
                                                         nn.LeakyReLU,
                                                         hidden_dim,
                                                         int(ROA_Encoder_ob_dim/historyNum)),
                                          device=device)
-
 Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                 nn.LeakyReLU,
                                                 int(Encoder_ob_dim/historyNum),
                                                 int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
-
 Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
                                                           hidden_dim=hidden_dim,
                                                           ext_dim=ROA_ext_dim,
@@ -133,7 +129,6 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           batch_num=batchNum,
                                                           num_env=env.num_envs,
                                                           is_decouple=is_decouple), device=device)
-
 Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                           hidden_dim=hidden_dim,
                           ext_dim=ext_dim,
@@ -146,7 +141,6 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_
                           device=device,
                           num_env=env.num_envs,
                           is_decouple=is_decouple), device=device)
-
 actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                            env.num_envs,
@@ -191,7 +185,8 @@ ppo = PPO.PPO(actor=actor,
 
 iteration_number = 0
 
-# wandb.init(group="jsh",project=task_name,name=name)
+
+wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -317,7 +312,7 @@ for update in range(iteration_number, 1000000):
 
     end = time.time()
 
-    # wandb.log(data_log)
+    wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))

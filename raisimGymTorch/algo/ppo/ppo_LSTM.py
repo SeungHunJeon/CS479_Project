@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from .storage_encoding import RolloutStorage
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 
@@ -234,71 +234,75 @@ class PPO:
 
     def filter_for_obj_f_dynamics_from_obs(self, obs_batch, latent_batch_):
 
-        # TODO -> whether
-        # if(self.encoder.architecture.is_decouple):
-        #
-        #     obs_batch = obs_batch.permute((1,0,2))
-        #     obs_batch = obs_batch.reshape((self.num_envs, -1, int(obs_batch.shape[-1] / self.num_history_batch)))
-        #     obs_batch = obs_batch.permute((1,0,2))
+        obj_f_dynamics_obs = []
 
-        # obj_f_dynamics_obs = []
+        obj_f_dynamics_true = []
 
-        # obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim
-        #                                   - self.encoder.architecture.dyn_dim
-        #                                   - self.encoder.architecture.act_dim:
-        #                                   self.encoder.architecture.block_dim]
-
-        dyn_info = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
+        dyn_obs = obs_batch[1:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
                                        - self.encoder.architecture.dyn_info_dim:
                                        self.encoder.architecture.block_dim * self.num_history_batch]
 
-        dyn_info = dyn_info.unsqueeze(-2)
+        dyn_obs_pred = obs_batch[2:, ..., self.encoder.architecture.block_dim * self.num_history_batch
+                                           - self.encoder.architecture.dyn_info_dim:
+                                           self.encoder.architecture.block_dim * self.num_history_batch]
 
-        Obj_Pos = dyn_info[..., :3]
+        action_info = obs_batch[2:, ..., self.encoder.architecture.block_dim * self.num_history_batch
+                                         - self.encoder.architecture.act_dim
+                                         - self.encoder.architecture.dyn_info_dim:
+                                         self.encoder.architecture.block_dim * self.num_history_batch
+                                         - self.encoder.architecture.dyn_info_dim]
 
-        ee_Pos = dyn_info[..., 3:6]
+        latent_batch = latent_batch_.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
 
-        Obj_Vel = dyn_info[..., 6:9]
+        latent_batch = latent_batch[1:-1]
+
+        Obj_Pos = dyn_obs[..., :3].unsqueeze(-1)
+        ee_Pos = dyn_obs[..., 3:6].unsqueeze(-1)
+        Obj_Vel = dyn_obs[..., 6:9].unsqueeze(-1)
+        Robot_Vel = dyn_obs[..., 9:12].unsqueeze(-1)
+        Obj_AVel = dyn_obs[..., 12:15].unsqueeze(-1)
+        Robot_AVel = dyn_obs[..., 15:18].unsqueeze(-1)
+        Obj_RotMat = dyn_obs[..., 18:27].unsqueeze(-1)
+        Obj_RotMat = Obj_RotMat.reshape(Obj_RotMat.shape[0], Obj_RotMat.shape[1], -1, 3)
+        Robot_RotMat = dyn_obs[..., 27:36].unsqueeze(-1)
+        Robot_RotMat = Robot_RotMat.reshape(Obj_RotMat.shape[0], Obj_RotMat.shape[1], -1, 3)
+        Robot_RotMat_transpose = torch.transpose(Robot_RotMat, -2, -1)
+        Obj_Geometry = dyn_obs[..., 36:].unsqueeze(-1)
+
+        Obj_Pos_pred = dyn_obs_pred[..., :3].unsqueeze(-1)
+        Obj_RotMat_pred = dyn_obs_pred[..., 18:27].unsqueeze(-1)
+        Obj_RotMat_pred = Obj_RotMat_pred.reshape(Obj_RotMat_pred.shape[0], Obj_RotMat_pred.shape[1], -1, 3)
+
+        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_Vel - Robot_AVel)).squeeze(-1))
+        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_AVel - Robot_Vel)).squeeze(-1))
+        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_Pos - ee_Pos)).squeeze(-1))
+        obj_f_dynamics_obs.append((Robot_RotMat[..., 0, :] - Obj_RotMat[..., 0, :]).squeeze(-1))
+        obj_f_dynamics_obs.append((Obj_Geometry).squeeze(-1))
+        obj_f_dynamics_obs.append(action_info)
+        obj_f_dynamics_obs.append(latent_batch)
+
+        obj_f_dynamics_true.append((Robot_RotMat_transpose @ (Obj_Pos_pred - Obj_Pos)).squeeze(-1)[...,:2])
+        # Need to make LOG function
+
+        # Obj_Rot_diff = torch.transpose((Obj_RotMat_pred[..., 0, :] - Obj_RotMat[..., 0, :]).unsqueeze(), -2, -1)
 
 
+        obj_f_dynamics_true.append((Robot_RotMat_transpose @ (Obj_RotMat_pred[..., 0, :] - Obj_RotMat[..., 0, :]).unsqueeze(-1)).squeeze(-1))
 
-        act_info = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
-                                       - self.encoder.architecture.act_dim
-                                       - self.encoder.architecture.dyn_info_dim:
-                                       self.encoder.architecture.block_dim * self.num_history_batch
-                                       - self.encoder.architecture.dyn_info_dim]
-
-
-
-
-        obs_batch_f = obs_batch[:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
-                                          - self.encoder.architecture.act_dim
-                                          - self.encoder.architecture.dyn_info_dim:
-                                          self.encoder.architecture.block_dim * self.num_history_batch]
-
-        # obs_batch_f = obs_batch_f.reshape(-1, self.encoder.architecture.dyn_dim + self.encoder.architecture.act_dim)
-
-        # obs_batch_f = obs_batch_f.reshape(-1, (self.encoder.architecture.act_dim + self.encoder.architecture.dyn_info_dim))
-        #
-        # obj_f_dynamics_obs.append(obs_batch_f)
-        #
-        # latent_batch = latent_batch_.clone().detach()
-        #
-        # latent_batch = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
-        #
-        # latent_batch = latent_batch[:-1, ...]
-        #
-        # latent_batch = latent_batch.reshape((-1, self.encoder.architecture.hidden_dim))
-        #
-        # obj_f_dynamics_obs.append(latent_batch)
-        #
-        # obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
-        #
         # obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim * self.num_history_batch
         #                                        - self.encoder.architecture.dyn_predict_dim:
         #                                        self.encoder.architecture.block_dim * self.num_history_batch]).clone().detach()
         #
         # obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_predict_dim)
+
+        # 임의로 size up 할까? 의미가 있나 근데 ..? Normalize 마렵긴 한데 value를 어케 찾을지 모르겠네 ? prediction 만 하고 gradient 구하는거만 normalize한다? 흠 ..?;
+        obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
+
+        obj_f_dynamics_true = torch.cat(obj_f_dynamics_true, dim=-1)
+
+        # print(torch.mean(obj_f_dynamics_obs))
+
+        # print(torch.mean(obj_f_dynamics_true))
 
         return obj_f_dynamics_obs, obj_f_dynamics_true
 
@@ -334,23 +338,23 @@ class PPO:
         output = self.encoder_ROA.evaluate_update(obs)
 
         return output
-    def plot_grad_flow(self, named_parameters):
-        ave_grads = []
-        layers = []
-        for n, p in named_parameters:
-            if(p.requires_grad) and ("bias" not in n):
-                layers.append(n)
-                ave_grad = p.grad.clone().detach().to('cpu')
-                ave_grads.append(ave_grad.abs().mean())
-        plt.plot(ave_grads, alpha=0.3, color="b")
-        plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
-        plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
-        plt.xlim(xmin=0, xmax=len(ave_grads))
-        plt.xlabel("Layers")
-        plt.ylabel("average gradient")
-        plt.title("Gradient flow")
-        plt.grid(True)
-        plt.savefig('gradient.png')
+    # def plot_grad_flow(self, named_parameters):
+    #     ave_grads = []
+    #     layers = []
+    #     for n, p in named_parameters:
+    #         if(p.requires_grad) and ("bias" not in n):
+    #             layers.append(n)
+    #             ave_grad = p.grad.clone().detach().to('cpu')
+    #             ave_grads.append(ave_grad.abs().mean())
+    #     plt.plot(ave_grads, alpha=0.3, color="b")
+    #     plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
+    #     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
+    #     plt.xlim(xmin=0, xmax=len(ave_grads))
+    #     plt.xlabel("Layers")
+    #     plt.ylabel("average gradient")
+    #     plt.title("Gradient flow")
+    #     plt.grid(True)
+    #     plt.savefig('gradient.png')
 
     def get_obs_ROA(self, obs_batch):
         obs_ROA_batch = []

@@ -214,7 +214,6 @@ class RaiboController {
 //    Obj_Vel_temp = {0, 0, 0};
 //    Obj_Avel_temp = {0, 0, 0};
 
-    RSINFO(1)
     return true;
   };
 
@@ -329,12 +328,20 @@ class RaiboController {
 
 
     /// Obj vel, avel, latent vector, action
-    dynamics_Info_ << Obj_Pos_.e(), ee_Pos_w_.e(),
-        Obj_Vel_.e(), gv_.segment(0,3),
-        Obj_AVel_.e(), gv_.segment(3,3),
-        Obj_Rot_.e().row(0), Obj_Rot_.e().row(1), Obj_Rot_.e().row(2),
-        baseRot_.e().row(0), baseRot_.e().row(1), baseRot_.e().row(2),
-        obj_geometry_;
+    dynamics_Info_.segment(0,3) << Obj_Pos_.e();
+    dynamics_Info_.segment(3,3) << ee_Pos_w_.e();
+    dynamics_Info_.segment(6,3) << Obj_Vel_.e();
+    dynamics_Info_.segment(9,3) << gv_.segment(0,3);
+    dynamics_Info_.segment(12,3) << Obj_AVel_.e();
+    dynamics_Info_.segment(15,3) << gv_.segment(3,3);
+    dynamics_Info_.segment(18,3) = Obj_Rot_.e().row(0);
+    dynamics_Info_.segment(21,3) = Obj_Rot_.e().row(1);
+    dynamics_Info_.segment(24,3) = Obj_Rot_.e().row(2);
+    dynamics_Info_.segment(27,3) = baseRot_.e().row(0);
+    dynamics_Info_.segment(30,3) = baseRot_.e().row(1);
+    dynamics_Info_.segment(33,3) = baseRot_.e().row(2);
+    dynamics_Info_.segment(36,3) << obj_geometry_;
+
 
 //    Obj_Pos_.e(), Obj_Rot_.e().row(0), Obj_Rot_.e().row(1),
 //    Obj_Rot_.e().row(2)
@@ -452,18 +459,18 @@ class RaiboController {
         stateInfoHistory_[i](j) = normDist_(gen_) * 0.1;
     }
 
-    for (int i = 0; i < actionNum_; i++)
+    for (int i = 0; i < actionNum_; i++) {
       for (int j=0; j < actionDim_; j++)
         actionInfoHistory_[i](j) = normDist_(gen_) * 0.1;
+    }
+
 
     for (int i = 0; i<actionNum_; i++)
     {
-      dynamicsInfoHistory_[i].setZero(dynamicsInfoDim_);
+      dynamicsInfoHistory_[i].setZero();
     }
 
     std::fill(success_batch_.begin(), success_batch_.end(), false);
-
-    RSINFO(1)
 
   }
 
@@ -515,9 +522,9 @@ class RaiboController {
       obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_,
                         exteroceptiveDim_) = objectInfoHistory_[i];
       obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_ + exteroceptiveDim_,
-                        actionDim_) = actionInfoHistory_[i+1];
+                        actionDim_) = actionInfoHistory_[i];
       obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_ + exteroceptiveDim_ + actionDim_,
-                        dynamicsInfoDim_) = dynamicsInfoHistory_[i+1];
+                        dynamicsInfoDim_) = dynamicsInfoHistory_[i];
     }
 
     // current state

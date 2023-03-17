@@ -1,14 +1,14 @@
 record_video: no
 seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
-name: "Velocity Command Smoothing12 simdt 400 max time : 12"
+name: "test"
 environment:
   Rollout: False
   position_goal: False
   discrete_action: False
   seed: 2
   render: False
-  num_envs: 1
+  num_envs: 300
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.0025
@@ -44,6 +44,7 @@ environment:
     inertialparamDim_: 15
     dynamicsInfoDim_: 39
     dynamicsPredictDim_: 5
+    dynamicsInputDim_: 15
     historyNum_: 5
     actionhistoryNum_: 6
     actionDim_: 3

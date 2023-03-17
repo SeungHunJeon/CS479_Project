@@ -193,7 +193,6 @@ class ENVIRONMENT {
 //    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
 
     object_type = 2;
-    RSINFO(1)
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
     if(curriculumFactor_ > 0.4)
@@ -208,9 +207,7 @@ class ENVIRONMENT {
     }
 
     else {
-      RSINFO(1)
       Low_controller_2_.reset(&world_);
-      RSINFO(1)
       controller_.updateStateVariables();
     }
 
