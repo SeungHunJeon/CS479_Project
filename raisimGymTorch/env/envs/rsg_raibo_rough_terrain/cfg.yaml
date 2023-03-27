@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
-name: "test"
+name: "Forward Dynamics, remove normalizer in Controller"
 environment:
   Rollout: False
   position_goal: False
