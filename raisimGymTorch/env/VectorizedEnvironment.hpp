@@ -291,6 +291,12 @@ class VectorizedEnvironment {
       env->curriculumUpdate();
   };
 
+  void ObservationDeNormalize(Eigen::Ref<EigenRowMajorMat> &ob) {
+#pragma omp parallel for schedule(auto)
+    for(int i=0; i<num_envs_; i++)
+      ob.row(i) = ob.row(i).template cwiseProduct((obVar_ + epsilon).cwiseSqrt().transpose()) + obMean_.transpose();
+  }
+
  private:
 
   void updateObservationStatisticsAndNormalize(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics) {
@@ -313,6 +319,8 @@ class VectorizedEnvironment {
     for(int i=0; i<num_envs_; i++)
       ob.row(i) = (ob.row(i) - obMean_.transpose()).template cwiseQuotient((obVar_ + epsilon).cwiseSqrt().transpose());
   }
+
+
 
   inline void perAgentStep_Rollout(int agentId,
                            Eigen::Ref<EigenRowMajorMat> &action,

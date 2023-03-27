@@ -70,9 +70,9 @@ class PPO:
                                      *self.critic.parameters(),
                                      *self.encoder.parameters(),
                                      *self.encoder_ROA.parameters(),
-                                     # *self.estimator.parameters(),
+                                     *self.estimator.parameters()
                                      # *self.obs_f_dynamics.parameters()
-                                     *self.decoder.parameters()
+                                     # *self.decoder.parameters()
                                      ], lr=learning_rate)
 
         self.dynamics_optimizer = optim.Adam([*self.obj_f_dynamics.parameters(),
@@ -238,11 +238,11 @@ class PPO:
 
         obj_f_dynamics_true = []
 
-        dyn_obs = obs_batch[1:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
+        dyn_obs_current = obs_batch[1:-1, ..., self.encoder.architecture.block_dim * self.num_history_batch
                                        - self.encoder.architecture.dyn_info_dim:
                                        self.encoder.architecture.block_dim * self.num_history_batch]
 
-        dyn_obs_pred = obs_batch[2:, ..., self.encoder.architecture.block_dim * self.num_history_batch
+        dyn_obs_next = obs_batch[2:, ..., self.encoder.architecture.block_dim * self.num_history_batch
                                            - self.encoder.architecture.dyn_info_dim:
                                            self.encoder.architecture.block_dim * self.num_history_batch]
 
@@ -256,44 +256,43 @@ class PPO:
 
         latent_batch = latent_batch[1:-1]
 
-        Obj_Pos = dyn_obs[..., :3].unsqueeze(-1)
-        ee_Pos = dyn_obs[..., 3:6].unsqueeze(-1)
-        Obj_Vel = dyn_obs[..., 6:9].unsqueeze(-1)
-        Robot_Vel = dyn_obs[..., 9:12].unsqueeze(-1)
-        Obj_AVel = dyn_obs[..., 12:15].unsqueeze(-1)
-        Robot_AVel = dyn_obs[..., 15:18].unsqueeze(-1)
-        Obj_RotMat = dyn_obs[..., 18:27].unsqueeze(-1)
-        Obj_RotMat = Obj_RotMat.reshape(Obj_RotMat.shape[0], Obj_RotMat.shape[1], -1, 3)
-        Robot_RotMat = dyn_obs[..., 27:36].unsqueeze(-1)
-        Robot_RotMat = Robot_RotMat.reshape(Obj_RotMat.shape[0], Obj_RotMat.shape[1], -1, 3)
-        Robot_RotMat_transpose = torch.transpose(Robot_RotMat, -2, -1)
-        Obj_Geometry = dyn_obs[..., 36:].unsqueeze(-1)
+        obj_pos_res = (dyn_obs_next[..., :3] - dyn_obs_current[..., :3])
+        robot_pos_res = (dyn_obs_next[..., 3:6] - dyn_obs_current[..., 3:6])
+        obj_vel_res = (dyn_obs_next[..., 6:9] - dyn_obs_current[..., 6:9])
+        robot_vel_res = (dyn_obs_next[..., 9:12] - dyn_obs_current[..., 9:12])
+        obj_avel_res = (dyn_obs_next[..., 12:15] - dyn_obs_current[..., 12:15])
+        robot_avel_res = (dyn_obs_next[..., 15:18] - dyn_obs_current[..., 15:18])
+        obj_rot_x_res = (dyn_obs_next[..., 18:21] - dyn_obs_current[..., 18:21])
+        robot_rot_x_res = (dyn_obs_next[..., 21:24] - dyn_obs_current[..., 21:24])
+        obj_geometry = dyn_obs_current[..., 24:27]
+        obj_robot_dist = dyn_obs_current[..., :3] - dyn_obs_current[..., 3:6]
+        obj_robot_rot_rel = dyn_obs_current[..., 18:21] - dyn_obs_current[..., 21:24]
 
-        Obj_Pos_pred = dyn_obs_pred[..., :3].unsqueeze(-1)
-        Obj_RotMat_pred = dyn_obs_pred[..., 18:27].unsqueeze(-1)
-        Obj_RotMat_pred = Obj_RotMat_pred.reshape(Obj_RotMat_pred.shape[0], Obj_RotMat_pred.shape[1], -1, 3)
+        obj_f_dynamics_obs.append(obj_pos_res[:-1])
+        obj_f_dynamics_obs.append(robot_pos_res[:-1])
+        obj_f_dynamics_obs.append(obj_vel_res[:-1])
+        obj_f_dynamics_obs.append(robot_vel_res[:-1])
+        obj_f_dynamics_obs.append(obj_avel_res[:-1])
+        obj_f_dynamics_obs.append(robot_avel_res[:-1])
+        obj_f_dynamics_obs.append(obj_rot_x_res[:-1])
+        obj_f_dynamics_obs.append(robot_rot_x_res[:-1])
+        obj_f_dynamics_obs.append(obj_robot_dist[:-1])
+        obj_f_dynamics_obs.append(obj_robot_rot_rel[:-1])
+        obj_f_dynamics_obs.append(obj_geometry[:-1])
+        obj_f_dynamics_obs.append(action_info[:-1])
+        obj_f_dynamics_obs.append(latent_batch[:-1])
 
-        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_Vel - Robot_AVel)).squeeze(-1))
-        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_AVel - Robot_Vel)).squeeze(-1))
-        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_Pos - ee_Pos)).squeeze(-1))
-        obj_f_dynamics_obs.append((Robot_RotMat[..., 0, :] - Obj_RotMat[..., 0, :]).squeeze(-1))
-        obj_f_dynamics_obs.append((Obj_Geometry).squeeze(-1))
-        obj_f_dynamics_obs.append(action_info)
-        obj_f_dynamics_obs.append(latent_batch)
-
-        obj_f_dynamics_true.append((Robot_RotMat_transpose @ (Obj_Pos_pred - Obj_Pos)).squeeze(-1)[...,:2])
+        obj_f_dynamics_true.append(obj_pos_res[1:])
+        obj_f_dynamics_true.append(robot_pos_res[1:])
+        obj_f_dynamics_true.append(obj_vel_res[1:])
+        obj_f_dynamics_true.append(robot_vel_res[1:])
+        obj_f_dynamics_true.append(obj_avel_res[1:])
+        obj_f_dynamics_true.append(robot_avel_res[1:])
+        obj_f_dynamics_true.append(obj_rot_x_res[1:])
+        obj_f_dynamics_true.append(robot_rot_x_res[1:])
+        obj_f_dynamics_true.append(obj_robot_dist[1:])
+        obj_f_dynamics_true.append(obj_robot_rot_rel[1:])
         # Need to make LOG function
-
-        # Obj_Rot_diff = torch.transpose((Obj_RotMat_pred[..., 0, :] - Obj_RotMat[..., 0, :]).unsqueeze(), -2, -1)
-
-
-        obj_f_dynamics_true.append((Robot_RotMat_transpose @ (Obj_RotMat_pred[..., 0, :] - Obj_RotMat[..., 0, :]).unsqueeze(-1)).squeeze(-1))
-
-        # obj_f_dynamics_true = (obs_batch[1:, :, self.encoder.architecture.block_dim * self.num_history_batch
-        #                                        - self.encoder.architecture.dyn_predict_dim:
-        #                                        self.encoder.architecture.block_dim * self.num_history_batch]).clone().detach()
-        #
-        # obj_f_dynamics_true = obj_f_dynamics_true.reshape(-1, self.encoder.architecture.dyn_predict_dim)
 
         # 임의로 size up 할까? 의미가 있나 근데 ..? Normalize 마렵긴 한데 value를 어케 찾을지 모르겠네 ? prediction 만 하고 gradient 구하는거만 normalize한다? 흠 ..?;
         obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
@@ -389,30 +388,14 @@ class PPO:
 
 
 
-        if(self.encoder.architecture.is_decouple):
-            estimator_true_data = []
-            for i in range(self.num_history_batch):
-                estimator_true_data.append(obs_batch[..., self.encoder.architecture.block_dim*i
-                                           + self.encoder.architecture.pro_dim
-                                           + self.encoder.architecture.ext_dim - self.inertial_dim:
-                                           self.encoder.architecture.block_dim*i
-                                           + self.encoder.architecture.pro_dim
-                                           + self.encoder.architecture.ext_dim])
-            estimator_true_data = torch.cat(estimator_true_data, dim=-1)
-            estimator_true_data = estimator_true_data.permute((1,0,2))
-            estimator_true_data = estimator_true_data.reshape(self.num_envs, -1, self.inertial_dim)
-            estimator_true_data = estimator_true_data.permute((1,0,2))
-
-
-        else:
-            estimator_true_data = (obs_batch[-1, :,
-                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-                                   + self.encoder.architecture.pro_dim
-                                   + self.encoder.architecture.ext_dim - self.inertial_dim:
-                                   (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-                                   + self.encoder.architecture.pro_dim
-                                   + self.encoder.architecture.ext_dim
-                                   ])
+        estimator_true_data = (obs_batch[-1, :,
+                               (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                               + self.encoder.architecture.pro_dim
+                               + self.encoder.architecture.ext_dim - self.inertial_dim:
+                               (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                               + self.encoder.architecture.pro_dim
+                               + self.encoder.architecture.ext_dim
+                               ])
 
 
         obs_ROA_batch = torch.cat(obs_ROA_batch, dim=-1)
@@ -429,7 +412,7 @@ class PPO:
         self.obj_f_dynamics_loss = 0
         self.entropy_mean = 0
         self.latent_f_dyn_loss = 0
-        self.decoder_loss = 0
+        # self.decoder_loss = 0
 
         self.lambda_ROA = pow(self.lambda_ROA, self.lambdaDecayFactor)
         print(self.lambda_ROA)
@@ -454,11 +437,15 @@ class PPO:
                 latent_ROA = self.encode_ROA(obs_ROA_batch)
                 latent_ROA_d = latent_ROA.clone().detach()
 
-                obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent)
+
 
                 latent_f_dyn_input, latent_f_dyn_predict_true = self.filter_for_latent_f_dynamics_from_obs(obs_batch, latent)
 
-                decoder_input, decoder_output_true = self.filter_for_decoder_from_obs(obs_batch, latent)
+                # decoder_input, decoder_output_true = self.filter_for_decoder_from_obs(obs_batch, latent)
+                #
+                # decoder_predict = self.decoder.evaluate(decoder_input)
+
+                obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent)
 
                 # estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
@@ -513,9 +500,9 @@ class PPO:
 
                 latent_f_dyn_loss = self.criteria(latent_f_dyn_predict, latent_f_dyn_predict_true)
 
-                decoder_predict = self.decoder.evaluate(decoder_input)
 
-                decoder_loss = self.criteria(decoder_output_true, decoder_predict)
+
+                # decoder_loss = self.criteria(decoder_output_true, decoder_predict)
 
                 # Value function loss
                 if self.use_clipped_value_loss:
@@ -532,8 +519,8 @@ class PPO:
                        + loss_ROA \
                        + obj_f_dynamics_loss \
                        + latent_f_dyn_loss \
-                       + decoder_loss
-                       # + estimator_loss
+                       + estimator_loss
+                       # + decoder_loss
 
                 # dynamics_loss = obj_f_dynamics_loss
 
@@ -548,8 +535,8 @@ class PPO:
                                           *self.critic.parameters(),
                                           *self.encoder.parameters(),
                                           *self.encoder_ROA.parameters(),
-                                          *self.decoder.parameters()
-                                          # *self.estimator.parameters(),
+                                          # *self.decoder.parameters()
+                                          *self.estimator.parameters()
                                           ], self.max_grad_norm)
 
                 nn.utils.clip_grad_norm_([*self.obj_f_dynamics.parameters(),
@@ -574,7 +561,7 @@ class PPO:
                     self.obj_f_dynamics_loss += obj_f_dynamics_loss.item()
                     self.entropy_mean = (self.entropy_coef * entropy_batch.mean()).item()
                     self.latent_f_dyn_loss += latent_f_dyn_loss.item()
-                    self.decoder_loss += decoder_loss.item()
+                    # self.decoder_loss += decoder_loss.item()
 
         if log_this_iteration:
             num_updates = self.num_learning_epochs * self.num_mini_batches
@@ -586,6 +573,6 @@ class PPO:
             self.obj_f_dynamics_loss /= num_updates
             self.entropy_mean /= num_updates
             self.obj_f_dynamics_loss /= num_updates
-            self.decoder_loss /= num_updates
+            # self.decoder_loss /= num_updates
 
         return mean_value_loss, mean_surrogate_loss, locals()

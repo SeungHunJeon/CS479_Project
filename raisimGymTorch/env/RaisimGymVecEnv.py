@@ -89,6 +89,11 @@ class RaisimGymVecEnv:
     def observe_Rollout(self, update_statistics=False):
         self.wrapper.observe_Rollout(self._observation_Rollout, update_statistics)
         return self._observation_Rollout.copy()
+
+    def observe_denormalize(self, observe):
+        self.wrapper.observationDeNormalize(observe)
+        return observe
+
     def observe(self, update_statistics=True):
         self.wrapper.observe(self._observation, update_statistics)
         return self._observation

@@ -38,6 +38,8 @@ class ENVIRONMENT_ROLLOUT {
 //    READ_YAML(int, historyNum_, cfg["dimension"]["historyNum_"])
     READ_YAML(int, nHorizon_, cfg["nHorizon_"])
     READ_YAML(bool, is_position_goal, cfg["position_goal"])
+    READ_YAML(double, obj_mass_, cfg["obj_mass"])
+    READ_YAML(double, bound_ratio, cfg["bound_ratio"])
 
     if(is_discrete_) {
       READ_YAML(int, radial_, cfg["discrete"]["radial"])
@@ -108,6 +110,7 @@ class ENVIRONMENT_ROLLOUT {
     // Reward coefficients
     controller_0.setRewardConfig(cfg);
     command_Obj_Pos_ << 2, 2, command_object_height_/2;
+    command_Obj_quat_ << 1, 0, 0, 0;
 
     if(is_position_goal)
     {
@@ -178,6 +181,7 @@ class ENVIRONMENT_ROLLOUT {
       server_->focusOn(raibo_0);
       std::cout << "Launch Server !!" << std::endl;
       command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, command_object_height_, 1, 0, 0, 0.5);
+      command_Obj_->setOrientation(command_Obj_quat_);
 //#pragma omp parallel for schedule(auto)
       for (int i = 0; i<nHorizon_; i++) {
         auto Obj = server_->addVisualSphere("Predict_Obj_" + std::to_string(i), 0.2, 0.4, 0.4, 0.8, 0.6);
@@ -289,7 +293,7 @@ class ENVIRONMENT_ROLLOUT {
 
   void hard_reset () {
     friction = 1.1 + 0.2*curriculumFactor_ * normDist_(gen_);
-    if (friction < 0.6)
+    if (friction < 0.8)
       friction = 1.1;
     world_0.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
     Obj_->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
@@ -309,7 +313,7 @@ class ENVIRONMENT_ROLLOUT {
         objectGenerator_.Inertial_Randomize(obj);
         auto raibo = reinterpret_cast<ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
         raibo->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-        controller_batch_[i]->reset_Rollout(command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+        controller_batch_[i]->reset_Rollout(command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction);
 //      controller_batch_[i]->reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
         Low_controller_batch_[i]->reset(world_batch_[i]);
         controller_batch_[i]->updateStateVariables();
@@ -325,7 +329,7 @@ class ENVIRONMENT_ROLLOUT {
         objectGenerator_.Inertial_Randomize(obj);
         auto raibo = reinterpret_cast<ArticulatedSystem *>(world_batch_[i]->getObject("robot"));
         raibo->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-        controller_batch_[i]->reset_Rollout(command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+        controller_batch_[i]->reset_Rollout(command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction);
 //      controller_batch_[i]->reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
         Low_velocity_controller_batch_[i]->reset(world_batch_[i]);
         controller_batch_[i]->updateStateVariables();
@@ -343,7 +347,7 @@ class ENVIRONMENT_ROLLOUT {
       hard_reset();
     /// set the state
     raibo_0->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-    controller_0.reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+    controller_0.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction);
 
     Low_velocity_controller_0.reset(&world_0);
     controller_0.updateStateVariables();
@@ -362,6 +366,8 @@ class ENVIRONMENT_ROLLOUT {
         Eigen::Vector3f command;
 
         command = controller_batch_[i]->advance(world_batch_[i], action.row(i));
+        controller_batch_[i]->update_actionHistory(world_batch_[i], action, curriculumFactor_);
+
         Low_velocity_controller_batch_[i]->setCommand(command);
 
         float dummy;
@@ -372,10 +378,9 @@ class ENVIRONMENT_ROLLOUT {
         for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
           /// per 0.02 sec, update history
-          if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_batch_[i]->historyNum_))
+          if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_batch_[i]->actionDim_))
           {
             controller_batch_[i]->updateHistory();
-            controller_batch_[i]->update_actionHistory(world_batch_[i], action, curriculumFactor_);
           }
 
           Low_velocity_controller_batch_[i]->advance(world_batch_[i]);
@@ -403,6 +408,7 @@ class ENVIRONMENT_ROLLOUT {
     Eigen::Vector3f command;
 
     command = controller_0.advance(&world_0, action);
+    controller_0.update_actionHistory(&world_0, action, curriculumFactor_);
     if(is_position_goal)
       Low_controller_0.setCommand(command);
     else
@@ -430,10 +436,10 @@ class ENVIRONMENT_ROLLOUT {
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
       /// per 0.02 sec, update history
-      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_0.historyNum_))
+      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_0.actionDim_))
       {
         controller_0.updateHistory();
-        controller_0.update_actionHistory(&world_0, action, curriculumFactor_);
+
       }
       if(is_position_goal) {
         Low_controller_0.updateObservation(&world_0);
@@ -509,8 +515,18 @@ class ENVIRONMENT_ROLLOUT {
 
     command_Obj_Pos_ << x_command, y_command, command_object_height_/2;
 
+    double alpha = uniDist_(gen_) * M_PI * 2;
+
+    command_Obj_quat_ << cos(alpha / 2), 0, 0, sin(alpha/2);
+
     if(visualizable_)
+    {
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
+      command_Obj_->setOrientation(command_Obj_quat_);
+    }
+
+
+
 
   }
 
@@ -634,8 +650,8 @@ class ENVIRONMENT_ROLLOUT {
       Low_controller_batch_[idx]->updateHistory();
 //    else
 //      Low_velocity_controller_batch_[idx]->advance(world_batch_[idx]);
-    world_batch_[idx]->integrate1();
-    world_batch_[idx]->integrate2();
+    world_batch_[idx]->integrate();
+//    world_batch_[idx]->integrate2();
     if(is_position_goal)
       Low_controller_batch_[idx]->updateStateVariable();
     controller_batch_[idx]->updateStateVariables();
@@ -648,11 +664,11 @@ class ENVIRONMENT_ROLLOUT {
 
 //    else
 //      Low_velocity_controller_0.advance(&world_0);
-
-    world_0.integrate1();
-    if(server_) server_->lockVisualizationServerMutex();
-    world_0.integrate2();
-    if(server_) server_->unlockVisualizationServerMutex();
+    world_0.integrate();
+//    world_0.integrate1();
+//    if(server_) server_->lockVisualizationServerMutex();
+//    world_0.integrate2();
+//    if(server_) server_->unlockVisualizationServerMutex();
     if(is_position_goal)
       Low_controller_0.updateStateVariable();
     controller_0.updateStateVariables();
@@ -730,7 +746,7 @@ class ENVIRONMENT_ROLLOUT {
 
  protected:
   bool is_position_goal = true;
-  double obj_mass_ = 3.0;
+  double obj_mass_ = 2.0;
   double friction = 1.1;
   static constexpr int nJoints_ = 12;
   raisim::World world_0;
@@ -741,7 +757,7 @@ class ENVIRONMENT_ROLLOUT {
   int gcDim_, gvDim_;
   int n_samples;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 0.5;
+  double bound_ratio = 0.3;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;
   Eigen::VectorXd gc_init_from_, gv_init_from_;
@@ -770,6 +786,7 @@ class ENVIRONMENT_ROLLOUT {
   std::vector<raisim::Visuals *> predict_Obj_batch_;
   raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_, *command_ball_, *com_pos_, *com_noisify_;
   Eigen::Vector3d command_Obj_Pos_;
+  Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
   raisim::Vec<3> Pos_e_;
   std::vector<Eigen::Vector2f> command_set;

@@ -15,7 +15,7 @@ import collections
 import torch.nn as nn
 import raisimGymTorch.algo.MPPI.mppi as mppi
 
-device = torch.device('cpu')
+device = torch.device('cuda:0')
 # configuration
 parser = argparse.ArgumentParser()
 parser.add_argument('-w', '--weight', help='trained weight path', type=str, default='')
@@ -40,7 +40,6 @@ cfg['environment']['num_envs'] = 1
 
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
-print(1)
 is_rollout = cfg['environment']['Rollout']
 #
 if (is_rollout):
@@ -48,7 +47,6 @@ if (is_rollout):
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain_ROLLOUT(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 else:
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-print(2)
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
@@ -64,6 +62,7 @@ pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
 dynamics_info_dim = cfg['environment']['dimension']['dynamicsInfoDim_']
+dynamics_input_dim = cfg['environment']['dimension']['dynamicsInputDim_']
 dynamics_predict_dim = cfg['environment']['dimension']['dynamicsPredictDim_']
 ROA_ext_dim = ext_dim - inertial_dim
 
@@ -115,19 +114,7 @@ def get_obs_ROA(encoder, obs_batch):
                              + encoder.architecture.ext_dim
                              + encoder.architecture.act_dim])
 
-    # estimator_true_data = (obs_batch[...,
-    #                        (encoder.architecture.pro_dim +
-    #                         encoder.architecture.ext_dim +
-    #                         encoder.architecture.act_dim)*(historyNum-1)
-    #                        + encoder.architecture.pro_dim +15:
-    #                        (encoder.architecture.pro_dim +
-    #                         encoder.architecture.ext_dim +
-    #                         encoder.architecture.act_dim)*(historyNum-1)
-    #                        + encoder.architecture.pro_dim +15+13
-    #                        ])
-
     obs_ROA_batch = np.concatenate(obs_ROA_batch, axis=-1)
-    # estimator_true_data = estimator_true_data.reshape(-1, 13)
 
     return obs_ROA_batch
 
@@ -151,7 +138,7 @@ else:
                                                          pro_dim + ROA_ext_dim),
                                           device=device)
 
-    obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_info_dim
+    obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_input_dim
 
     obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
                                                          nn.LeakyReLU,
@@ -250,7 +237,12 @@ else:
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
 
-    traj_sampler = mppi.MPPI(dynamics=obj_f_dynamics,
+    for i in range (int(int(iteration_number) / 100)):
+        env.curriculum_callback()
+
+    traj_sampler = mppi.MPPI(latent_f_dynamics=latent_f_dynamics,
+                             obj_f_dynamics=obj_f_dynamics,
+                             decoder=Decoder,
                              encoder=Encoder,
                              encoder_ROA=Encoder_Rollout,
                              actor=actor_Rollout,
@@ -262,8 +254,7 @@ else:
                              use_dynamics=use_dynamics,
                              inertial_dim=inertial_dim)
 
-    for i in range (int(int(iteration_number) / 100)):
-        env.curriculum_callback()
+
 
     success_batch = []
 
@@ -280,6 +271,7 @@ else:
                     obs = env.observe(False)
                     obs_ROA = get_obs_ROA(Encoder, obs)
                     latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+
                     action_ll, actions_log_prob = actor.sample(latent_ROA)
                     success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                     env.step_visualize_success(action_ll, success)
@@ -287,9 +279,6 @@ else:
                     # print(action_ll)
 
                 if (is_rollout == True):
-                    # obs = env.observe(False)
-                    # obs_ROA = get_obs_ROA(Encoder, obs)
-                    # latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
                     cur_pos = env.get_obj_pos()
                     tic = time.time()
                     cur_observation = env.observe_Rollout(False)
@@ -299,7 +288,7 @@ else:
                     toc = time.time()
                     print("time consuming : ", toc - tic)
                     env.predict_obj_update(predict_states.numpy())
-                    env.step_visualize(action_rollout.numpy())
+                    env.step_visualize(action_rollout.cpu().detach().numpy())
                     env.synchronize()
 
                     # gc = np.array([1]*19, dtype=np.float32)

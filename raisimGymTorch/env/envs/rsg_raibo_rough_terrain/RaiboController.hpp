@@ -80,11 +80,9 @@ class RaiboController {
     actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
     actionStd_<< Eigen::VectorXd::Constant(actionDim_, 1.0); /// joint target
 
-    obMean_.setZero(obDim_);
-    obStd_.setZero(obDim_);
     obDouble_.setZero(obDim_);
 
-
+    state_Info_.setZero(proprioceptiveDim_);
     Obj_Info_.setZero(exteroceptiveDim_);
     dynamics_Info_.setZero(dynamicsInfoDim_);
 
@@ -109,77 +107,6 @@ class RaiboController {
     obBlockDim_ = proprioceptiveDim_ + exteroceptiveDim_ + actionDim_ + dynamicsInfoDim_;
 
     RSFATAL_IF(obBlockDim_*actionNum_ != obDim_, "Dimension is fucking bull shit")
-
-    for (int i=0; i<historyNum_+1 ; i++) {
-      obMean_.segment((obBlockDim_)*i, obBlockDim_) <<
-        0.0, 0.0, 1.4, /// gravity axis 3
-        Eigen::VectorXd::Constant(6, 0.0), /// body lin/ang vel 6
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 1), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, sqrt(2)), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 2), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.0), /// object to target velocity
-        Eigen::VectorXd::Constant(3, 0.0), /// object to target angular velocity
-        0.0, 0.0, 0.0, /// Orientation row(0)
-        1.0, 1.0, 1.0, /// object geometry
-        Eigen::VectorXd::Constant(1, 2), /// mass
-        Eigen::VectorXd::Constant(3, 0), /// COM
-        Eigen::VectorXd::Constant(9, 0), /// Inertia
-        1.1, /// friction
-        0.5, /// contact
-        Eigen::VectorXd::Constant(actionDim_, 0.0), /// For action
-        0.0, 0.0, 0.0, /// For dynamics Info (Obj Pos)
-        0.0, 0.0, 0.0, /// For dynamics Info (EE Pos)
-        0, 0, 0, /// For dynamics Info (Obj Vel)
-        0, 0, 0, /// For dynamics Info (Robot Vel)
-        0, 0, 0, /// For dynamics Info (Obj Avel)
-        0, 0, 0, /// For dynamics Info (Robot Avel)
-        0, 0, 0, /// For dynamics Info (Obj Rot 0)
-        0, 0, 0, /// For dynamics Info (Obj Rot 1)
-        0, 0, 1.4, /// For dynamics Info (Obj Rot 2)
-        0, 0, 0, /// For dynamics Info (Robot Rot 0)
-        0, 0, 0, /// For dynamics Info (Robot Rot 1)
-        0, 0, 1.4, /// For dynamics Info (Robot Rot 2)
-        0, 0, 0; /// For dynamics Info (Geometry)
-    }
-
-    for (int i=0; i<historyNum_+1 ; i++) {
-      obStd_.segment((obBlockDim_)*i, obBlockDim_) <<
-        Eigen::VectorXd::Constant(3, 0.3), /// gravity axes
-        Eigen::VectorXd::Constant(3, 0.6), /// linear velocity
-        Eigen::VectorXd::Constant(3, 1.0), /// angular velocities
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.5), /// end-effector to object distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// object to target distance
-        Eigen::VectorXd::Constant(2, 0.5),
-        Eigen::VectorXd::Constant(1, 0.6), /// end-effector to target distance
-        Eigen::VectorXd::Constant(3, 0.5), /// object to target velocity
-        Eigen::VectorXd::Constant(3, 0.5), /// object to angular velocity
-        Eigen::VectorXd::Constant(3,0.5), /// Orientation row(1)
-        0.2, 0.2, 0.2, /// object geometry
-        Eigen::VectorXd::Constant(1, 1.0), /// mass
-        Eigen::VectorXd::Constant(3, 0.5), /// COM
-        Eigen::VectorXd::Constant(9, 0.2), /// Inertia
-        0.2, /// friction
-        0.5,
-        Eigen::VectorXd::Constant(actionDim_, 0.5), /// for aciton
-        0.4, 0.4, 0.3, /// For dynamics Info (Obj Pos)
-        0.4, 0.4, 0.3, /// For dynamics Info (EE Pos)
-        0.5, 0.5, 0.2, /// For dynamics Info (Obj Vel)
-        1.0, 1.0, 0.2, /// For dynamics Info (Robot Vel)
-        0.2, 0.2, 0.5, /// For dynamics Info (Obj Avel)
-        0.2, 0.2, 0.5, /// For dynamics Info (Robot Avel)
-        0.3, 0.3, 0.3, /// For dynamics Info (Obj Rot 0)
-        0.3, 0.3, 0.3, /// For dynamics Info (Obj Rot 1)
-        0.3, 0.3, 0.3, /// For dynamics Info (Obj Rot 2)
-        0.3, 0.3, 0.3, /// For dynamics Info (Robot Rot 0)
-        0.3, 0.3, 0.3, /// For dynamics Info (Robot Rot 1)
-        0.3, 0.3, 0.3, /// For dynamics Info (Robot Rot 2)
-        0.2, 0.2, 0.2; /// For dynamics Info (Geometry)
-    }
 
     footIndices_.push_back(raibo_->getBodyIdx("LF_SHANK"));
     footIndices_.push_back(raibo_->getBodyIdx("RF_SHANK"));
@@ -208,12 +135,6 @@ class RaiboController {
 
     success_batch_.resize(success_batch_num_);
 
-//    Obj_Rot_temp = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-//    Obj_Pos_temp = {0, 0, 0};
-//    baseRot_temp = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-//    Obj_Vel_temp = {0, 0, 0};
-//    Obj_Avel_temp = {0, 0, 0};
-
     return true;
   };
 
@@ -223,16 +144,9 @@ class RaiboController {
     std::rotate(objectInfoHistory_.begin(), objectInfoHistory_.begin()+1, objectInfoHistory_.end());
     objectInfoHistory_[historyNum_ - 1] = Obj_Info_;
 
-    Eigen::VectorXd stateInfo;
-    stateInfo.setZero(proprioceptiveDim_);
-
-    /// Update State Info
-    stateInfo.head(3) = baseRot_.e().row(2);
-    stateInfo.segment(3,3) = bodyLinVel_;
-    stateInfo.segment(6,3) = bodyAngVel_;
 
     std::rotate(stateInfoHistory_.begin(), stateInfoHistory_.begin()+1, stateInfoHistory_.end());
-    stateInfoHistory_[historyNum_ - 1] = stateInfo;
+    stateInfoHistory_[historyNum_ - 1] = state_Info_;
   }
   /// Simdt
   void updateStateVariables() {
@@ -253,6 +167,12 @@ class RaiboController {
     raibo_->getFrameVelocity(raibo_->getFrameIdxByLinkName("arm_link"), ee_Vel_w_);
 
     is_contact = false;
+
+    /// Update State Info
+    state_Info_.segment(0,3) = baseRot_.e().row(2);
+    state_Info_.segment(3,3) = bodyLinVel_;
+    state_Info_.segment(6,3) = bodyAngVel_;
+    state_Info_.segment(9,12) = gc_.segment(7, 12);
 
     for (auto &contact: raibo_->getContacts()) {
       if (contact.getlocalBodyIndex() == armIndices_.front()) {
@@ -326,8 +246,6 @@ class RaiboController {
     Obj_Info_.segment(35,1) << static_cast<double>(is_contact);
 
 
-
-    /// Obj vel, avel, latent vector, action
     dynamics_Info_.segment(0,3) << Obj_Pos_.e();
     dynamics_Info_.segment(3,3) << ee_Pos_w_.e();
     dynamics_Info_.segment(6,3) << Obj_Vel_.e();
@@ -335,25 +253,8 @@ class RaiboController {
     dynamics_Info_.segment(12,3) << Obj_AVel_.e();
     dynamics_Info_.segment(15,3) << gv_.segment(3,3);
     dynamics_Info_.segment(18,3) = Obj_Rot_.e().row(0);
-    dynamics_Info_.segment(21,3) = Obj_Rot_.e().row(1);
-    dynamics_Info_.segment(24,3) = Obj_Rot_.e().row(2);
-    dynamics_Info_.segment(27,3) = baseRot_.e().row(0);
-    dynamics_Info_.segment(30,3) = baseRot_.e().row(1);
-    dynamics_Info_.segment(33,3) = baseRot_.e().row(2);
-    dynamics_Info_.segment(36,3) << obj_geometry_;
-
-
-//    Obj_Pos_.e(), Obj_Rot_.e().row(0), Obj_Rot_.e().row(1),
-//    Obj_Rot_.e().row(2)
-//
-//    (baseRot_prev.e().transpose()*(Obj_Pos_.e() - Obj_Pos_prev.e())).head(2),
-//        baseRot_prev.e().transpose()*Obj_Rot_prev*LOG(Obj_Rot_.e() * Obj_Rot_prev.e()); /// LOG(*) : angular velocity
-
-//    RSINFO("Obj_Vel : " << Obj_Vel_.e())
-//    RSINFO("position difference : " << (Obj_Pos_.e() - Obj_Pos_temp.e()).head(2))
-//    RSINFO("OBJ AVEL : " << Obj_AVel_.e())
-//    RSINFO("Rotation difference : " <<  LOG(Obj_Rot_.e() * Obj_Rot_temp.e()))
-
+    dynamics_Info_.segment(21,3) = baseRot_.e().row(0);
+    dynamics_Info_.segment(24,3) << obj_geometry_;
 
     /// height map
     controlFrameX_ =
@@ -377,7 +278,7 @@ class RaiboController {
   }
 
   void getObservation(Eigen::VectorXd &observation) {
-    observation = (obDouble_ - obMean_).cwiseQuotient(obStd_);
+    observation = obDouble_;
   }
 
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
@@ -426,11 +327,12 @@ class RaiboController {
     return Obj_Pos_.e() + Obj_->getCom().e();
   }
 
-  void reset_Rollout(Eigen::Vector3d command_obj_pos_, Eigen::Vector3d obj_geometry, double friction) {
+  void reset_Rollout(Eigen::Vector3d command_obj_pos_, Eigen::Vector4d command_obj_quat_, Eigen::Vector3d obj_geometry, double friction) {
     raibo_->getState(gc_, gv_);
     is_success_ = false;
     is_achieved = true;
     command_Obj_Pos_ = command_obj_pos_;
+    command_Obj_quat_ = command_obj_quat_;
     obj_geometry_ = obj_geometry;
     friction_ = friction;
 
@@ -438,10 +340,11 @@ class RaiboController {
   }
 
   void reset(std::mt19937 &gen_,
-             std::normal_distribution<double> &normDist_, Eigen::Vector3d command_obj_pos_, Eigen::Vector3d obj_geometry, double friction) {
+             std::normal_distribution<double> &normDist_, Eigen::Vector3d command_obj_pos_, Eigen::Vector4d command_obj_quat_, Eigen::Vector3d obj_geometry, double friction) {
     raibo_->getState(gc_, gv_);
 //    jointTarget_ = gc_.segment(7, nJoints_);
     command_Obj_Pos_ = command_obj_pos_;
+    command_Obj_quat_ = command_obj_quat_;
     obj_geometry_ = obj_geometry;
 
     is_success_ = false;
@@ -527,12 +430,8 @@ class RaiboController {
                         dynamicsInfoDim_) = dynamicsInfoHistory_[i];
     }
 
-    // current state
-    obDouble_.segment((obBlockDim_)*historyNum_, 3) = baseRot_.e().row(2);
-
-//    /// body velocities
-    obDouble_.segment((obBlockDim_)*historyNum_ + 3, 3) = bodyLinVel_;
-    obDouble_.segment((obBlockDim_)*historyNum_ + 6, 3) = bodyAngVel_;
+    obDouble_.segment((obBlockDim_)*historyNum_, proprioceptiveDim_)
+    = state_Info_;
 
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_, exteroceptiveDim_)
     = Obj_Info_;
@@ -577,10 +476,12 @@ class RaiboController {
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
     Eigen::Vector3d obj_to_target (command_Obj_Pos_ - Obj_Pos_.e());
     Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - ee_Pos_w_.e());
+
     ee_to_obj(2) = 0;
     obj_to_target(2) = 0;
     ee_to_target(2) = 0;
     Obj_Vel_(2) = 0;
+
 //    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
 //    obj_to_target = baseRot_.e().transpose() * obj_to_target;
 //    ee_to_target = baseRot_.e().transpose() * ee_to_target;
@@ -670,11 +571,10 @@ class RaiboController {
   std::vector<size_t> footIndices_, footFrameIndicies_, armIndices_;
   Eigen::VectorXd nominalConfig_;
    /// output dim : joint action 12 + task space action 6 + gain dim 4
-  static constexpr size_t historyLength_ = 14;
 
-  int proprioceptiveDim_ = 9;
+  int proprioceptiveDim_ = 21;
   int exteroceptiveDim_ = 36;
-  int dynamicsInfoDim_ = 39;
+  int dynamicsInfoDim_ = 27;
   static constexpr int actionDim_ = 3;
   int historyNum_ = 4;
   int actionNum_ = 5;
@@ -724,11 +624,12 @@ class RaiboController {
   // robot observation variables
   std::vector<raisim::VecDyn> heightScan_;
   Eigen::VectorXi scanConfig_;
-  Eigen::VectorXd obDouble_, obMean_, obStd_;
+  Eigen::VectorXd obDouble_;
   std::vector<std::vector<raisim::Vec<2>>> scanPoint_;
   Eigen::MatrixXd scanSin_;
   Eigen::MatrixXd scanCos_;
   Eigen::VectorXd Obj_Info_;
+  Eigen::VectorXd state_Info_;
   Eigen::VectorXd dynamics_Info_;
   raisim::Vec<3> Obj_Pos_, Obj_Vel_, Obj_AVel_;
   raisim::Mat<3,3> Obj_Rot_, Tar_Rot_;
@@ -743,6 +644,7 @@ class RaiboController {
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_;
   Eigen::VectorXd actionTarget_;
   Eigen::Vector3d command_Obj_Pos_;
+  Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d obj_geometry_;
   Eigen::VectorXd classify_vector_;
 

@@ -2,10 +2,14 @@ import torch
 import numpy as np
 import torch.nn as nn
 import time
+import copy
+
 class MPPI():
 
     def __init__(self,
-                 dynamics,
+                 latent_f_dynamics,
+                 obj_f_dynamics,
+                 decoder,
                  encoder,
                  encoder_ROA,
                  actor,
@@ -17,7 +21,9 @@ class MPPI():
                  use_dynamics,
                  inertial_dim):
 
-        self.dynamics = dynamics
+        self.latent_f_dynamics = latent_f_dynamics
+        self.obj_f_dynamics = obj_f_dynamics
+        self.decoder = decoder
         self.n_samples = n_samples
         self.horizon = horizon
         self.device = device
@@ -26,7 +32,7 @@ class MPPI():
         self.cur_state = None
         self.encoder = encoder
         self.encoder_ROA = encoder_ROA
-        self.encoder_ROA_Rollout = encoder_ROA
+        self.encoder_ROA_Rollout = copy.deepcopy(self.encoder_ROA)
         self.env = environment
         self.criteria = nn.MSELoss()
         self.gamma = gamma
@@ -36,11 +42,58 @@ class MPPI():
         self.best_actions = None
         self.best_future_states = None
         self.inertial_dim = inertial_dim
+
     def smoothing_actions(self, action_batch, return_batch):
 
         smoothed_action = None
 
         return smoothed_action
+
+    def filter_for_obj_f_dynamics_from_obs(self, obs_batch, latent_batch_, action_batch):
+        obj_f_dynamics_obs = []
+
+
+        self.env.mean
+        self.env.var
+        # TODO (Need Denormalize) action_batch is from random sampling ..
+        action_info = action_batch
+        # action_info *= 2
+        # denormalize using obMean obsVar
+        #
+        #
+
+        dyn_obs = obs_batch[..., self.encoder.architecture.block_dim
+                                       - self.encoder.architecture.dyn_info_dim:
+                                       self.encoder.architecture.block_dim]
+
+        latent_batch = latent_batch_.reshape((-1, self.n_samples, self.encoder.architecture.hidden_dim))
+
+        latent_batch = latent_batch[1:-1]
+
+        Obj_Pos = dyn_obs[..., :3].unsqueeze(-1)
+        ee_Pos = dyn_obs[..., 3:6].unsqueeze(-1)
+        Obj_Vel = dyn_obs[..., 6:9].unsqueeze(-1)
+        Robot_Vel = dyn_obs[..., 9:12].unsqueeze(-1)
+        Obj_AVel = dyn_obs[..., 12:15].unsqueeze(-1)
+        Robot_AVel = dyn_obs[..., 15:18].unsqueeze(-1)
+        Obj_RotMat = dyn_obs[..., 18:27].unsqueeze(-1)
+        Obj_RotMat = Obj_RotMat.reshape(Obj_RotMat.shape[0], Obj_RotMat.shape[1], -1, 3)
+        Robot_RotMat = dyn_obs[..., 27:36].unsqueeze(-1)
+        Robot_RotMat = Robot_RotMat.reshape(Obj_RotMat.shape[0], Obj_RotMat.shape[1], -1, 3)
+        Robot_RotMat_transpose = torch.transpose(Robot_RotMat, -2, -1)
+        Obj_Geometry = dyn_obs[..., 36:].unsqueeze(-1)
+
+        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_Vel - Robot_Vel)).squeeze(-1))
+        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_AVel - Robot_AVel)).squeeze(-1))
+        obj_f_dynamics_obs.append((Robot_RotMat_transpose @ (Obj_Pos - ee_Pos)).squeeze(-1))
+        obj_f_dynamics_obs.append((Robot_RotMat[..., 0, :] - Obj_RotMat[..., 0, :]).squeeze(-1))
+        obj_f_dynamics_obs.append((Obj_Geometry).squeeze(-1))
+        obj_f_dynamics_obs.append(action_info)
+        obj_f_dynamics_obs.append(latent_batch)
+
+        obj_f_dynamics_obs = torch.cat(obj_f_dynamics_obs, dim=-1)
+
+        return obj_f_dynamics_obs
 
     def filter_for_encode_from_obs(self, obs_batch):
         filtered_obs = []
@@ -51,12 +104,21 @@ class MPPI():
                                 + self.encoder.architecture.pro_dim
                                 + self.encoder.architecture.ext_dim - self.inertial_dim])
 
+            filtered_obs.append(obs_batch[...,
+                                (self.encoder.architecture.block_dim)*i
+                                + self.encoder.architecture.pro_dim
+                                + self.encoder.architecture.ext_dim:
+                                (self.encoder.architecture.block_dim)*i
+                                + self.encoder.architecture.pro_dim
+                                + self.encoder.architecture.ext_dim
+                                + self.encoder.architecture.act_dim])
+
         if isinstance(filtered_obs[0], np.ndarray):
             filtered_obs = np.concatenate(filtered_obs, axis=-1)
-            return torch.Tensor(filtered_obs)
+            return torch.Tensor(filtered_obs).to(self.device)
         if isinstance(filtered_obs[0], torch.Tensor):
             filtered_obs = torch.cat(filtered_obs, dim=-1)
-            return filtered_obs
+            return filtered_obs.to(self.device)
 
     def sampling_actions(self, latent_batch):
         """
@@ -69,17 +131,15 @@ class MPPI():
         """
         action sampling from uniform distribution
         """
-        # sampled_action = 6 * (np.random.rand(self.n_samples, 2).astype(np.float32) - 0.5)
+        # sampled_action = 5 * (np.random.rand(self.n_samples, 2).astype(np.float32) - 0.5)
         """
         action sampling from uniform distribution & rejection through current policy
         """
-        action_ll, actions_log_prob = self.actor.sample(latent_batch)
+        sampled_action, actions_log_prob = self.actor.sample(latent_batch)
 
         """
         
         """
-
-        sampled_action = action_ll
 
         return sampled_action
 
@@ -111,32 +171,41 @@ class MPPI():
         cur_observation_batch = self.cur_observation
         filtered_obs = self.filter_for_encode_from_obs(cur_observation_batch)
         cur_latent_batch = self.encoder_ROA.evaluate(filtered_obs)
-        # self.encoder_ROA_Rollout = self.encoder_ROA
+        cur_latent_batch = cur_latent_batch.repeat(self.n_samples, 1)
+        self.encoder_ROA_Rollout = copy.deepcopy(self.encoder_ROA)
+
         for i in range(self.horizon):
             actions = self.sampling_actions(cur_latent_batch)
             total_action_batch.append(torch.Tensor(actions))
 
-            # Dynamics model
-            # dynamics_input = torch.Tensor(np.concatenate([actions, cur_latent_batch], axis=-1))
-            # predicted_state = self.dynamics.predict(dynamics_input)
-            # print(predicted_state.shape)
-            # predicted_state_z = torch.Tensor(np.zeros([300])).unsqueeze(-1)
-            # predicted_state = torch.cat([predicted_state, predicted_state_z],dim=-1)
-            # next_state_batch = predicted_state + cur_state_batch
-            # next_observation_batch = self.env.step_rollout(actions)
+            if(self.use_dynamics):
+                # Latent forward dynamics model
+                # cur_late
+                # latent_dynamics_input = torch.cat(cur_latent_batch)
+                latent_dynamics_input = torch.Tensor(np.concatenate([cur_latent_batch.cpu().numpy(), actions], axis=-1)).to(self.device)
+                predicted_latent_batch = self.latent_f_dynamics.predict(latent_dynamics_input)
+                predicted_obs_batch = self.decoder.predict(predicted_latent_batch)
 
-            # Rollout
-            toc = time.time()
-            self.env.step_rollout(actions)
-            tic = time.time()
-            print("time consuming for step rollout : ", tic-toc)
-            next_observation_batch = self.env.observe_Rollout(False)
-            next_state_batch = self.env.get_obj_pos()
+                obj_dynamics_input = self.filter_for_obj_f_dynamics_from_obs(predicted_obs_batch, predicted_latent_batch, actions)
+                predicted_obj_batch = self.obj_f_dynamics(obj_dynamics_input)
+                # TODO (denormalize obj batch)
+                cur_latent_batch = predicted_latent_batch
 
-            total_state_batch.append(torch.Tensor(next_state_batch))
-            cur_state_batch = next_state_batch
-            cur_observation_batch = next_observation_batch
-            cur_latent_batch = self.encoder_ROA.evaluate(self.filter_for_encode_from_obs(cur_observation_batch))
+            else:
+                # Rollout
+                toc = time.time()
+                self.env.step_rollout(actions)
+                tic = time.time()
+                print("time consuming for step rollout : ", tic-toc)
+                next_observation_batch = self.env.observe_Rollout(False)
+                next_state_batch = self.env.get_obj_pos()
+
+                total_state_batch.append(torch.Tensor(next_state_batch))
+                cur_state_batch = next_state_batch
+                cur_observation_batch = next_observation_batch
+                cur_latent_batch = self.encoder_ROA_Rollout.evaluate(self.filter_for_encode_from_obs(cur_observation_batch))
+
+
 
         # I don't know exact dimension ..
         total_state_batch = torch.stack(total_state_batch, dim=0)

@@ -115,8 +115,8 @@ Decoder = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['Decoder']['ne
                                          device=device)
 Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                 nn.LeakyReLU,
-                                                int(Encoder_ob_dim/historyNum),
-                                                int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
+                                                hidden_dim,
+                                                inertial_dim), device=device)
 Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
                                                           hidden_dim=hidden_dim,
                                                           ext_dim=ROA_ext_dim,
@@ -129,6 +129,7 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           batch_num=batchNum,
                                                           num_env=env.num_envs,
                                                           is_decouple=is_decouple), device=device)
+
 Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                           hidden_dim=hidden_dim,
                           ext_dim=ext_dim,
@@ -141,6 +142,7 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_
                           device=device,
                           num_env=env.num_envs,
                           is_decouple=is_decouple), device=device)
+
 actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                            env.num_envs,
@@ -186,7 +188,7 @@ ppo = PPO.PPO(actor=actor,
 iteration_number = 0
 
 
-wandb.init(group="jsh",project=task_name,name=name)
+# wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -233,6 +235,7 @@ for update in range(iteration_number, 1000000):
 
                 # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
                 latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
+                filtered_obs = ppo.filter_for_encode_from_obs(obs)
                 # print(latent)
                 # print(latent.shape)
                 actions, actions_log_prob = actor.sample(latent)
@@ -312,7 +315,7 @@ for update in range(iteration_number, 1000000):
 
     end = time.time()
 
-    wandb.log(data_log)
+    # wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))

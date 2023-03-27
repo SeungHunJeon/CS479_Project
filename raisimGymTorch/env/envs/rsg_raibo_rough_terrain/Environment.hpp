@@ -35,7 +35,8 @@ class ENVIRONMENT {
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
     READ_YAML(bool, is_discrete_, cfg["discrete_action"])
     READ_YAML(bool, is_position_goal, cfg["position_goal"])
-
+    READ_YAML(double, obj_mass, cfg["obj_mass"])
+    READ_YAML(double, bound_ratio, cfg["bound_ratio"])
     if(is_discrete_) {
       READ_YAML(int, radial_, cfg["discrete"]["radial"])
       READ_YAML(int, tangential_, cfg["discrete"]["tangential"])
@@ -96,6 +97,7 @@ class ENVIRONMENT {
     // Reward coefficients
     controller_.setRewardConfig(cfg);
     command_Obj_Pos_ << 2, 2, command_object_height_/2;
+    command_Obj_quat_ << 1, 0, 0, 0;
 
     command_set.push_back({1.5,0});
     command_set.push_back({-1.5, 0});
@@ -108,8 +110,9 @@ class ENVIRONMENT {
       server_->launchServer(8080);
       server_->focusOn(raibo_);
       std::cout << "Launch Server !!" << std::endl;
-      command_Obj_ = server_->addVisualCylinder("command_Obj_", 0.5, command_object_height_, 1, 0, 0, 0.5);
+      command_Obj_ = server_->addVisualBox("command_Obj_", 0.5, 0.5, command_object_height_, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
+      command_Obj_->setOrientation(command_Obj_quat_);
       target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
       command_ball_ = server_->addVisualSphere("command_Ball", 0.1, 0, 1, 0, 1.0);
       com_pos_ = server_->addVisualSphere("com_pos", 0.05, 0, 0.5, 0.5, 1.0);
@@ -199,7 +202,7 @@ class ENVIRONMENT {
       hard_reset();
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-    controller_.reset(gen_, normDist_, command_Obj_Pos_, objectGenerator_.get_geometry(), friction);
+    controller_.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction);
     if(is_position_goal) {
       Low_controller_.reset(&world_);
       controller_.updateStateVariables();
@@ -251,7 +254,7 @@ class ENVIRONMENT {
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
       /// level frequency times 5.
-      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.actionDim_) == 0)
+      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.actionNum_) == 0)
       {
         controller_.updateHistory();
       }
@@ -269,7 +272,7 @@ class ENVIRONMENT {
         subStep();
 //        if(visualize)
 //          std::this_thread::sleep_for(std::chrono::microseconds(1000));
-
+//
         if(isTerminalState(dummy)) {
           howManySteps++;
           break;
@@ -320,10 +323,19 @@ class ENVIRONMENT {
     x_command = x + sqrt(2)*cos(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
     y_command = y + sqrt(2)*sin(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
 
+
+
     command_Obj_Pos_ << x_command, y_command, command_object_height_/2;
 
-    if(visualizable_)
+    double alpha = uniDist_(gen_) * M_PI * 2;
+
+    command_Obj_quat_ << cos(alpha / 2), 0, 0, sin(alpha/2);
+
+
+    if(visualizable_) {
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
+      command_Obj_->setOrientation(command_Obj_quat_);
+    }
 
   }
 
@@ -413,7 +425,7 @@ class ENVIRONMENT {
 
  protected:
   bool is_position_goal = true;
-  const double obj_mass = 2.0;
+  double obj_mass = 2.0;
   double friction = 1.1;
   static constexpr int nJoints_ = 12;
   raisim::World world_;
@@ -447,6 +459,7 @@ class ENVIRONMENT {
   raisim::SingleBodyObject *Obj_, *Manipulate_;
   raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_, *command_ball_, *com_pos_, *com_noisify_;
   Eigen::Vector3d command_Obj_Pos_;
+  Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
   raisim::Vec<3> Pos_e_;
   std::vector<Eigen::Vector2f> command_set;

@@ -46,7 +46,8 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("getDepthImage", &VectorizedEnvironment<ENVIRONMENT>::getDepthImage)
     .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT>::getColorImage)
     .def("getSuccess", &VectorizedEnvironment<ENVIRONMENT>::getSuccess)
-    .def("step_visualize_success", &VectorizedEnvironment<ENVIRONMENT>::step_visualize_success);
+    .def("step_visualize_success", &VectorizedEnvironment<ENVIRONMENT>::step_visualize_success)
+    .def("observationDeNormalize", &VectorizedEnvironment<ENVIRONMENT>::ObservationDeNormalize);
 //    .def("synchronize", &VectorizedEnvironment<ENVIRONMENT>::synchronize);
 
   py::class_<VectorizedEnvironment<ENVIRONMENT_ROLLOUT>>(m, "RaisimGymRaiboRoughTerrain_ROLLOUT")
@@ -85,7 +86,7 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
       .def("get_obj_pos", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::get_obj_pos)
       .def("observe_Rollout", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::observe_Rollout)
       .def("predict_obj_update", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::predict_obj_update)
-
+      .def("observationDeNormalize", &VectorizedEnvironment<ENVIRONMENT_ROLLOUT>::ObservationDeNormalize)
       ;
 
   py::class_<NormalSampler>(m, "NormalSampler")
