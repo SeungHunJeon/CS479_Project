@@ -73,7 +73,7 @@ Encoder_ob_dim = historyNum * (pro_dim + ext_dim + act_dim)
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
-is_decouple = cfg['LSTM']['is_decouple_']
+layerNum = cfg['LSTM']['numLayer_']
 
 # ROA Encoding
 ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
@@ -164,7 +164,7 @@ else:
 
     Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                     nn.LeakyReLU,
-                                                    int(Encoder_ob_dim/historyNum),
+                                                    hidden_dim,
                                                     int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
 
     Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
@@ -177,8 +177,8 @@ else:
                                                                   hist_num=historyNum,
                                                                   device=device,
                                                                   batch_num=batchNum,
-                                                                  num_env=env.num_envs,
-                                                                  is_decouple=is_decouple), device=device)
+                                                                  layer_num=layerNum,
+                                                                  num_env=env.num_envs), device=device)
 
     Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                                                               hidden_dim=hidden_dim,
@@ -189,9 +189,9 @@ else:
                                                               dyn_predict_dim=dynamics_predict_dim,
                                                               hist_num=historyNum,
                                                               batch_num=batchNum,
+                                                              layer_num=layerNum,
                                                               device=device,
-                                                              num_env=env.num_envs,
-                                                              is_decouple=is_decouple), device=device)
+                                                              num_env=env.num_envs), device=device)
 
 
     actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
@@ -212,8 +212,8 @@ else:
                                                                       hist_num=historyNum,
                                                                       device=device,
                                                                       batch_num=batchNum,
-                                                                      num_env=env.num_envs,
-                                                                      is_decouple=is_decouple), device=device)
+                                                                      layer_num=layerNum,
+                                                                      num_env=env.num_envs), device=device)
 
     actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
@@ -259,7 +259,7 @@ else:
     success_batch = []
 
     for i in range (100):
-        env.curriculum_callback()
+        # env.curriculum_callback()
         env.reset()
         Encoder.architecture.reset()
         Encoder_ROA.architecture.reset()

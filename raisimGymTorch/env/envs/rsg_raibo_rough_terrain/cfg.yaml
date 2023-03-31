@@ -41,14 +41,13 @@ environment:
   hierarchical: True
 
   dimension:
-    proprioceptiveDim_: 21
-    exteroceptiveDim_: 36
+    proprioceptiveDim_: 15
+    exteroceptiveDim_: 33
     inertialparamDim_: 15
     dynamicsInfoDim_: 27
     dynamicsPredictDim_: 30
     dynamicsInputDim_: 33
-    historyNum_: 5
-    actionhistoryNum_: 6
+    historyNum_: 20
     actionDim_: 3
 
   ROA_dimension:
@@ -66,9 +65,9 @@ encoder:
   actionlatentDim_: 4
 
 LSTM:
-  is_decouple_: False
   hiddendim_: 48
   batchNum_: 1
+  numLayer_: 2
 
 architecture:
   policy_net: [256, 128, 64]

@@ -457,14 +457,8 @@ class PPO:
                 loss_ROA = self.criteria(latent_d, latent_ROA)
 
 
-                if(self.encoder.architecture.is_decouple):
-                    latent_for_update = latent[self.num_history_batch-1::self.num_history_batch, :]
-                    actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent_for_update, actions_batch)
-                    value_batch = self.critic.evaluate(latent_for_update)
-
-                else:
-                    actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent, actions_batch)
-                    value_batch = self.critic.evaluate(latent)
+                actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent, actions_batch)
+                value_batch = self.critic.evaluate(latent)
 
                 # Adjusting the learning rate using KL divergence
                 mu_batch = self.actor.action_mean

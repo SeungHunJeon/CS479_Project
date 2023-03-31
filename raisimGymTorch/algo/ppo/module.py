@@ -152,7 +152,7 @@ class Transformer_Encoder(nn.Module):
 #         return self.architecture.input_shape
 
 class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_env, is_decouple, device):
+    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_env, layer_num, device):
         super(LSTM, self).__init__()
         self.ext_dim = ext_dim
         self.pro_dim = pro_dim
@@ -162,22 +162,16 @@ class LSTM(nn.Module):
         self.hist_num = hist_num
         self.device = device
         self.hidden_dim = hidden_dim
-
+        self.layer_num = layer_num
         self.num_env = num_env
         self.batch_num = batch_num
-        self.is_decouple = is_decouple
-
-        if(self.is_decouple):
-            self.input_dim = input_dim
-
-        else:
-            self.input_dim = input_dim*self.hist_num
+        self.input_dim = input_dim*self.hist_num
 
         self.block_dim = ext_dim + pro_dim + dyn_info_dim + act_dim
 
         self.lstm = nn.LSTM(input_size=self.input_dim,
                             hidden_size=self.hidden_dim,
-                            num_layers=1,
+                            num_layers=self.layer_num,
                             batch_first=False)
 
         # self.init_weights(self.architecture, scale)
@@ -186,12 +180,7 @@ class LSTM(nn.Module):
         self.h_0 = None
         self.c_0 = None
     def forward(self, obs):
-        if(self.is_decouple):
-            inputs = obs.reshape((self.num_env, -1, self.input_dim))
-            inputs = torch.permute(inputs, (1, 0, 2))
-
-        else:
-            inputs = obs.reshape(-1, self.num_env, self.input_dim)
+        inputs = obs.reshape(-1, self.num_env, self.input_dim)
 
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
@@ -207,18 +196,7 @@ class LSTM(nn.Module):
         return output
 
     def forward_update(self, obs):
-        # ordered = self.obs_inorder(obs, update=True)
-        # inputs = ordered.view(-1, self.num_env, self.input_dim)
-        # print(obs[0,0,52:104]) # 40 300 260 (52 * 5)
-        # inputs = obs.view(-1, self.num_env, self.input_dim)
-
-        if(self.is_decouple):
-            inputs = torch.permute(obs, (1,0,2)) # 40 300 5*a -> 300 40 5*a
-            inputs = torch.reshape(inputs, (self.num_env, -1, self.input_dim)) # 300 200 a
-            inputs = torch.permute(inputs, (1,0,2)) # 200 300 a
-
-        else:
-            inputs = obs.reshape((-1, self.num_env, self.input_dim))
+        inputs = obs.reshape((-1, self.num_env, self.input_dim))
 
 
         # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
@@ -351,6 +329,9 @@ class DiscreteDistribution(nn.Module):
         return actions_log_prob, entropy
     def entropy(self):
         return self.distribution.entropy()
+
+# class GaussianMixtureModel(nn.Module):
+
 
 class MultivariateGaussianDiagonalCovariance(nn.Module):
     def __init__(self, dim, size, init_std, fast_sampler, seed=0):

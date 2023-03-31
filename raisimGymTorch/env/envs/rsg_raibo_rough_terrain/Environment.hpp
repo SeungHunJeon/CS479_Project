@@ -99,11 +99,6 @@ class ENVIRONMENT {
     command_Obj_Pos_ << 2, 2, command_object_height_/2;
     command_Obj_quat_ << 1, 0, 0, 0;
 
-    command_set.push_back({1.5,0});
-    command_set.push_back({-1.5, 0});
-    command_set.push_back({0, 1.5});
-    command_set.push_back({0, -1.5});
-
     // visualize if it is the first environment
     if (visualizable_) {
       server_ = std::make_unique<raisim::RaisimServer>(&world_);
@@ -184,12 +179,14 @@ class ENVIRONMENT {
 
   void hard_reset () {
     friction = 1.1 + 0.2*curriculumFactor_ * normDist_(gen_);
-    if (friction < 0.8)
+    if (std::abs(friction - 1.1) > 0.3)
       friction = 1.1;
     world_.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
 
-    Obj_->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
-    Obj_->setLinearDamping(0.6*friction/1.1);
+    /// Update Object damping coefficient
+    /// Deprecated (box doesn't necessary)
+//    Obj_->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
+//    Obj_->setLinearDamping(0.6*friction/1.1);
   }
 
   void reset() {
@@ -198,7 +195,7 @@ class ENVIRONMENT {
     object_type = 2;
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
-    if(curriculumFactor_ > 0.4)
+    if(curriculumFactor_ > 0.5)
       hard_reset();
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
@@ -250,14 +247,9 @@ class ENVIRONMENT {
     int howManySteps;
     int lowlevelSteps;
 
-    /// Low level frequency
+    /// Low level frequency 0.01
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
-
-      /// level frequency times 5.
-      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_.actionNum_) == 0)
-      {
-        controller_.updateHistory();
-      }
+      controller_.updateHistory();
       if(is_position_goal) {
         Low_controller_.updateObservation(&world_);
         Low_controller_.advance(&world_);
@@ -315,8 +307,11 @@ class ENVIRONMENT {
     Obj_->setPosition(x, y, object_height/2);
     Obj_->setOrientation(1, 0, 0, 0);
     Obj_->setVelocity(0,0,0,0,0,0);
-    Obj_->setAngularDamping({1.0,1.0,1.0});
-    Obj_->setLinearDamping(0.5);
+
+    /// Update Object damping coefficient
+    /// Deprecated (box doesn't necessary)
+//    Obj_->setAngularDamping({1.0,1.0,1.0});
+//    Obj_->setLinearDamping(0.5);
 
     phi_ = uniDist_(gen_);
 
@@ -462,7 +457,6 @@ class ENVIRONMENT {
   Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
   raisim::Vec<3> Pos_e_;
-  std::vector<Eigen::Vector2f> command_set;
   int command_order = 0;
   double object_height = 0.55;
   double command_object_height_ = 0.55;
