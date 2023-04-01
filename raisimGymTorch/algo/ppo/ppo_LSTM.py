@@ -211,9 +211,7 @@ class PPO:
     def filter_for_latent_f_dynamics_from_obs(self, obs_batch, latent_batch_):
         latent_f_dynamics_input = []
 
-        latent_batch = latent_batch_.clone().detach()
-
-        latent_batch = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
+        latent_batch = latent_batch_.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
 
         latent_batch_input = latent_batch[:-1, ...]
 
@@ -420,6 +418,8 @@ class PPO:
             for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
+                if isinstance(self.encoder.architecture, nn.Transformer):
+                    print(1)
                 self.encoder.architecture.reset()
                 self.encoder_ROA.architecture.reset()
 
@@ -439,18 +439,18 @@ class PPO:
 
 
 
-                latent_f_dyn_input, latent_f_dyn_predict_true = self.filter_for_latent_f_dynamics_from_obs(obs_batch, latent)
+                latent_f_dyn_input, latent_f_dyn_predict_true = self.filter_for_latent_f_dynamics_from_obs(obs_batch, latent_d)
 
                 # decoder_input, decoder_output_true = self.filter_for_decoder_from_obs(obs_batch, latent)
                 #
                 # decoder_predict = self.decoder.evaluate(decoder_input)
 
-                obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent)
+                obj_f_dyn_input, obj_f_dyn_true = self.filter_for_obj_f_dynamics_from_obs(obs_batch, latent_d)
 
                 # estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
-                estimator_input = self.encode(obs_batch[-1, ...]).reshape(-1, self.encoder.architecture.hidden_dim)
-
+                estimator_input = latent_d.reshape(-1, self.num_envs, self.encoder.architecture.hidden_dim)
+                estimator_input = estimator_input[-1, ...].squeeze(0)
                 estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
 
                 lambda_loss_ROA = self.lambda_ROA * self.criteria(latent, latent_ROA_d)
@@ -514,7 +514,6 @@ class PPO:
                        + obj_f_dynamics_loss \
                        + latent_f_dyn_loss \
                        + estimator_loss
-                       # + decoder_loss
 
                 # dynamics_loss = obj_f_dynamics_loss
 
@@ -529,7 +528,6 @@ class PPO:
                                           *self.critic.parameters(),
                                           *self.encoder.parameters(),
                                           *self.encoder_ROA.parameters(),
-                                          # *self.decoder.parameters()
                                           *self.estimator.parameters()
                                           ], self.max_grad_norm)
 

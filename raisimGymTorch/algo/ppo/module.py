@@ -3,7 +3,8 @@ import numpy as np
 import torch
 from torch.distributions import Normal
 from torch.distributions import Categorical
-from ..helper import Transformer
+from ..helper.Transformer import PositionalEncoding
+import math
 
 class Actor:
     def __init__(self, architecture, distribution, device='cpu'):
@@ -116,41 +117,66 @@ class Estimator:
     @property
     def obs_shape(self):
         return self.architecture.input_shape
+class Transformer(nn.Module):
+    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_env, d_model, max_len, device):
+        super(Transformer, self).__init__()
+        self.ext_dim = ext_dim
+        self.pro_dim = pro_dim
+        self.act_dim = act_dim
+        self.dyn_info_dim = dyn_info_dim
+        self.dyn_predict_dim = dyn_predict_dim
+        self.hist_num = hist_num
+        self.device = device
+        self.hidden_dim = hidden_dim
+        self.num_env = num_env
+        self.batch_num = batch_num
+        self.input_dim = input_dim
+        # self.input_dim = input_dim*self.hist_num
+        self.block_dim = ext_dim + pro_dim + dyn_info_dim + act_dim
 
+        # Transformer
 
-class Transformer_Encoder(nn.Module):
-    def __init__(self, layer, N):
-        super(Transformer_Encoder).__init__()
-        self.layers = Transformer.clones(layer, N)
-        self.norm = Transformer.LayerNrom(layer.size)
+        self.embedding = nn.Linear(input_dim, d_model)
+        self.max_len = max_len
+        self.d_model = d_model
+        self.pe = PositionalEncoding(d_model=d_model,
+                                     max_len=max_len)
+        self.transformer_layer = nn.TransformerEncoderLayer(d_model=d_model,
+                                                            dim_feedforward=256,
+                                                            nhead=8)
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer=self.transformer_layer,
+                                                 num_layers=4)
 
-    def forward(self, x, mask):
-        for layer in self.layers:
-            x = layer(x, mask)
-        return self.norm(x)
+        self.lin = nn.Linear(d_model, self.hidden_dim)
 
-# class ROA(nn.Module):
-#     def __init__(self, architecture, device='cpu'):
-#         super(ROA, self).__init__()
-#         self.architecture = architecture
-#         self.architecture.to(device)
-#
-#     def predict(self, obs):
-#         return self.architecture(obs).detach()
-#
-#     def evaluate(self, obs):
-#         return self.architecture(obs)
-#
-#     def evaluate_update(self, obs):
-#         return self.architecture.forward_update(obs)
-#
-#     def parameters(self):
-#         return [*self.architecture.parameters()]
-#
-#     @property
-#     def obs_shape(self):
-#         return self.architecture.input_shape
+        # self.init_weights(self.architecture, scale)
+        self.input_shape = [self.input_dim*batch_num]
+        self.output_shape = [hidden_dim]
+    def forward(self, obs):
+        inputs = obs.reshape(-1, self.num_env, self.input_dim)
+        inputs = self.embedding(inputs)
+        inputs = inputs * math.sqrt(self.d_model)
+        inputs = self.pe(inputs)
+        # print(outputs.shape)
+        outputs = self.transformer_encoder(inputs)
+        output = outputs[-1, :, :]
 
+        return output
+
+    def forward_update(self, obs):
+        inputs = obs.reshape(-1, self.num_env, self.input_dim)
+        inputs = inputs.reshape(self.max_len, -1, self.input_dim)
+        inputs = self.embedding(inputs)
+        inputs = inputs * math.sqrt(self.d_model)
+        inputs = self.pe(inputs)
+        # print(outputs.shape)
+        outputs = self.transformer_encoder(inputs)
+        outputs = outputs[-1, :, :]
+        output = outputs.reshape(-1, self.hidden_dim)
+
+        return output
+    def reset(self):
+        return True
 class LSTM(nn.Module):
     def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_env, layer_num, device):
         super(LSTM, self).__init__()
@@ -179,6 +205,8 @@ class LSTM(nn.Module):
         self.output_shape = [hidden_dim]
         self.h_0 = None
         self.c_0 = None
+
+    # Forward function is for encode one-step observation which incorporates number of (high-level controller frequency) / (low-level controller frequency)
     def forward(self, obs):
         inputs = obs.reshape(-1, self.num_env, self.input_dim)
 
@@ -195,6 +223,8 @@ class LSTM(nn.Module):
 
         return output
 
+    # Forward_update is for encode 1-iteration whole-step observation which incorporates number of
+    # (number of step) * (high-level controller frequency) / (low-level controller frequency)
     def forward_update(self, obs):
         inputs = obs.reshape((-1, self.num_env, self.input_dim))
 

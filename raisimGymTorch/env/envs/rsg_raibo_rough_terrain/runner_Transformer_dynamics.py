@@ -116,7 +116,8 @@ Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']
                                                 nn.LeakyReLU,
                                                 hidden_dim,
                                                 inertial_dim), device=device)
-Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
+
+Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.Transformer(input_dim=int(ROA_Encoder_ob_dim/historyNum),
                                                           hidden_dim=hidden_dim,
                                                           ext_dim=ROA_ext_dim,
                                                           pro_dim=pro_dim,
@@ -126,10 +127,11 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           hist_num=historyNum,
                                                           device=device,
                                                           batch_num=batchNum,
-                                                          layer_num=layerNum,
-                                                          num_env=env.num_envs), device=device)
+                                                          num_env=env.num_envs,
+                                                          d_model=hidden_dim,
+                                                          max_len=historyNum), device=device)
 
-Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
+Encoder = ppo_module.Encoder(architecture=ppo_module.Transformer(input_dim=int(Encoder_ob_dim/historyNum),
                           hidden_dim=hidden_dim,
                           ext_dim=ext_dim,
                           pro_dim=pro_dim,
@@ -138,9 +140,10 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_
                           dyn_predict_dim=dynamics_predict_dim,
                           hist_num=historyNum,
                           batch_num=batchNum,
-                          layer_num=layerNum,
                           device=device,
-                          num_env=env.num_envs), device=device)
+                          num_env=env.num_envs,
+                          d_model=hidden_dim,
+                          max_len=historyNum), device=device)
 
 pytorch_total_params = sum(p.numel() for p in Encoder.architecture.parameters())
 
@@ -191,7 +194,7 @@ ppo = PPO.PPO(actor=actor,
 iteration_number = 0
 
 
-wandb.init(group="jsh",project=task_name,name=name)
+# wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -200,8 +203,6 @@ for update in range(iteration_number, 1000000):
     torch.cuda.empty_cache()
     start = time.time()
     env.reset()
-    Encoder.architecture.reset()
-    Encoder_ROA.architecture.reset()
     reward_ll_sum = 0
     done_sum = 0
     average_dones = 0.
@@ -249,8 +250,6 @@ for update in range(iteration_number, 1000000):
         # env.stop_video_recording()
         # env.turn_off_visualization()
         env.reset()
-        Encoder.architecture.reset()
-        Encoder_ROA.architecture.reset()
         env.save_scaling(saver.data_dir, str(update))
 
     data_log = {}
@@ -318,7 +317,7 @@ for update in range(iteration_number, 1000000):
 
     end = time.time()
 
-    wandb.log(data_log)
+    # wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
