@@ -343,7 +343,7 @@ class ENVIRONMENT_ROLLOUT {
   void reset() {
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
-    if(curriculumFactor_ > 0.4)
+    if(curriculumFactor_ > 0.5)
       hard_reset();
     /// set the state
     raibo_0->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
@@ -376,12 +376,7 @@ class ENVIRONMENT_ROLLOUT {
 
         /// Low level frequency
         for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
-
-          /// per 0.02 sec, update history
-          if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_batch_[i]->actionDim_))
-          {
-            controller_batch_[i]->updateHistory();
-          }
+          controller_batch_[i]->updateHistory();
 
           Low_velocity_controller_batch_[i]->advance(world_batch_[i]);
 
@@ -435,12 +430,7 @@ class ENVIRONMENT_ROLLOUT {
     /// Low level frequency
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
 
-      /// per 0.02 sec, update history
-      if(lowlevelSteps % (int(high_level_control_dt_/low_level_control_dt_ + 1e-10) / controller_0.actionDim_))
-      {
-        controller_0.updateHistory();
-
-      }
+      controller_0.updateHistory();
       if(is_position_goal) {
         Low_controller_0.updateObservation(&world_0);
         Low_controller_0.advance(&world_0);

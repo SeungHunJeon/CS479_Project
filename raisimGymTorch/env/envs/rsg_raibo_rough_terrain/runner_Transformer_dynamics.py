@@ -74,12 +74,20 @@ hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
 layerNum = cfg['LSTM']['numLayer_']
 
+# Transformer
+n_head = cfg['Transformer']['n_head_']
+layerNum = cfg['Transformer']['layerNum_']
+dim_feedforward = cfg['Transformer']['dim_feedforward_']
+
 # ROA Encoding
 ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
+
+num_learning_epochs = cfg['PPO']['num_learning_epoch']
+num_mini_batches = cfg['PPO']['num_mini_batches']
 
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
@@ -129,6 +137,10 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.Transformer(input_dim=i
                                                           batch_num=batchNum,
                                                           num_env=env.num_envs,
                                                           d_model=hidden_dim,
+                                                          num_minibatch = num_mini_batches,
+                                                          dim_feedforward = dim_feedforward,
+                                                          layerNum = layerNum,
+                                                          nhead = n_head,
                                                           max_len=historyNum), device=device)
 
 Encoder = ppo_module.Encoder(architecture=ppo_module.Transformer(input_dim=int(Encoder_ob_dim/historyNum),
@@ -143,6 +155,10 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.Transformer(input_dim=int(E
                           device=device,
                           num_env=env.num_envs,
                           d_model=hidden_dim,
+                          num_minibatch = num_mini_batches,
+                          dim_feedforward = dim_feedforward,
+                          layerNum = layerNum,
+                          nhead = n_head,
                           max_len=historyNum), device=device)
 
 pytorch_total_params = sum(p.numel() for p in Encoder.architecture.parameters())
@@ -161,9 +177,6 @@ critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value
 
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/RaiboController.hpp"])
-
-num_learning_epochs = 16
-num_mini_batches = 1
 
 ppo = PPO.PPO(actor=actor,
               critic=critic,

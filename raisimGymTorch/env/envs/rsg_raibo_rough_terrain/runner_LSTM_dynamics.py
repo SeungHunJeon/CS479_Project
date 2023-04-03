@@ -80,6 +80,8 @@ ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
+num_learning_epochs = 16
+num_mini_batches = 1
 
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
@@ -127,6 +129,7 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           device=device,
                                                           batch_num=batchNum,
                                                           layer_num=layerNum,
+                                                          num_minibatch = num_mini_batches,
                                                           num_env=env.num_envs), device=device)
 
 Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
@@ -140,6 +143,7 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_
                           batch_num=batchNum,
                           layer_num=layerNum,
                           device=device,
+                          num_minibatch = num_mini_batches,
                           num_env=env.num_envs), device=device)
 
 pytorch_total_params = sum(p.numel() for p in Encoder.architecture.parameters())
@@ -159,8 +163,6 @@ critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
                            save_items=[task_path + "/cfg.yaml", task_path + "/Environment.hpp", task_path + "/RaiboController.hpp"])
 
-num_learning_epochs = 16
-num_mini_batches = 1
 
 ppo = PPO.PPO(actor=actor,
               critic=critic,

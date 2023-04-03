@@ -3,7 +3,7 @@ seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
 name: "Forward Dynamics, remove normalizer in Controller"
 environment:
-  Rollout: False
+  Rollout: True
   position_goal: False
   discrete_action: False
   seed: 2
@@ -18,12 +18,14 @@ environment:
   max_time: 12.0
   entropy_coeff: 1e-2
   nSamples_: 300
-  nHorizon_: 12
+  nHorizon_: 30
   obj_mass: 2.0
   bound_ratio: 0.3
+
   discrete:
     radial: 1
     tangential: 72
+
   reward:
     commandsmoothRewardCoeff_: 10
     commandsmooth2RewardCoeff_: 10
@@ -35,6 +37,7 @@ environment:
     towardTargetRewardCoeff_: 1
     stayTargetRewardCoeff_: 3
     stayObjectHeadingRewardCoeff_ : 1
+
   curriculum:
     initial_factor: .2
     decay_factor: 0.97
@@ -53,16 +56,26 @@ environment:
   ROA_dimension:
     exteroceptiveDim_: 28
 
+PPO:
+  num_learning_epoch: 4
+  num_mini_batches: 4
+
 MPPI:
   nSamples_: 300
-  nHorizon_: 20
+  nHorizon_: 30
   gamma_: 1e-1
-  use_dynamics_: True
+  use_dynamics_: False
 
 encoder:
   proprioceptivelatentDim_: 16
   exteroceptivelatentDim_: 32
   actionlatentDim_: 4
+
+Transformer:
+  dim_feedforward_: 256
+  n_head_: 8
+  layerNum_: 8
+  d_model: 48
 
 LSTM:
   hiddendim_: 48

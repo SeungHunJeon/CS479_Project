@@ -127,7 +127,7 @@ class RolloutStorage:
         mini_batch_size = batch_size // num_mini_batches
         for batch_id in range(num_mini_batches):
 
-            obs_batch = self.obs_tc[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            obs_batch = self.obs_tc[:, batch_id*(self.num_envs // num_mini_batches):(batch_id+1)*(self.num_envs // num_mini_batches), :]
             action_batch = torch.reshape(self.actions_tc, (-1, self.actions_tc.size(-1)))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
             sigma_batch = torch.reshape(self.sigma_tc, (-1, self.sigma_tc.size(-1)))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
             mu_batch = torch.reshape(self.mu_tc, (-1, self.mu_tc.size(-1)))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]

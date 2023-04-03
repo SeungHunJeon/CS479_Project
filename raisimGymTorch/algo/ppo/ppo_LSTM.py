@@ -180,38 +180,10 @@ class PPO:
         self.writer.add_scalar('PPO/mean_noise_std', mean_std.item(), variables['it'])
         self.writer.add_scalar('PPO/learning_rate', self.learning_rate, variables['it'])
 
-
-    def filter_for_decoder_from_obs(self, obs_batch, latent_batch):
-
-        decoder_output = []
-
-        decoder_input = latent_batch.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
-
-        decoder_output.append(obs_batch[..., self.encoder.architecture.block_dim * (self.num_history_batch - 1)
-                                            :
-                                            self.encoder.architecture.block_dim * (self.num_history_batch - 1)
-                                            + self.encoder.architecture.pro_dim
-                                            + self.encoder.architecture.ext_dim
-                                            - self.inertial_dim])
-
-        decoder_output.append(obs_batch[..., self.encoder.architecture.block_dim * (self.num_history_batch - 1)
-                                            + self.encoder.architecture.pro_dim
-                                            + self.encoder.architecture.ext_dim
-                                            :
-                                            self.encoder.architecture.block_dim * (self.num_history_batch - 1)
-                                            + self.encoder.architecture.pro_dim
-                                            + self.encoder.architecture.ext_dim
-                                            + self.encoder.architecture.act_dim])
-
-        decoder_output = torch.cat(decoder_output, dim=-1)
-
-        return decoder_input, decoder_output
-
-
     def filter_for_latent_f_dynamics_from_obs(self, obs_batch, latent_batch_):
         latent_f_dynamics_input = []
 
-        latent_batch = latent_batch_.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
+        latent_batch = latent_batch_.reshape((-1, self.num_envs // self.num_mini_batches, self.encoder.architecture.hidden_dim))
 
         latent_batch_input = latent_batch[:-1, ...]
 
@@ -250,7 +222,7 @@ class PPO:
                                          self.encoder.architecture.block_dim * self.num_history_batch
                                          - self.encoder.architecture.dyn_info_dim]
 
-        latent_batch = latent_batch_.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))
+        latent_batch = latent_batch_.reshape((-1, self.num_envs // self.num_mini_batches, self.encoder.architecture.hidden_dim))
 
         latent_batch = latent_batch[1:-1]
 
@@ -356,7 +328,6 @@ class PPO:
     def get_obs_ROA(self, obs_batch):
         obs_ROA_batch = []
 
-
         for i in range(self.num_history_batch):
             # Get proprioceptive part of observation
             obs_ROA_batch.append(obs_batch[...,
@@ -418,8 +389,8 @@ class PPO:
             for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
-                if isinstance(self.encoder.architecture, nn.Transformer):
-                    print(1)
+
+
                 self.encoder.architecture.reset()
                 self.encoder_ROA.architecture.reset()
 
@@ -449,7 +420,7 @@ class PPO:
 
                 # estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
-                estimator_input = latent_d.reshape(-1, self.num_envs, self.encoder.architecture.hidden_dim)
+                estimator_input = latent_d.reshape(-1, self.num_envs // self.num_mini_batches, self.encoder.architecture.hidden_dim)
                 estimator_input = estimator_input[-1, ...].squeeze(0)
                 estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
 
