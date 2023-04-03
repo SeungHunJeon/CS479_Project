@@ -570,7 +570,6 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void predict_obj_update(Eigen::Ref<EigenRowMajorMat> &predict_state_batch) {
-#pragma omp parallel for schedule(auto)
     for (int i = 0; i<nHorizon_; i++) {
       predict_Obj_batch_[i]->setPosition(predict_state_batch.row(i).cast<double>());
     }

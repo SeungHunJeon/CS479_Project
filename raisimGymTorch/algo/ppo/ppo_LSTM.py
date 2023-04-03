@@ -200,6 +200,9 @@ class PPO:
 
         latent_f_dynamics_input = torch.cat(latent_f_dynamics_input, dim=-1)
 
+        latent_f_dynamics_input = torch.reshape(latent_f_dynamics_input, (-1, self.encoder.architecture.hidden_dim + self.encoder.architecture.act_dim))
+        latent_predict_true = torch.reshape(latent_predict_true, (-1, self.encoder.architecture.hidden_dim))
+
         return latent_f_dynamics_input, latent_predict_true
 
     def filter_for_obj_f_dynamics_from_obs(self, obs_batch, latent_batch_):

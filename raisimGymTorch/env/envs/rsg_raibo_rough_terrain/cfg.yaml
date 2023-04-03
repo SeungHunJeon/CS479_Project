@@ -3,12 +3,12 @@ seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
 name: "Forward Dynamics, remove normalizer in Controller"
 environment:
-  Rollout: True
+  Rollout: False
   position_goal: False
   discrete_action: False
   seed: 2
   render: False
-  num_envs: 300
+  num_envs: 100
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.0025
@@ -75,10 +75,10 @@ Transformer:
   dim_feedforward_: 256
   n_head_: 8
   layerNum_: 8
-  d_model: 48
+  d_model: 24
 
 LSTM:
-  hiddendim_: 48
+  hiddendim_: 24
   batchNum_: 1
   numLayer_: 2
 
@@ -101,7 +101,7 @@ architecture:
     net: [256, 128, 64]
 
   latent_f_dynamics:
-    net: [512, 256, 128]
+    net: [256, 128, 64]
 
   obs_f_dynamics:
     net: [256, 128]
