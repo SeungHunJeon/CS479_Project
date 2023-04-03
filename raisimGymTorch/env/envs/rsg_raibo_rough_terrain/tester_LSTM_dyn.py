@@ -14,6 +14,7 @@ import argparse
 import collections
 import torch.nn as nn
 import raisimGymTorch.algo.MPPI.mppi as mppi
+import pandas as pd
 
 device = torch.device('cuda:0')
 # configuration
@@ -36,7 +37,7 @@ use_dynamics = cfg['MPPI']['use_dynamics_']
 
 # create environment from the configuration file
 # cfg['environment']['num_envs'] = 1 + n_samples
-cfg['environment']['num_envs'] = 1
+cfg['environment']['num_envs'] = 100
 
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
@@ -164,7 +165,7 @@ else:
 
     Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                     nn.LeakyReLU,
-                                                    int(Encoder_ob_dim/historyNum),
+                                                    hidden_dim,
                                                     int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
 
     Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
@@ -257,10 +258,15 @@ else:
 
 
     success_batch = []
+    success = None
+
 
     for i in range (100):
-        env.curriculum_callback()
+        # env.curriculum_callback()
         env.reset()
+
+        env_value = env.get_envrionmental_value()
+        print(env_value.shape)
         Encoder.architecture.reset()
         Encoder_ROA.architecture.reset()
         if(is_rollout):
@@ -303,6 +309,8 @@ else:
                     # print(gc_batch)
                     # print(gv_batch)
 
+
+
                     """
                     Encoder 넣을 때 적절한 시기에 clone해서 넣어줘야 할 듯 ? LSTM이라
                     """
@@ -320,6 +328,20 @@ else:
                 '''
                 action_traj = MPPI(state, e, o)
                 '''
+        print( "Trial : {} ".format(i))
+        print(success.sum().item())
+        success_npy = success.numpy()
+        env_value = np.concatenate([env_value, success_npy], axis=-1)
+        # print(env_value.shape)
+
+        # env_value
+        env_value_data_frame = pd.DataFrame(env_value)
+        env_value_data_frame.to_csv("env_value.csv", index=False)
+
+        # if int(success) == 0:
+        #     print("failed")
+        # else:
+        #     print("success")
         # success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
         # success_sum = torch.sum(success, dim=0) / success.shape(0)
         # print(success_sum)

@@ -35,6 +35,8 @@ environment:
     towardTargetRewardCoeff_: 1
     stayTargetRewardCoeff_: 3
     stayObjectHeadingRewardCoeff_ : 1
+    stayTargetHeadingRewardCoeff_ : 3
+    stayTargetHeadingRewardCoeff_alpha_ : 1
   curriculum:
     initial_factor: .2
     decay_factor: 0.97

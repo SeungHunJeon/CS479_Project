@@ -124,7 +124,8 @@ class RaiboController {
                     "commandsmooth_rew",
                     "commandsmooth2_rew",
                     "torque_rew",
-                    "stayObject_heading_rew"};
+                    "stayObject_heading_rew",
+                    "stayTarget_heading_rew"};
     stepData_.resize(stepDataTag_.size());
 
 
@@ -190,8 +191,10 @@ class RaiboController {
     Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
     Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
 
-
-    if(obj_to_target.head(2).norm() < 0.05)
+    raisim::Mat<3,3> command_Obj_Rot_;
+    raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
+    double stay_t_heading  = abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
+    if(obj_to_target.head(2).norm() < 0.05 && stay_t_heading > 0.98)
       is_success_ = true;
 
     std::rotate(success_batch_.begin(), success_batch_.begin()+1, success_batch_.end());
@@ -386,7 +389,7 @@ class RaiboController {
     stepData_[5] = commandsmooth2Reward_;
     stepData_[6] = torqueReward_;
     stepData_[7] = stayObjectHeadingReward_;
-
+    stepData_[8] = stayTargetHeadingReward_;
 
     towardObjectReward_ = 0.;
     stayObjectReward_ = 0.;
@@ -396,6 +399,7 @@ class RaiboController {
     commandsmooth2Reward_ = 0.;
     torqueReward_ = 0.;
     stayObjectHeadingReward_ = 0.;
+    stayTargetHeadingReward_ = 0.;
 
     return float(stepData_.sum());
   }
@@ -460,6 +464,8 @@ class RaiboController {
     READ_YAML(double, commandsmooth2RewardCoeff_, cfg["reward"]["commandsmooth2RewardCoeff_"])
     READ_YAML(double, torqueRewardCoeff_, cfg["reward"]["torque_reward_coeff"])
     READ_YAML(double, stayObjectHeadingRewardCoeff_, cfg["reward"]["stayObjectHeadingRewardCoeff_"])
+    READ_YAML(double, stayTargetHeadingRewardCoeff_, cfg["reward"]["stayTargetHeadingRewardCoeff_"])
+    READ_YAML(double, stayTargetHeadingRewardCoeff_alpha_, cfg["reward"]["stayTargetHeadingRewardCoeff_alpha_"])
   }
 
   void updateObject(raisim::SingleBodyObject* obj) {
@@ -491,6 +497,18 @@ class RaiboController {
 
     Eigen::Vector3d heading; heading << baseRot_[0], baseRot_[1], 0;
 
+
+    /// Reward for alignment
+    raisim::Mat<3,3> command_Obj_Rot_;
+    raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
+    double stay_t_heading  = abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
+    if(stay_t_heading > 0.985){
+      stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(- stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+    }else {
+      stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
+          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+    }
+
     /// stay close to the object
     double stay_o = ee_to_obj.norm(); /// max : inf, min : 0
     double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 0, min : -1
@@ -503,8 +521,11 @@ class RaiboController {
 
     /// keep the object close to the target
     double stay_t = obj_to_target.norm();
-    stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
-
+    if(stay_t < 0.05) {
+      stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(0);
+    } else{
+      stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
+    }
     double commandReward_tmp = std::max(5., static_cast<double>(command_.norm()));
     double command_smooth = (command_ - pre_command_).squaredNorm();
     double command_smooth2 = (command_ - 2*pre_command_ + prepre_command_).squaredNorm();
@@ -661,7 +682,7 @@ class RaiboController {
   double commandsmooth2RewardCoeff_ = 0., commandsmooth2Reward_ = 0.;
   double torqueRewardCoeff_ = 0., torqueReward_ = 0.;
   double stayObjectHeadingReward_ = 0., stayObjectHeadingRewardCoeff_ = 0.;
-
+  double stayTargetHeadingReward_ = 0.,  stayTargetHeadingRewardCoeff_ = 0., stayTargetHeadingRewardCoeff_alpha_ = 0. ;
   // exported data
   Eigen::VectorXd stepData_;
   std::vector<std::string> stepDataTag_;

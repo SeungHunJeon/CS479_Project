@@ -46,6 +46,7 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("getDepthImage", &VectorizedEnvironment<ENVIRONMENT>::getDepthImage)
     .def("getColorImage", &VectorizedEnvironment<ENVIRONMENT>::getColorImage)
     .def("getSuccess", &VectorizedEnvironment<ENVIRONMENT>::getSuccess)
+    .def("get_environmental_value", &VectorizedEnvironment<ENVIRONMENT>::get_environmental_value)
     .def("step_visualize_success", &VectorizedEnvironment<ENVIRONMENT>::step_visualize_success)
     .def("observationDeNormalize", &VectorizedEnvironment<ENVIRONMENT>::ObservationDeNormalize);
 //    .def("synchronize", &VectorizedEnvironment<ENVIRONMENT>::synchronize);

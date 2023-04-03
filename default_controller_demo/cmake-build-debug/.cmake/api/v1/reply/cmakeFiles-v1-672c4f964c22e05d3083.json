@@ -1,0 +1,212 @@
+{
+	"inputs" : 
+	[
+		{
+			"path" : "CMakeLists.txt"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "cmake-build-debug/CMakeFiles/3.24.2/CMakeSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeSystemSpecificInitialize.cmake"
+		},
+		{
+			"isGenerated" : true,
+			"path" : "cmake-build-debug/CMakeFiles/3.24.2/CMakeCXXCompiler.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeSystemSpecificInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeGenericSystem.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeInitializeConfigs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/Platform/Linux.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/Platform/UnixPaths.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeCXXInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeLanguageInformation.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/Compiler/GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/Compiler/GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/Platform/Linux-GNU-CXX.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/Platform/Linux-GNU.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeCommonLanguageInclude.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3ConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Config.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Targets.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/FindOpenMP.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/CMakeParseImplicitLinkInfo.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/moonk/raisim_ws/raisimlib/raisim/linux/lib/cmake/raisim/raisimConfig-version.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/moonk/raisim_ws/raisimlib/raisim/linux/lib/cmake/raisim/raisimConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3ConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Config.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Targets.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/moonk/raisim_ws/raisimlib/raisim/linux/lib/cmake/raisim/raisim-targets.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/moonk/raisim_ws/raisimlib/raisim/linux/lib/cmake/raisim/raisim-targets-release.cmake"
+		},
+		{
+			"path" : "module/controller/CMakeLists.txt"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3ConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Config.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Targets.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/moonk/raisim_ws/raisimlib/raisim/linux/lib/cmake/raisim/raisimConfig-version.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/home/moonk/raisim_ws/raisimlib/raisim/linux/lib/cmake/raisim/raisimConfig.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/FindPackageHandleStandardArgs.cmake"
+		},
+		{
+			"isCMake" : true,
+			"isExternal" : true,
+			"path" : "/snap/clion/229/bin/cmake/linux/x64/share/cmake-3.24/Modules/FindPackageMessage.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3ConfigVersion.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Config.cmake"
+		},
+		{
+			"isExternal" : true,
+			"path" : "/usr/lib/cmake/eigen3/Eigen3Targets.cmake"
+		}
+	],
+	"kind" : "cmakeFiles",
+	"paths" : 
+	{
+		"build" : "/home/moonk/workspace/raibo_arm/default_controller_demo/cmake-build-debug",
+		"source" : "/home/moonk/workspace/raibo_arm/default_controller_demo"
+	},
+	"version" : 
+	{
+		"major" : 1,
+		"minor" : 0
+	}
+}

@@ -1,0 +1,67 @@
+{
+	"archive" : {},
+	"artifacts" : 
+	[
+		{
+			"path" : "module/controller/libraibot_position_controller_sim.a"
+		}
+	],
+	"backtrace" : 2,
+	"backtraceGraph" : 
+	{
+		"commands" : 
+		[
+			"add_library",
+			"create_controller"
+		],
+		"files" : 
+		[
+			"module/controller/CMakeLists.txt"
+		],
+		"nodes" : 
+		[
+			{
+				"file" : 0
+			},
+			{
+				"command" : 1,
+				"file" : 0,
+				"line" : 35,
+				"parent" : 0
+			},
+			{
+				"command" : 0,
+				"file" : 0,
+				"line" : 25,
+				"parent" : 1
+			}
+		]
+	},
+	"id" : "raibot_position_controller_sim::@889be60e461c32ea4f6d",
+	"name" : "raibot_position_controller_sim",
+	"nameOnDisk" : "libraibot_position_controller_sim.a",
+	"paths" : 
+	{
+		"build" : "module/controller",
+		"source" : "module/controller"
+	},
+	"sourceGroups" : 
+	[
+		{
+			"name" : "Header Files",
+			"sourceIndexes" : 
+			[
+				0
+			]
+		}
+	],
+	"sources" : 
+	[
+		{
+			"backtrace" : 2,
+			"path" : "module/controller/raibot_position_controller_sim/raibot_position_controller_sim.hpp",
+			"sourceGroupIndex" : 0
+		}
+	],
+	"type" : "STATIC_LIBRARY"
+}

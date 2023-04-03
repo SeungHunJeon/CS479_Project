@@ -24,6 +24,8 @@ class RaisimGymVecEnv:
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self._success = np.zeros(self.num_envs, dtype=np.bool)
+        self._env_val = np.zeros([self.num_envs, 17], dtype=np.float32)
+        # 0-2 : H W D / 3-11 : Inertia row1+row2+row3 / 12-14 : COM / 15 : Mass / 16 : friction
         self.rewards = [[] for _ in range(self.num_envs)]
         self.wrapper.setSeed(seed)
         self.count = 0.0
@@ -69,6 +71,7 @@ class RaisimGymVecEnv:
         return np.array(self.wrapper.getDepthImage(), dtype=np.float32).reshape(-1, self.height, self.width)
     def get_color_image(self): ## only for one env
         return np.array(self.wrapper.getColorImage()).reshape(-1, self.height, self.width,4)[..., [2,1,0]].astype(np.uint8)
+
 
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"
@@ -124,6 +127,10 @@ class RaisimGymVecEnv:
         self.wrapper.getSuccess(self._success)
 
         return self._success
+
+    def get_envrionmental_value(self):
+        self.wrapper.get_environmental_value(self._env_val)
+        return self._env_val
 
     def get_step_data(self, data_size, data_mean, data_var, data_min, data_max):
         return self.wrapper.getStepData(data_size, data_mean, data_var, data_min, data_max)

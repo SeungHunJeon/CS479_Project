@@ -215,7 +215,6 @@ class ENVIRONMENT {
     }
 
 
-
   }
 
 
@@ -333,8 +332,16 @@ class ENVIRONMENT {
 
 
     if(visualizable_) {
+      server_->removeVisualObject("command_Obj_");
+      command_Obj_ = server_->addVisualBox("command_Obj_", objectGenerator_.get_geometry()[0], objectGenerator_.get_geometry()[1], objectGenerator_.get_geometry()[2], 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       command_Obj_->setOrientation(command_Obj_quat_);
+
+      ///TODO
+      /// add raisim server bar chart
+
+      ///
+
     }
 
   }
@@ -359,6 +366,10 @@ class ENVIRONMENT {
   void subStep() {
     if(controller_.is_success()) {
       Obj_->setAppearance("0, 0, 1, 0.7");
+    }
+
+    else{
+        Obj_->setAppearance("0, 1, 0, 0.3");
     }
 
     if(is_position_goal)
@@ -405,6 +416,16 @@ class ENVIRONMENT {
     return controller_.is_success();
   }
 
+  void get_env_value(Eigen::Ref<EigenVec> value){
+
+    value.head(3) << objectGenerator_.get_geometry().cast<float>();
+    value.segment(3,3) << Obj_->getInertiaMatrix_B().row(0).cast<float>();
+    value.segment(6,3) << Obj_->getInertiaMatrix_B().row(1).cast<float>();
+    value.segment(9,3) << Obj_->getInertiaMatrix_B().row(2).cast<float>();
+    value.segment(12,3) << Obj_->getBodyToComPosition_rs().e().cast<float>();
+    value(15) = Obj_->getMass();
+    value(16)= friction ;
+  }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
     controllerSphere_->setPosition(pos[0], pos[1], heightMap_->getHeight(pos[0], pos[1]));

@@ -1,0 +1,105 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"childIndexes" : 
+					[
+						1
+					],
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"projectIndex" : 0,
+					"source" : "."
+				},
+				{
+					"build" : "module/controller",
+					"jsonFile" : "directory-module.controller-Debug-08a36534b9d9b23bb947.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.10"
+					},
+					"parentIndex" : 0,
+					"projectIndex" : 1,
+					"source" : "module/controller",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"childIndexes" : 
+					[
+						1
+					],
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "_compliant_gym_tester"
+				},
+				{
+					"directoryIndexes" : 
+					[
+						1
+					],
+					"name" : "controller",
+					"parentIndex" : 0,
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 1,
+					"id" : "raibot_default_controller::@889be60e461c32ea4f6d",
+					"jsonFile" : "target-raibot_default_controller-Debug-4de088ad0863a4018cea.json",
+					"name" : "raibot_default_controller",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "raibot_position_controller_sim::@889be60e461c32ea4f6d",
+					"jsonFile" : "target-raibot_position_controller_sim-Debug-12c3e8aa522fbc17a010.json",
+					"name" : "raibot_position_controller_sim",
+					"projectIndex" : 1
+				},
+				{
+					"directoryIndex" : 1,
+					"id" : "raibot_position_controller_sim_2::@889be60e461c32ea4f6d",
+					"jsonFile" : "target-raibot_position_controller_sim_2-Debug-12cc0993c4924113e538.json",
+					"name" : "raibot_position_controller_sim_2",
+					"projectIndex" : 1
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/moonk/workspace/raibo_arm/default_controller_demo/cmake-build-debug",
+		"source" : "/home/moonk/workspace/raibo_arm/default_controller_demo"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 4
+	}
+}

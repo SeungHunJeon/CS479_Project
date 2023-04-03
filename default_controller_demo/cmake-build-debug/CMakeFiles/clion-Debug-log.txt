@@ -1,0 +1,18 @@
+/snap/clion/229/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/snap/clion/229/bin/ninja/linux/x64/ninja -G Ninja -S /home/moonk/workspace/raibo_arm/default_controller_demo -B /home/moonk/workspace/raibo_arm/default_controller_demo/cmake-build-debug
+ASDQWFSAD Build done .. 
+-- raisim:
+--   Version: 1.1.6
+--   Includes: /home/moonk/raisim_ws/raisimlib/raisim/linux/include
+--   Libraries: raisim::raisimPng;raisim::raisimODE;raisim::raisimMine;raisim::raisim
+-- raisim:
+--   Version: 1.1.6
+--   Includes: /home/moonk/raisim_ws/raisimlib/raisim/linux/include
+--   Libraries: raisim::raisimPng;raisim::raisimODE;raisim::raisimMine;raisim::raisim
+raibot_default_controllerraibot_position_controller_simraibot_position_controller_sim_2
+RRRRR Build done .. 
+--complete:raibot_default_controller
+--complete:raibot_position_controller_sim
+--complete:raibot_position_controller_sim_2
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/moonk/workspace/raibo_arm/default_controller_demo/cmake-build-debug
