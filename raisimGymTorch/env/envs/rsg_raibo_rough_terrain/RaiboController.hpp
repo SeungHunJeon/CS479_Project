@@ -169,11 +169,15 @@ class RaiboController {
 
     is_contact = false;
 
+    raisim::Vec<3> LF_FOOT_Pos_w_, RF_FOOT_Pos_w_;
+    raibo_->getFramePosition(raibo_->getFrameIdxByLinkName("LF_FOOT"), LF_FOOT_Pos_w_);
+    raibo_->getFramePosition(raibo_->getFrameIdxByLinkName("RF_FOOT"), RF_FOOT_Pos_w_);
     /// Update State Info
     state_Info_.segment(0,3) = baseRot_.e().row(2);
     state_Info_.segment(3,3) = bodyLinVel_;
     state_Info_.segment(6,3) = bodyAngVel_;
-    state_Info_.segment(9,12) = gc_.segment(7, 12);
+    state_Info_.segment(9,3) = baseRot_.e().transpose()*(LF_FOOT_Pos_w_.e() - ee_Pos_w_.e());
+    state_Info_.segment(12,3) = baseRot_.e().transpose()*(RF_FOOT_Pos_w_.e() - ee_Pos_w_.e());
 
     for (auto &contact: raibo_->getContacts()) {
       if (contact.getlocalBodyIndex() == armIndices_.front()) {
@@ -233,20 +237,16 @@ class RaiboController {
     dist_temp_min_ = std::min(2.0, dist_temp_);
     Obj_Info_.segment(8, 1) << dist_temp_min_;
     Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
-    Obj_Info_.segment(12, 3) << baseRot_.e().transpose() * Obj_AVel_.e();
-    // TODO
-    /// I think the orientation would be represented as relative orientation => rotation difference => cosine similarity has to be adapted
-    /// This representation means that each body frame's (robot, object) x axis vector
-    Obj_Info_.segment(15,3) = (baseRot_.e().row(0) - Obj_->getOrientation().e().row(0));
+    Obj_Info_.segment(12,3) = (baseRot_.e().row(0) - Obj_->getOrientation().e().row(0));
 //    Obj_Info_.segment(21,4) = classify_vector_;
-    Obj_Info_.segment(18,3) = obj_geometry_;
-    Obj_Info_.segment(21, 1) << Obj_->getMass();
-    Obj_Info_.segment(22, 3) << Obj_->getCom().e();
-    Obj_Info_.segment(25,3) = Obj_->getInertiaMatrix_B().row(0);
-    Obj_Info_.segment(28,3) = Obj_->getInertiaMatrix_B().row(1);
-    Obj_Info_.segment(31,3) = Obj_->getInertiaMatrix_B().row(2);
-    Obj_Info_.segment(34,1) << friction_;
-    Obj_Info_.segment(35,1) << static_cast<double>(is_contact);
+    Obj_Info_.segment(15,3) = obj_geometry_;
+    Obj_Info_.segment(18, 1) << Obj_->getMass();
+    Obj_Info_.segment(19, 3) << Obj_->getCom().e();
+    Obj_Info_.segment(22,3) = Obj_->getInertiaMatrix_B().row(0);
+    Obj_Info_.segment(25,3) = Obj_->getInertiaMatrix_B().row(1);
+    Obj_Info_.segment(28,3) = Obj_->getInertiaMatrix_B().row(2);
+    Obj_Info_.segment(31,1) << friction_;
+    Obj_Info_.segment(32,1) << static_cast<double>(is_contact);
 
 
     dynamics_Info_.segment(0,3) << Obj_Pos_.e();
@@ -593,15 +593,15 @@ class RaiboController {
   Eigen::VectorXd nominalConfig_;
    /// output dim : joint action 12 + task space action 6 + gain dim 4
 
-  int proprioceptiveDim_ = 21;
-  int exteroceptiveDim_ = 36;
+  int proprioceptiveDim_ = 15;
+  int exteroceptiveDim_ = 33;
   int dynamicsInfoDim_ = 27;
   static constexpr int actionDim_ = 3;
-  int historyNum_ = 4;
-  int actionNum_ = 5;
+  int historyNum_ = 19;
+  int actionNum_ = 20;
   int obBlockDim_ = 0;
 
-  static constexpr size_t obDim_ = 435;
+  static constexpr size_t obDim_ = 1560;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 

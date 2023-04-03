@@ -42,6 +42,16 @@ class MPPI():
         self.best_actions = None
         self.best_future_states = None
         self.inertial_dim = inertial_dim
+        self.action_mean = self.env.mean[self.encoder.architecture.block_dim * self.encoder.architecture.hist_num
+                                         - self.encoder.architecture.act_dim
+                                         - self.encoder.architecture.dyn_info_dim:
+                                         self.encoder.architecture.block_dim * self.encoder.architecture.hist_num
+                                         - self.encoder.architecture.dyn_info_dim]
+        self.action_var = self.env.var[self.encoder.architecture.block_dim * self.encoder.architecture.hist_num
+                                       - self.encoder.architecture.act_dim
+                                       - self.encoder.architecture.dyn_info_dim:
+                                       self.encoder.architecture.block_dim * self.encoder.architecture.hist_num
+                                       - self.encoder.architecture.dyn_info_dim]
 
     def smoothing_actions(self, action_batch, return_batch):
 
@@ -171,7 +181,8 @@ class MPPI():
         cur_observation_batch = self.cur_observation
         filtered_obs = self.filter_for_encode_from_obs(cur_observation_batch)
         cur_latent_batch = self.encoder_ROA.evaluate(filtered_obs)
-        cur_latent_batch = cur_latent_batch.repeat(self.n_samples, 1)
+        print("cur latent batch : ", cur_latent_batch[0])
+        # cur_latent_batch = cur_latent_batch.repeat(self.n_samples, 1)
         self.encoder_ROA_Rollout = copy.deepcopy(self.encoder_ROA)
 
         for i in range(self.horizon):
@@ -184,10 +195,6 @@ class MPPI():
                 # latent_dynamics_input = torch.cat(cur_latent_batch)
                 latent_dynamics_input = torch.Tensor(np.concatenate([cur_latent_batch.cpu().numpy(), actions], axis=-1)).to(self.device)
                 predicted_latent_batch = self.latent_f_dynamics.predict(latent_dynamics_input)
-                predicted_obs_batch = self.decoder.predict(predicted_latent_batch)
-
-                obj_dynamics_input = self.filter_for_obj_f_dynamics_from_obs(predicted_obs_batch, predicted_latent_batch, actions)
-                predicted_obj_batch = self.obj_f_dynamics(obj_dynamics_input)
                 # TODO (denormalize obj batch)
                 cur_latent_batch = predicted_latent_batch
 
@@ -223,6 +230,12 @@ class MPPI():
         optimal_action = self.best_actions[0, ...]
 
         self.best_actions = self.best_actions[1:, ...]
+
+        # Validate latent forward dynamics model is feasible
+        normalized_optimal_action = (torch.Tensor(optimal_action).unsqueeze(0).numpy() - self.action_mean) / self.action_var
+        latent_dynamics_input = torch.Tensor(np.concatenate([cur_latent_batch[0].unsqueeze(0).cpu().numpy(), normalized_optimal_action], axis=-1)).to(self.device)
+        predicted_latent = self.latent_f_dynamics.predict(latent_dynamics_input)
+        print("predicted latent :", predicted_latent)
 
         # action smoothing via cost batch
         smoothed_action = self.smoothing_actions(total_action_batch, cost_batch)

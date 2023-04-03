@@ -37,11 +37,20 @@ use_dynamics = cfg['MPPI']['use_dynamics_']
 
 # create environment from the configuration file
 # cfg['environment']['num_envs'] = 1 + n_samples
-cfg['environment']['num_envs'] = 100
+cfg['environment']['num_envs'] = 1
 
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
 is_rollout = cfg['environment']['Rollout']
+# create environment from the configuration file
+# cfg['environment']['num_envs'] = 1 + n_samples
+if(is_rollout):
+    num_env = cfg['environment']['num_envs']
+else:
+    num_env = 1
+cfg['environment']['num_envs'] = 1
+
+
 #
 if (is_rollout):
     print(1)
@@ -58,7 +67,6 @@ weight_dir = weight_path.rsplit('/', 1)[0] + '/'
 
 # Encoding
 historyNum = cfg['environment']['dimension']['historyNum_']
-actionhistoryNum = cfg['environment']['dimension']['actionhistoryNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
 ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
 inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
@@ -74,7 +82,7 @@ Encoder_ob_dim = historyNum * (pro_dim + ext_dim + act_dim)
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
-is_decouple = cfg['LSTM']['is_decouple_']
+layerNum = cfg['LSTM']['numLayer_']
 
 # ROA Encoding
 ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
@@ -82,7 +90,8 @@ ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
-
+num_learning_epochs = 1
+num_mini_batches = 1
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
 
@@ -178,8 +187,9 @@ else:
                                                                   hist_num=historyNum,
                                                                   device=device,
                                                                   batch_num=batchNum,
-                                                                  num_env=env.num_envs,
-                                                                  is_decouple=is_decouple), device=device)
+                                                                  layer_num=layerNum,
+                                                                  num_minibatch = num_mini_batches,
+                                                                  num_env=num_env), device=device)
 
     Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                                                               hidden_dim=hidden_dim,
@@ -190,14 +200,15 @@ else:
                                                               dyn_predict_dim=dynamics_predict_dim,
                                                               hist_num=historyNum,
                                                               batch_num=batchNum,
+                                                              layer_num=layerNum,
                                                               device=device,
-                                                              num_env=env.num_envs,
-                                                              is_decouple=is_decouple), device=device)
+                                                              num_minibatch = num_mini_batches,
+                                                              num_env=num_env), device=device)
 
 
     actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
-                                                                               env.num_envs,
+                                                                               num_env,
                                                                                1.0,
                                                                                NormalSampler(act_dim),
                                                                                cfg['seed']),
@@ -213,8 +224,9 @@ else:
                                                                       hist_num=historyNum,
                                                                       device=device,
                                                                       batch_num=batchNum,
-                                                                      num_env=env.num_envs,
-                                                                      is_decouple=is_decouple), device=device)
+                                                                      layer_num=layerNum,
+                                                                      num_minibatch = num_mini_batches,
+                                                                      num_env=num_env), device=device)
 
     actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
                              ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
@@ -234,6 +246,7 @@ else:
     Estimator.architecture.load_state_dict(torch.load(weight_path)['Inertial_estimator'])
     obj_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['obj_f_dynamics_state_dict'])
     obs_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['obs_f_dynamics_state_dict'])
+    latent_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['latent_f_dynamics_state_dict'])
 
     env.load_scaling(weight_dir, int(iteration_number))
     env.turn_on_visualization()
