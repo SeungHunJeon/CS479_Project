@@ -9,7 +9,6 @@ class MPPI():
     def __init__(self,
                  latent_f_dynamics,
                  obj_f_dynamics,
-                 decoder,
                  encoder,
                  encoder_ROA,
                  actor,
@@ -23,7 +22,6 @@ class MPPI():
 
         self.latent_f_dynamics = latent_f_dynamics
         self.obj_f_dynamics = obj_f_dynamics
-        self.decoder = decoder
         self.n_samples = n_samples
         self.horizon = horizon
         self.device = device

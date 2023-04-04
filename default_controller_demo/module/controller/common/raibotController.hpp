@@ -122,6 +122,9 @@ class raibotController {
 
   void setCommand(const Eigen::Ref<EigenVec>& command) {
     command_ = command.cast<double>();
+    for(int i = 0; i<3; i++) {
+      command_(i) = std::clamp(command_(i), -3.0, 3.0);
+    }
 
     // project to centrifugal accel. vxy * wz = 0.3 * g
     if (std::abs(command_(2)) - 2.943 / (command_.head(2).norm() + 1e-8) > 0) {

@@ -16,9 +16,7 @@ class PPO:
                  actor,
                  critic,
                  encoder,
-                 decoder,
                  obj_f_dynamics,
-                 obs_f_dyanmics,
                  latent_f_dynamics,
                  obs_shape,
                  num_envs,
@@ -56,9 +54,7 @@ class PPO:
         self.inertial_dim = inertial_dim
         self.estimator = estimator
         self.obj_f_dynamics = obj_f_dynamics
-        self.obs_f_dynamics = obs_f_dyanmics
         self.latent_f_dynamics = latent_f_dynamics
-        self.decoder = decoder
 
         if shuffle_batch:
             self.batch_sampler = self.storage.mini_batch_generator_shuffle
@@ -138,9 +134,6 @@ class PPO:
 
         # latent f dynamics loss
         self.latent_f_dyn_loss = None
-
-        # Decoder loss
-        self.decoder_loss = None
 
     def act(self, actor_obs):
         self.actor_obs = actor_obs

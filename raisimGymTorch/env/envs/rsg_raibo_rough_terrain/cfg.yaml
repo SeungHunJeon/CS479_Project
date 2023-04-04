@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
-name: "Forward Dynamics, remove normalizer in Controller"
+name: "Latent dim 128, "
 environment:
   Rollout: False
   position_goal: False
@@ -37,7 +37,7 @@ environment:
     towardTargetRewardCoeff_: 1
     stayTargetRewardCoeff_: 3
     stayObjectHeadingRewardCoeff_ : 1
-    stayTargetHeadingRewardCoeff_ : 3
+    stayTargetHeadingRewardCoeff_ : 1
     stayTargetHeadingRewardCoeff_alpha_ : 1
   curriculum:
     initial_factor: .2
@@ -73,13 +73,13 @@ encoder:
   actionlatentDim_: 4
 
 Transformer:
-  dim_feedforward_: 256
+  dim_feedforward_: 512
   n_head_: 8
-  layerNum_: 8
-  d_model: 24
+  layerNum_: 6
+  d_model: 128
 
 LSTM:
-  hiddendim_: 24
+  hiddendim_: 128
   batchNum_: 1
   numLayer_: 2
 

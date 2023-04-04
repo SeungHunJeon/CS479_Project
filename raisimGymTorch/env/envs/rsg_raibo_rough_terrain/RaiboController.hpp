@@ -501,7 +501,7 @@ class RaiboController {
     /// Reward for alignment
     raisim::Mat<3,3> command_Obj_Rot_;
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
-    double stay_t_heading  = abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
+    double stay_t_heading  = Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8);
     if(stay_t_heading > 0.985){
       stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(- stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
     }else {
@@ -521,11 +521,7 @@ class RaiboController {
 
     /// keep the object close to the target
     double stay_t = obj_to_target.norm();
-    if(stay_t < 0.05) {
-      stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(0);
-    } else{
-      stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
-    }
+    stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
     double commandReward_tmp = std::max(5., static_cast<double>(command_.norm()));
     double command_smooth = (command_ - pre_command_).squaredNorm();
     double command_smooth2 = (command_ - 2*pre_command_ + prepre_command_).squaredNorm();

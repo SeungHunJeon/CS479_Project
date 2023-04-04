@@ -91,12 +91,6 @@ num_mini_batches = cfg['PPO']['num_mini_batches']
 
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
-obs_f_dynamics_input_dim = pro_dim + ROA_ext_dim + act_dim
-obs_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obs_f_dynamics']['net'],
-                                                     nn.LeakyReLU,
-                                                     obs_f_dynamics_input_dim,
-                                                     pro_dim + ROA_ext_dim),
-                                      device=device)
 
 obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_input_dim
 
@@ -115,11 +109,6 @@ latent_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj
                                       device=device)
 
 
-Decoder = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['Decoder']['net'],
-                                                        nn.LeakyReLU,
-                                                        hidden_dim,
-                                                        int(ROA_Encoder_ob_dim/historyNum)),
-                                         device=device)
 Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                 nn.LeakyReLU,
                                                 hidden_dim,
@@ -181,9 +170,7 @@ saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name
 ppo = PPO.PPO(actor=actor,
               critic=critic,
               encoder=Encoder,
-              decoder=Decoder,
               obj_f_dynamics=obj_f_dynamics,
-              obs_f_dyanmics=obs_f_dynamics,
               latent_f_dynamics=latent_f_dynamics,
               num_envs=cfg['environment']['num_envs'],
               obs_shape=[env.num_obs],
@@ -232,9 +219,7 @@ for update in range(iteration_number, 1000000):
             'Inertial_estimator': Estimator.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
             'obj_f_dynamics_state_dict': obj_f_dynamics.architecture.state_dict(),
-            'obs_f_dynamics_state_dict': obs_f_dynamics.architecture.state_dict(),
             'latent_f_dynamics_state_dict': latent_f_dynamics.architecture.state_dict(),
-            'Decoder_state_dict': Decoder.architecture.state_dict()
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
         data_size = 0

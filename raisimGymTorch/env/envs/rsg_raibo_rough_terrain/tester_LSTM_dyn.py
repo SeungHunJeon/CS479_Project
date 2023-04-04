@@ -47,8 +47,8 @@ is_rollout = cfg['environment']['Rollout']
 if(is_rollout):
     num_env = cfg['environment']['num_envs']
 else:
-    num_env = 1
-cfg['environment']['num_envs'] = 1
+    num_env = 300
+cfg['environment']['num_envs'] = 300
 
 
 #
@@ -140,14 +140,6 @@ else:
 
     print("Visualizing and evaluating the policy: ", weight_path)
 
-    obs_f_dynamics_input_dim = pro_dim + ROA_ext_dim + act_dim
-
-    obs_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obs_f_dynamics']['net'],
-                                                         nn.LeakyReLU,
-                                                         obs_f_dynamics_input_dim,
-                                                         pro_dim + ROA_ext_dim),
-                                          device=device)
-
     obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_input_dim
 
     obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
@@ -164,13 +156,6 @@ else:
                                                             hidden_dim),
                                              device=device)
 
-
-
-    Decoder = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['Decoder']['net'],
-                                                  nn.LeakyReLU,
-                                                  hidden_dim,
-                                                  int(ROA_Encoder_ob_dim/historyNum)),
-                                   device=device)
 
     Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                     nn.LeakyReLU,
@@ -245,7 +230,6 @@ else:
     Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
     Estimator.architecture.load_state_dict(torch.load(weight_path)['Inertial_estimator'])
     obj_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['obj_f_dynamics_state_dict'])
-    obs_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['obs_f_dynamics_state_dict'])
     latent_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['latent_f_dynamics_state_dict'])
 
     env.load_scaling(weight_dir, int(iteration_number))
@@ -256,7 +240,6 @@ else:
 
     traj_sampler = mppi.MPPI(latent_f_dynamics=latent_f_dynamics,
                              obj_f_dynamics=obj_f_dynamics,
-                             decoder=Decoder,
                              encoder=Encoder,
                              encoder_ROA=Encoder_Rollout,
                              actor=actor_Rollout,
