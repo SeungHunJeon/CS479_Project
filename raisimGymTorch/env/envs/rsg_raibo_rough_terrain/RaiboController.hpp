@@ -502,18 +502,16 @@ class RaiboController {
     raisim::Mat<3,3> command_Obj_Rot_;
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
     double stay_t_heading  = Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8);
-    if(stay_t_heading > 0.985){
-      stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(- stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
-    }else {
-      stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
-          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
-    }
+    stay_t_heading = std::acos(stay_t_heading); /// same => 0, totally different => pi
+    stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(-stay_t_heading)
+        * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
 
     /// stay close to the object
     double stay_o = ee_to_obj.norm(); /// max : inf, min : 0
-    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 0, min : -1
+    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8); /// max : 1, min : 0
+    stay_o_heading = std::acos(stay_o_heading); /// same => 0, totally different => pi
     stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
-    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
+    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(-stay_o_heading);
 
     /// move the object towards the target
     double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;

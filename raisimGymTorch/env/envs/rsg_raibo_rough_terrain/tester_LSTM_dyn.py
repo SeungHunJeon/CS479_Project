@@ -15,7 +15,11 @@ import collections
 import torch.nn as nn
 import raisimGymTorch.algo.MPPI.mppi as mppi
 import pandas as pd
+from matplotlib.animation import FuncAnimation
+import matplotlib.pyplot as plt
+import matplotlib
 
+matplotlib.use('tkagg')
 device = torch.device('cuda:0')
 # configuration
 parser = argparse.ArgumentParser()
@@ -47,8 +51,8 @@ is_rollout = cfg['environment']['Rollout']
 if(is_rollout):
     num_env = cfg['environment']['num_envs']
 else:
-    num_env = 300
-cfg['environment']['num_envs'] = 300
+    num_env = 100
+    cfg['environment']['num_envs'] = 100
 
 
 #
@@ -57,6 +61,8 @@ if (is_rollout):
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain_ROLLOUT(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 else:
     env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+
+print('env create success')
 # shortcuts
 ob_dim = env.num_obs
 act_dim = env.num_acts
@@ -127,7 +133,6 @@ def get_obs_ROA(encoder, obs_batch):
     obs_ROA_batch = np.concatenate(obs_ROA_batch, axis=-1)
 
     return obs_ROA_batch
-
 
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
@@ -233,8 +238,9 @@ else:
     latent_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['latent_f_dynamics_state_dict'])
 
     env.load_scaling(weight_dir, int(iteration_number))
+    print('ww')
     env.turn_on_visualization()
-
+    print('ww')
     for i in range (int(int(iteration_number) / 100)):
         env.curriculum_callback()
 
@@ -257,14 +263,38 @@ else:
     success = None
 
 
+
+
     for i in range (100):
         # env.curriculum_callback()
         env.reset()
 
-        env_value = env.get_envrionmental_value()
-        print(env_value.shape)
+        # env_value = env.get_envrionmental_value()
+        # print(env_value.shape)
         Encoder.architecture.reset()
         Encoder_ROA.architecture.reset()
+
+        # For action plotting
+        idx = 0
+        x = []
+        y = []
+        x = np.linspace(0, 36, 180)
+        y = np.zeros(180)
+        y2 = np.zeros(180)
+        y3 = np.zeros(180)
+        plt.ion()
+        figure, ax = plt.subplots(nrows=3, ncols=1, figsize=(8,6))
+        line1, = ax[0].plot(x,y)
+        line2, = ax[1].plot(x,y2)
+        line3, = ax[2].plot(x,y3)
+        ax[0].set_xlim(0, 36)
+        ax[1].set_xlim(0, 36)
+        ax[2].set_xlim(0, 36)
+        ax[0].set_ylim(-5, 5)
+        ax[1].set_ylim(-5, 5)
+        ax[2].set_ylim(-5, 5)
+
+
         if(is_rollout):
             target_pos = env.get_target_pos()
         for step in range(total_steps):
@@ -273,12 +303,26 @@ else:
                     obs = env.observe(False)
                     obs_ROA = get_obs_ROA(Encoder, obs)
                     latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+                    action_ll = actor.architecture(latent_ROA, actor=True).cpu().numpy()
+                    # action_ll, actions_log_prob = actor.sample(latent_ROA)
 
-                    action_ll, actions_log_prob = actor.sample(latent_ROA)
+                    # For action plotting
+                    y[idx] = action_ll[0][0]
+                    y2[idx] = action_ll[0][1]
+                    y3[idx] = action_ll[0][2]
+                    idx+=1
+                    line1.set_xdata(x)
+                    line1.set_ydata(y)
+                    line2.set_xdata(x)
+                    line2.set_ydata(y2)
+                    line3.set_xdata(x)
+                    line3.set_ydata(y3)
+                    figure.canvas.draw()
+                    figure.canvas.flush_events()
+
                     success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
                     env.step_visualize_success(action_ll, success)
 
-                    # print(action_ll)
 
                 if (is_rollout == True):
                     cur_pos = env.get_obj_pos()
@@ -324,15 +368,17 @@ else:
                 '''
                 action_traj = MPPI(state, e, o)
                 '''
+        # For action plotting
+        plt.close(figure)
         print( "Trial : {} ".format(i))
         print(success.sum().item())
         success_npy = success.numpy()
-        env_value = np.concatenate([env_value, success_npy], axis=-1)
+        # env_value = np.concatenate([env_value, success_npy], axis=-1)
         # print(env_value.shape)
 
         # env_value
-        env_value_data_frame = pd.DataFrame(env_value)
-        env_value_data_frame.to_csv("env_value.csv", index=False)
+        # env_value_data_frame = pd.DataFrame(env_value)
+        # env_value_data_frame.to_csv("env_value.csv", index=False)
 
         # if int(success) == 0:
         #     print("failed")

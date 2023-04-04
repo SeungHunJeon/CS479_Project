@@ -132,7 +132,6 @@ else:
             # env.move_controller_cursor(0, command)
                 obs = env.observe(False)
                 action_ll, actions_log_prob = actor.sample(torch.from_numpy(obs).to(device))
-
                 print(action_ll)
                 # action_ll = torch.Tensor([0]).unsqueeze(0)
                 env.step_visualize(action_ll)

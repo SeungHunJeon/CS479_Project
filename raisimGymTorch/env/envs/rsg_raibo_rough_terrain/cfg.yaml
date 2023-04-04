@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
-name: "Latent dim 128, "
+name: "Latent dim 128, orientation term update"
 environment:
   Rollout: False
   position_goal: False
@@ -37,7 +37,7 @@ environment:
     towardTargetRewardCoeff_: 1
     stayTargetRewardCoeff_: 3
     stayObjectHeadingRewardCoeff_ : 1
-    stayTargetHeadingRewardCoeff_ : 1
+    stayTargetHeadingRewardCoeff_ : 2
     stayTargetHeadingRewardCoeff_alpha_ : 1
   curriculum:
     initial_factor: .2

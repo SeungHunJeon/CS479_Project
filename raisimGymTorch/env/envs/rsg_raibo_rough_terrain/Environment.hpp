@@ -334,7 +334,6 @@ class ENVIRONMENT {
 
       ///TODO
       /// add raisim server bar chart
-
       ///
 
     }
