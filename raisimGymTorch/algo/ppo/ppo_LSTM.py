@@ -71,9 +71,9 @@ class PPO:
                                      # *self.decoder.parameters()
                                      ], lr=learning_rate)
 
-        self.dynamics_optimizer = optim.Adam([*self.obj_f_dynamics.parameters(),
-                                              *self.latent_f_dynamics.parameters()],
-                                             lr=learning_rate)
+        # self.dynamics_optimizer = optim.Adam([*self.obj_f_dynamics.parameters(),
+        #                                       *self.latent_f_dynamics.parameters()],
+        #                                      lr=learning_rate)
 
         # remove estimator
         # self.optimizer = optim.Adam([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], lr=learning_rate)
@@ -478,9 +478,10 @@ class PPO:
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
                        + lambda_loss_ROA \
                        + loss_ROA \
-                       + obj_f_dynamics_loss \
-                       + latent_f_dyn_loss \
                        + estimator_loss
+                       # + obj_f_dynamics_loss \
+                       # + latent_f_dyn_loss \
+
 
                 # dynamics_loss = obj_f_dynamics_loss
 
@@ -488,7 +489,7 @@ class PPO:
 
                 # Gradient step
                 self.optimizer.zero_grad()
-                self.dynamics_optimizer.zero_grad()
+                # self.dynamics_optimizer.zero_grad()
                 loss.backward()
 
                 nn.utils.clip_grad_norm_([*self.actor.parameters(),
@@ -498,9 +499,9 @@ class PPO:
                                           *self.estimator.parameters()
                                           ], self.max_grad_norm)
 
-                nn.utils.clip_grad_norm_([*self.obj_f_dynamics.parameters(),
-                                          *self.latent_f_dynamics.parameters()]
-                                         ,self.max_grad_norm)
+                # nn.utils.clip_grad_norm_([*self.obj_f_dynamics.parameters(),
+                #                           *self.latent_f_dynamics.parameters()]
+                #                          ,self.max_grad_norm)
 
                 # remove estimator
                 # nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], self.max_grad_norm)
@@ -508,7 +509,7 @@ class PPO:
 
 
                 self.optimizer.step()
-                self.dynamics_optimizer.step()
+                # self.dynamics_optimizer.step()
                 # self.plot_grad_flow(self.encoder[0].architecture.named_parameters())
 
                 if log_this_iteration:
