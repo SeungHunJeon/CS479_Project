@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
-task_name: "Random_Object_encod_LSTM_dyn hidden_dim 96"
-name: "Add rotational reward term"
+task_name: "Multi Object"
+name: ""
 environment:
   Rollout: False
   position_goal: False
@@ -37,7 +37,7 @@ environment:
     towardTargetRewardCoeff_: 1
     stayTargetRewardCoeff_: 3
     stayObjectHeadingRewardCoeff_ : 1
-    stayTargetHeadingRewardCoeff_ : 3
+    stayTargetHeadingRewardCoeff_ : 0
     stayTargetHeadingRewardCoeff_alpha_ : 1
   curriculum:
     initial_factor: .2
@@ -46,8 +46,8 @@ environment:
 
   dimension:
     proprioceptiveDim_: 15
-    exteroceptiveDim_: 33
-    inertialparamDim_: 15
+    exteroceptiveDim_: 37
+    inertialparamDim_: 16
     dynamicsInfoDim_: 27
     dynamicsPredictDim_: 30
     dynamicsInputDim_: 33

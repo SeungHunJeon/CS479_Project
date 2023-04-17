@@ -292,12 +292,11 @@ class ENVIRONMENT_ROLLOUT {
   }
 
   void hard_reset () {
-    friction = 1.1 + 0.2*curriculumFactor_ * normDist_(gen_);
-    if (friction < 0.8)
-      friction = 1.1;
+    friction = 1.1 + 0.4*curriculumFactor_ * 2 * (uniDist_(gen_) - 0.5);
     world_0.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
-    Obj_->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
-    Obj_->setLinearDamping(0.6*friction/1.1);
+    air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
+    Obj_->setAngularDamping({air_damping, air_damping, air_damping});
+    Obj_->setLinearDamping(air_damping);
   }
 
   void reset_Rollout() {
@@ -347,7 +346,7 @@ class ENVIRONMENT_ROLLOUT {
       hard_reset();
     /// set the state
     raibo_0->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-    controller_0.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction);
+    controller_0.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction, air_damping);
 
     Low_velocity_controller_0.reset(&world_0);
     controller_0.updateStateVariables();
@@ -737,6 +736,7 @@ class ENVIRONMENT_ROLLOUT {
   bool is_position_goal = true;
   double obj_mass_ = 2.0;
   double friction = 1.1;
+  double air_damping = 0.5;
   static constexpr int nJoints_ = 12;
   raisim::World world_0;
   std::vector<raisim::World *> world_batch_;

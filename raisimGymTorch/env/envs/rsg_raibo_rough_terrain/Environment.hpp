@@ -178,26 +178,27 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void hard_reset () {
-    friction = 1.1 + 0.2*curriculumFactor_ * uniDist_(gen_);
+    friction = 1.1 + 0.4*curriculumFactor_ * 2 * (uniDist_(gen_) - 0.5);
     world_.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
 
     /// Update Object damping coefficient
     /// Deprecated (box doesn't necessary)
-//    Obj_->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
-//    Obj_->setLinearDamping(0.6*friction/1.1);
+    air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
+    Obj_->setAngularDamping({air_damping, air_damping, air_damping});
+    Obj_->setLinearDamping(air_damping);
   }
 
   void reset() {
-//    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
-
-    object_type = 2;
+    object_type = intuniDist_(gen_);
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
     if(curriculumFactor_ > 0.5)
       hard_reset();
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-    controller_.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction);
+    controller_.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction, air_damping);
+    Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
+    controller_.updateClassifyvector(temp);
     if(is_position_goal) {
       Low_controller_.reset(&world_);
       controller_.updateStateVariables();
@@ -399,9 +400,9 @@ class ENVIRONMENT {
 //    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
     curriculumFactor_ = std::pow(curriculumFactor_, curriculumDecayFactor_);
     /// create heightmap
-    updateObstacle(true);
-    Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
-    controller_.updateClassifyvector(temp);
+//    updateObstacle(true);
+//    Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
+//    controller_.updateClassifyvector(temp);
   }
 
   bool check_success() {
@@ -440,6 +441,7 @@ class ENVIRONMENT {
   bool is_position_goal = true;
   double obj_mass = 2.0;
   double friction = 1.1;
+  double air_damping = 0.5;
   static constexpr int nJoints_ = 12;
   raisim::World world_;
   double simulation_dt_;
@@ -486,9 +488,11 @@ class ENVIRONMENT {
   thread_local static std::mt19937 gen_;
   thread_local static std::normal_distribution<double> normDist_;
   thread_local static std::uniform_real_distribution<double> uniDist_;
+  thread_local static std::uniform_int_distribution<int> intuniDist_;
 };
 
 thread_local std::mt19937 raisim::ENVIRONMENT::gen_;
 thread_local std::normal_distribution<double> raisim::ENVIRONMENT::normDist_(0., 1.);
 thread_local std::uniform_real_distribution<double> raisim::ENVIRONMENT::uniDist_(0., 1.);
+thread_local std::uniform_int_distribution<int> raisim::ENVIRONMENT::intuniDist_(0, 2);
 }

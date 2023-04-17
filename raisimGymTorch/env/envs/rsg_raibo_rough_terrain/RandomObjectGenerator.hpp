@@ -21,7 +21,7 @@ class RandomObjectGenerator {
   };
 
   RandomObjectGenerator() {
-    classify_vector.setZero(4);
+    classify_vector.setZero(3);
     geometry.setZero(3);
   }
 
@@ -273,7 +273,7 @@ class RandomObjectGenerator {
         compute_ratio(bound_ratio, curriculumFactor, gen, normDist);
         radius_ = radius * ratio;
         object_height = 2*radius_;
-        classify_vector << 1, 0, 0, 0;
+        classify_vector << 1, 0, 0;
         geometry << 2*radius_, 2*radius_, 2*radius_;
 //        return world->addSphere(radius_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
         auto Obj = world->addSphere(radius_, mass, "object");
@@ -288,7 +288,7 @@ class RandomObjectGenerator {
         radius_ = radius * ratio;
         height_ = height * height_ratio;
         object_height = height_;
-        classify_vector << 0, 1, 0, 0;
+        classify_vector << 0, 1, 0;
         geometry << 2*radius_, 2*radius_, height_;
 //        return world->addCylinder(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
         auto Obj = world->addCylinder(radius_, height_, mass, "object");
@@ -306,7 +306,7 @@ class RandomObjectGenerator {
         height_ = height * height_ratio;
 
         object_height = height_;
-        classify_vector << 0, 0, 1, 0;
+        classify_vector << 0, 0, 1;
         geometry << width1_, width2_, height_;
 //        return world->addBox(width1_, width2_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
         auto Obj = world->addBox(width1_, width2_, height_, mass, "object");
@@ -317,15 +317,15 @@ class RandomObjectGenerator {
 
 
 
-      case ObjectShape::Capsule: /// 3
-      {
-        double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
-        double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
-        object_height = 2 * radius_ + height_;
-        classify_vector << 0, 0, 0, 1;
-        geometry << 2*radius_, 2*radius_, height_+2*radius_;
-        return world->addCapsule(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
-      }
+//      case ObjectShape::Capsule: /// 3
+//      {
+//        double radius_ = radius * (1 + curriculumFactor * bound_ratio * normDist(gen));
+//        double height_ = height * (1 + curriculumFactor * bound_ratio * normDist(gen));
+//        object_height = 2 * radius_ + height_;
+//        classify_vector << 0, 0, 0, 1;
+//        geometry << 2*radius_, 2*radius_, height_+2*radius_;
+//        return world->addCapsule(radius_, height_, mass, "object", raisim::COLLISION(1), raisim::COLLISION(1) | raisim::COLLISION(63));
+//      }
 
     }
     return nullptr;

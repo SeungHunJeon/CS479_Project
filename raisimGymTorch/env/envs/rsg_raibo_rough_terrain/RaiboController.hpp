@@ -128,9 +128,8 @@ class RaiboController {
                     "stayTarget_heading_rew"};
     stepData_.resize(stepDataTag_.size());
 
-
-    classify_vector_.setZero(4);
-    classify_vector_ << 1, 0, 0, 0;
+    classify_vector_.setZero(3);
+    classify_vector_ << 1, 0, 0;
     pre_command_.setZero();
     prepre_command_.setZero();
 
@@ -238,15 +237,16 @@ class RaiboController {
     Obj_Info_.segment(8, 1) << dist_temp_min_;
     Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
     Obj_Info_.segment(12,3) = (baseRot_.e().row(0) - Obj_->getOrientation().e().row(0));
-//    Obj_Info_.segment(21,4) = classify_vector_;
-    Obj_Info_.segment(15,3) = obj_geometry_;
-    Obj_Info_.segment(18, 1) << Obj_->getMass();
-    Obj_Info_.segment(19, 3) << Obj_->getCom().e();
-    Obj_Info_.segment(22,3) = Obj_->getInertiaMatrix_B().row(0);
-    Obj_Info_.segment(25,3) = Obj_->getInertiaMatrix_B().row(1);
-    Obj_Info_.segment(28,3) = Obj_->getInertiaMatrix_B().row(2);
-    Obj_Info_.segment(31,1) << friction_;
-    Obj_Info_.segment(32,1) << static_cast<double>(is_contact);
+    Obj_Info_.segment(15,3) = classify_vector_;
+    Obj_Info_.segment(18,3) = obj_geometry_;
+    Obj_Info_.segment(21, 1) << Obj_->getMass();
+    Obj_Info_.segment(22, 3) << Obj_->getCom().e();
+    Obj_Info_.segment(25,3) = Obj_->getInertiaMatrix_B().row(0);
+    Obj_Info_.segment(28,3) = Obj_->getInertiaMatrix_B().row(1);
+    Obj_Info_.segment(31,3) = Obj_->getInertiaMatrix_B().row(2);
+    Obj_Info_.segment(34,1) << friction_;
+    Obj_Info_.segment(35,1) << air_damping;
+    Obj_Info_.segment(36,1) << static_cast<double>(is_contact);
 
 
     dynamics_Info_.segment(0,3) << Obj_Pos_.e();
@@ -275,6 +275,8 @@ class RaiboController {
       is_achieved = true;
 
   }
+
+
 
   Eigen::VectorXd get_desired_pos () {
     return desired_pos_;
@@ -343,7 +345,7 @@ class RaiboController {
   }
 
   void reset(std::mt19937 &gen_,
-             std::normal_distribution<double> &normDist_, Eigen::Vector3d command_obj_pos_, Eigen::Vector4d command_obj_quat_, Eigen::Vector3d obj_geometry, double friction) {
+             std::normal_distribution<double> &normDist_, Eigen::Vector3d command_obj_pos_, Eigen::Vector4d command_obj_quat_, Eigen::Vector3d obj_geometry, double friction, double damping) {
     raibo_->getState(gc_, gv_);
 //    jointTarget_ = gc_.segment(7, nJoints_);
     command_Obj_Pos_ = command_obj_pos_;
@@ -353,6 +355,7 @@ class RaiboController {
     is_success_ = false;
     is_achieved = true;
     friction_ = friction;
+    air_damping = damping;
     pre_command_.setZero();
     prepre_command_.setZero();
     // history
@@ -594,14 +597,14 @@ class RaiboController {
   /// output dim : joint action 12 + task space action 6 + gain dim 4
 
   int proprioceptiveDim_ = 15;
-  int exteroceptiveDim_ = 33;
+  int exteroceptiveDim_ = 37;
   int dynamicsInfoDim_ = 27;
   static constexpr int actionDim_ = 3;
   int historyNum_ = 19;
   int actionNum_ = 20;
   int obBlockDim_ = 0;
 
-  static constexpr size_t obDim_ = 1560;
+  static constexpr size_t obDim_ = 1640;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
@@ -641,6 +644,7 @@ class RaiboController {
   std::vector<bool> success_batch_;
   double dist_temp_;
   double friction_ = 1.1;
+  double air_damping = 0.5;
 
   // robot observation variables
   std::vector<raisim::VecDyn> heightScan_;
