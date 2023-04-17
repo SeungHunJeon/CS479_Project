@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
-task_name: "Random_Object_encod_LSTM_dyn"
-name: "Latent dim 128, orientation term update"
+task_name: "Random_Object_encod_LSTM_dyn hidden_dim 96"
+name: "Add rotational reward term"
 environment:
   Rollout: False
   position_goal: False
@@ -13,7 +13,7 @@ environment:
   num_threads: 30
   simulation_dt: 0.0025
   control_dt: 0.2
-#  low_level_control_dt: 0.005
+  #  low_level_control_dt: 0.005
   low_level_control_dt: 0.01
   max_time: 12.0
   entropy_coeff: 1e-2
@@ -31,13 +31,13 @@ environment:
     commandsmooth2RewardCoeff_: 10
     #    commandRewardCoeff_: 0
     torque_reward_coeff: 0
-#    torque_reward_coeff: 0
+    #    torque_reward_coeff: 0
     towardObjectRewardCoeff_: 1
     stayObjectRewardCoeff_: 2
     towardTargetRewardCoeff_: 1
     stayTargetRewardCoeff_: 3
     stayObjectHeadingRewardCoeff_ : 1
-    stayTargetHeadingRewardCoeff_ : 2
+    stayTargetHeadingRewardCoeff_ : 3
     stayTargetHeadingRewardCoeff_alpha_ : 1
   curriculum:
     initial_factor: .2
@@ -73,19 +73,19 @@ encoder:
   actionlatentDim_: 4
 
 Transformer:
-  dim_feedforward_: 512
+  dim_feedforward_: 256
   n_head_: 8
-  layerNum_: 6
-  d_model: 128
+  layerNum_: 8
+  d_model: 48
 
 LSTM:
-  hiddendim_: 128
+  hiddendim_: 96
   batchNum_: 1
   numLayer_: 2
 
 architecture:
-  policy_net: [256, 128, 64]
-  value_net: [256, 128, 64]
+  policy_net: [128, 64]
+  value_net: [128, 64]
 
   encoding:
     policy_net: [ 128, 64 ]

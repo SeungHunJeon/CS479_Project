@@ -179,8 +179,8 @@ class RaiboController {
     state_Info_.segment(9,3) = baseRot_.e().transpose()*(LF_FOOT_Pos_w_.e() - ee_Pos_w_.e());
     state_Info_.segment(12,3) = baseRot_.e().transpose()*(RF_FOOT_Pos_w_.e() - ee_Pos_w_.e());
 
-    for (auto &contact: raibo_->getContacts()) {
-      if (contact.getlocalBodyIndex() == armIndices_.front()) {
+    for (auto &contact : raibo_->getContacts()) {
+      if (contact.getPairObjectIndex() == Obj_->getIndexInWorld()) {
         is_contact = true;
         break;
       }
@@ -435,16 +435,16 @@ class RaiboController {
     }
 
     obDouble_.segment((obBlockDim_)*historyNum_, proprioceptiveDim_)
-    = state_Info_;
+        = state_Info_;
 
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_, exteroceptiveDim_)
-    = Obj_Info_;
+        = Obj_Info_;
 
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_, actionDim_)
-    = actionInfoHistory_.back();
+        = actionInfoHistory_.back();
 
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_+actionDim_, dynamicsInfoDim_)
-    = dynamicsInfoHistory_.back();
+        = dynamicsInfoHistory_.back();
   }
 
   inline void checkConfig(const Yaml::Node &cfg) {
@@ -501,17 +501,19 @@ class RaiboController {
     /// Reward for alignment
     raisim::Mat<3,3> command_Obj_Rot_;
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
-    double stay_t_heading  = Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8);
-    stay_t_heading = std::acos(stay_t_heading); /// same => 0, totally different => pi
-    stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(-stay_t_heading)
-        * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+    double stay_t_heading  = abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
+    if(stay_t_heading > 0.985){
+      stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(- stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+    }else {
+      stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
+          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+    }
 
     /// stay close to the object
     double stay_o = ee_to_obj.norm(); /// max : inf, min : 0
-    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8); /// max : 1, min : 0
-    stay_o_heading = std::acos(stay_o_heading); /// same => 0, totally different => pi
+    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 0, min : -1z
     stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
-    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(-stay_o_heading);
+    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
 
     /// move the object towards the target
     double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;
@@ -519,7 +521,11 @@ class RaiboController {
 
     /// keep the object close to the target
     double stay_t = obj_to_target.norm();
-    stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
+    if(stay_t < 0.05) {
+      stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(0);
+    } else{
+      stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
+    }
     double commandReward_tmp = std::max(5., static_cast<double>(command_.norm()));
     double command_smooth = (command_ - pre_command_).squaredNorm();
     double command_smooth2 = (command_ - 2*pre_command_ + prepre_command_).squaredNorm();
@@ -585,7 +591,7 @@ class RaiboController {
   raisim::ArticulatedSystem *raibo_;
   std::vector<size_t> footIndices_, footFrameIndicies_, armIndices_;
   Eigen::VectorXd nominalConfig_;
-   /// output dim : joint action 12 + task space action 6 + gain dim 4
+  /// output dim : joint action 12 + task space action 6 + gain dim 4
 
   int proprioceptiveDim_ = 15;
   int exteroceptiveDim_ = 33;

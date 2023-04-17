@@ -178,9 +178,7 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void hard_reset () {
-    friction = 1.1 + 0.2*curriculumFactor_ * normDist_(gen_);
-    if (std::abs(friction - 1.1) > 0.3)
-      friction = 1.1;
+    friction = 1.1 + 0.2*curriculumFactor_ * uniDist_(gen_);
     world_.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
 
     /// Update Object damping coefficient
