@@ -53,13 +53,14 @@ class RandomObjectGenerator {
                              ) {
 
     double value;
-    while (true)
-    {
-      value = bound_ratio * reference * curriculumFactor * normDist(gen); /// 0.5 * 1 * 0.2 * normDist
-      if (std::abs(value) < bound_ratio * reference * curriculumFactor)
-        break;
-    }
-    return value;
+    value = bound_ratio * reference * curriculumFactor * normDist(gen);
+//    while (true)
+//    {
+//      value = bound_ratio * reference * curriculumFactor * normDist(gen); /// 0.5 * 1 * 0.2 * normDist
+//      if (std::abs(value) < bound_ratio * reference * curriculumFactor)
+//        break;
+//    }
+    return std::clamp(value, -bound_ratio*reference*curriculumFactor, bound_ratio*reference*curriculumFactor);
   }
 
   inline Eigen::Matrix3d sample_inertia (raisim::SingleBodyObject* object,
@@ -119,11 +120,12 @@ class RandomObjectGenerator {
         radius = soft_sample(obj_radius_, bound_ratio, curriculumFactor, gen, normDist);
         radius = std::abs(radius);
         theta = 2*M_PI*uniDist(gen);
-        phi = M_PI*uniDist(gen);
+        phi = M_PI*(uniDist(gen)-0.5);
 
-        COM << radius * sin(phi) * cos(theta),
-        radius * sin(phi) * sin(theta),
-        radius * cos(phi);
+//        COM << radius * sin(phi) * cos(theta),
+//        radius * sin(phi) * sin(theta),
+//        radius * cos(phi);
+        COM << 0, 0, 0;
 
         return COM;
       }

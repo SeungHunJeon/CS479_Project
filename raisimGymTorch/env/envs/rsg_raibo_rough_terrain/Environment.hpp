@@ -45,6 +45,7 @@ class ENVIRONMENT {
 
     world_.addGround(0.0, "ground");
     world_.setDefaultMaterial(1.1, 0.0, 0.01);
+    world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
 
     /// add objects
     raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
@@ -178,8 +179,8 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void hard_reset () {
-    friction = 1.1 + 0.4*curriculumFactor_ * 2 * (uniDist_(gen_) - 0.5);
-    world_.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
+    friction = 0.6 + 0.2*curriculumFactor_ * 2 * (uniDist_(gen_) - 0.5);
+    world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
 
     /// Update Object damping coefficient
     /// Deprecated (box doesn't necessary)
@@ -302,8 +303,9 @@ class ENVIRONMENT {
     x += gc_init_[0];
     y += gc_init_[1];
 
-    Obj_->setPosition(x, y, object_height/2);
-    Obj_->setOrientation(1, 0, 0, 0);
+    phi_ = uniDist_(gen_) * M_PI * 2;;
+    Obj_->setPosition(x, y, object_height/2+1e-2);
+    Obj_->setOrientation(cos(phi_/2), 0, 0, sin(phi_/2));
     Obj_->setVelocity(0,0,0,0,0,0);
 
     /// Update Object damping coefficient
@@ -439,8 +441,8 @@ class ENVIRONMENT {
 
  protected:
   bool is_position_goal = true;
-  double obj_mass = 2.0;
-  double friction = 1.1;
+  double obj_mass = 6.0;
+  double friction = 0.6;
   double air_damping = 0.5;
   static constexpr int nJoints_ = 12;
   raisim::World world_;
@@ -449,7 +451,7 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 0.3;
+  double bound_ratio = 0.5;
   raisim::ArticulatedSystem* raibo_;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;
