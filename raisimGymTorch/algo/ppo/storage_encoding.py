@@ -14,6 +14,7 @@ class RolloutStorage:
         self.rewards = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.float32)
         self.actions = np.zeros([num_transitions_per_env, num_envs, *actions_shape], dtype=np.float32)
         self.dones = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.bool)
+        self.contacts = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.bool)
 
         # For PPO
         self.actions_log_prob = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.float32)
@@ -34,6 +35,7 @@ class RolloutStorage:
         self.advantages_tc = torch.from_numpy(self.advantages).to(self.device)
         self.mu_tc = torch.from_numpy(self.mu).to(self.device)
         self.sigma_tc = torch.from_numpy(self.sigma).to(self.device)
+        self.contacts_tc = torch.from_numpy(self.contacts).to(self.device)
 
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
@@ -41,7 +43,7 @@ class RolloutStorage:
 
         self.step = 0
 
-    def add_transitions(self, actor_obs, critic_obs, obs, actions, mu, sigma, rewards, dones, actions_log_prob):
+    def add_transitions(self, actor_obs, critic_obs, obs, actions, mu, sigma, rewards, dones, actions_log_prob, contact = False):
         if self.step >= self.num_transitions_per_env:
             raise AssertionError("Rollout buffer overflow")
         self.critic_obs[self.step] = critic_obs
@@ -53,6 +55,7 @@ class RolloutStorage:
         self.rewards[self.step] = rewards.reshape(-1, 1)
         self.dones[self.step] = dones.reshape(-1, 1)
         self.actions_log_prob[self.step] = actions_log_prob.reshape(-1, 1)
+        self.contacts[self.step] = contact.reshape(-1, 1)
         self.step += 1
 
     def clear(self):
@@ -92,6 +95,7 @@ class RolloutStorage:
         self.advantages_tc = torch.from_numpy(self.advantages).to(self.device)
         self.sigma_tc = torch.from_numpy(self.sigma).to(self.device)
         self.mu_tc = torch.from_numpy(self.mu).to(self.device)
+        self.contacts_tc = torch.from_numpy(self.contacts).to(self.device)
 
     def mini_batch_generator_shuffle(self, num_mini_batches):
         batch_size = self.num_envs * self.num_transitions_per_env
@@ -135,8 +139,9 @@ class RolloutStorage:
             advantage_batch = torch.reshape(self.advantages_tc, (-1, 1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
             return_batch = torch.reshape(self.returns_tc, (-1, 1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
             action_log_prob_batch = torch.reshape(self.actions_log_prob_tc, (-1, 1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
+            contact_batch = torch.reshape(self.contacts_tc, (-1,1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size]
 
-            yield obs_batch, action_batch, sigma_batch, mu_batch, value_batch, advantage_batch, return_batch, action_log_prob_batch
+            yield obs_batch, action_batch, sigma_batch, mu_batch, value_batch, advantage_batch, return_batch, action_log_prob_batch, contact_batch
 
             # yield self.obs_tc[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \
             #     self.actions_tc.view(-1, self.actions_tc.size(-1))[batch_id*mini_batch_size:(batch_id+1)*mini_batch_size], \

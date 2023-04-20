@@ -387,6 +387,10 @@ class ENVIRONMENT {
     ob = obScaled_.cast<float>();
   }
 
+  void get_contact(bool contact) {
+    controller_.getContact(contact);
+  }
+
   bool isTerminalState(float& terminalReward) {
 //    return controller_.isTerminalState(terminalReward);
     return false;

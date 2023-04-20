@@ -24,6 +24,7 @@ class RaisimGymVecEnv:
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self._success = np.zeros(self.num_envs, dtype=np.bool)
+        self._contact = np.zeros(self.num_envs, dtype=np.bool)
         self._env_val = np.zeros([self.num_envs, 17], dtype=np.float32)
         # 0-2 : H W D / 3-11 : Inertia row1+row2+row3 / 12-14 : COM / 15 : Mass / 16 : friction
         self.rewards = [[] for _ in range(self.num_envs)]
@@ -127,6 +128,11 @@ class RaisimGymVecEnv:
         self.wrapper.getSuccess(self._success)
 
         return self._success
+
+    def get_contact(self):
+        self.wrapper.getContact(self._contact)
+
+        return self._contact
 
     def get_envrionmental_value(self):
         self.wrapper.get_environmental_value(self._env_val)

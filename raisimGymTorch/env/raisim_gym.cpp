@@ -48,7 +48,8 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("getSuccess", &VectorizedEnvironment<ENVIRONMENT>::getSuccess)
     .def("get_environmental_value", &VectorizedEnvironment<ENVIRONMENT>::get_environmental_value)
     .def("step_visualize_success", &VectorizedEnvironment<ENVIRONMENT>::step_visualize_success)
-    .def("observationDeNormalize", &VectorizedEnvironment<ENVIRONMENT>::ObservationDeNormalize);
+    .def("observationDeNormalize", &VectorizedEnvironment<ENVIRONMENT>::ObservationDeNormalize)
+    .def("getContact", &VectorizedEnvironment<ENVIRONMENT>::getContact);
 //    .def("synchronize", &VectorizedEnvironment<ENVIRONMENT>::synchronize);
 
   py::class_<VectorizedEnvironment<ENVIRONMENT_ROLLOUT>>(m, "RaisimGymRaiboRoughTerrain_ROLLOUT")

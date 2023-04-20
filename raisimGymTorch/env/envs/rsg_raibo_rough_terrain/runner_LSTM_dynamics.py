@@ -246,6 +246,8 @@ for update in range(iteration_number, 1000000):
         with torch.no_grad():
             obs = env.observe(update < 10000)
 
+            contact = env.get_contact()
+
             # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
             latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
 
@@ -255,7 +257,7 @@ for update in range(iteration_number, 1000000):
 
             reward, dones = env.step(action)
 
-            ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones)
+            ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones, contact=contact)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
             # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
