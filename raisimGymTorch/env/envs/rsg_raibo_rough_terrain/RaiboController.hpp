@@ -572,11 +572,11 @@ class RaiboController {
     {
       stayTargetExtrinsicReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(stayTargetRewardCoeff_alpha_ * -stay_t);
       if (stay_t < 0.05)
-        stayTargetExtrinsicReward_ += cf * stayTargetReward_ * simDt_ * exp(0);
+        stayTargetExtrinsicReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(0);
     }
 
     intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;
-    extrinsicReward_ = stayTargetExtrinsicReward_;
+    extrinsicReward_ = 100*stayTargetExtrinsicReward_;
   }
 
   void set_History(std::vector<Eigen::VectorXd> &obj_info_history,
