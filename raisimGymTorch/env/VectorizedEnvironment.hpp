@@ -191,7 +191,7 @@ class VectorizedEnvironment {
   void getContact(Eigen::Ref<EigenBoolVec> &contact) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++) {
-      environments_[i]->get_contact(contact[i]);
+      contact[i] = environments_[i]->get_contact();
     }
   }
 

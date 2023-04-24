@@ -349,24 +349,27 @@ class PPO:
                                  + self.encoder.architecture.ext_dim
                                  + self.encoder.architecture.act_dim])
 
-        # Distillate the true inertial parameter (oracle)
-
-
-
-        estimator_true_data = (obs_batch[-1, :,
-                               (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-                               + self.encoder.architecture.pro_dim
-                               + self.encoder.architecture.ext_dim - self.inertial_dim:
-                               (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
-                               + self.encoder.architecture.pro_dim
-                               + self.encoder.architecture.ext_dim
-                               ])
-
 
         obs_ROA_batch = torch.cat(obs_ROA_batch, dim=-1)
-        estimator_true_data = estimator_true_data.reshape(-1, self.inertial_dim)
 
-        return obs_ROA_batch, estimator_true_data.detach()
+        return obs_ROA_batch
+
+    def filter_for_estimation(self, obs_batch, contact_mask):
+
+        estimator_true_data = obs_batch[:, :,
+                              (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                              + self.encoder.architecture.pro_dim
+                              + self.encoder.architecture.ext_dim - self.inertial_dim:
+                              (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                              + self.encoder.architecture.pro_dim
+                              + self.encoder.architecture.ext_dim
+                              ]
+
+        estimator_true_data_masked = estimator_true_data[contact_mask]
+
+        estimator_true_data_masked = estimator_true_data_masked.reshape(-1, self.inertial_dim)
+
+        return estimator_true_data_masked
 
     def _train_step(self, log_this_iteration):
         mean_value_loss = 0
@@ -386,14 +389,17 @@ class PPO:
             for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, contact_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
-
+                contact_batch = contact_batch.reshape((-1, self.num_envs, 1))
+                contact_mask = contact_batch.bool().squeeze(-1)
 
                 self.encoder.architecture.reset()
                 self.encoder_ROA.architecture.reset()
 
 
 
-                obs_ROA_batch, estimator_true_data = self.get_obs_ROA(obs_batch)
+                obs_ROA_batch = self.get_obs_ROA(obs_batch)
+
+                estimator_true_data = self.filter_for_estimation(obs_batch, contact_mask)
 
                 """
                 For model update, we'll use
@@ -402,7 +408,12 @@ class PPO:
                 3. 
                 """
 
+                # if(estimator_true_data.shape[0] != 0):
+                #     latent_estimation = self.encode(obs_batch[contact_mask])
+
                 latent = self.encode(obs_batch)
+                latent_estimation = latent.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))[contact_mask]
+
                 latent_d = latent.clone().detach()
                 latent_ROA = self.encode_ROA(obs_ROA_batch)
                 latent_ROA_d = latent_ROA.clone().detach()
@@ -419,9 +430,11 @@ class PPO:
 
                 # estimator_input = self.encoder_ROA.evaluate_update(obs_ROA_batch[-1, ...]).clone().detach().reshape(-1, self.encoder_ROA.architecture.hidden_dim)
 
-                estimator_input = latent_d.reshape(-1, self.num_envs // self.num_mini_batches, self.encoder.architecture.hidden_dim)
-                estimator_input = estimator_input[-1, ...].squeeze(0)
-                estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
+                if(estimator_true_data.shape[0] != 0):
+                    estimator_input = latent_estimation
+                    estimator_loss = self.criteria(self.estimator.evaluate(estimator_input), estimator_true_data)
+                else:
+                    estimator_loss = torch.Tensor([0]).to(self.device)
 
                 lambda_loss_ROA = self.lambda_ROA * self.criteria(latent, latent_ROA_d)
                 loss_ROA = self.criteria(latent_d, latent_ROA)

@@ -183,6 +183,7 @@ class RaiboController {
     for (auto &contact : raibo_->getContacts()) {
       if (contact.getPairObjectIndex() == Obj_->getIndexInWorld()) {
         is_contact = true;
+        contact_switch = true;
         break;
       }
     }
@@ -284,8 +285,8 @@ class RaiboController {
     return desired_pos_;
   }
 
-  void getContact(bool &contact) {
-    contact = is_contact;
+  bool getContact() {
+    return contact_switch;
   }
 
   void getObservation(Eigen::VectorXd &observation) {
@@ -360,6 +361,7 @@ class RaiboController {
 
     is_success_ = false;
     is_achieved = true;
+    contact_switch = false;
     friction_ = friction;
     air_damping = damping;
     pre_command_.setZero();
@@ -576,7 +578,7 @@ class RaiboController {
     }
 
     intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;
-    extrinsicReward_ = 100*stayTargetExtrinsicReward_;
+    extrinsicReward_ = stayTargetExtrinsicReward_;
   }
 
   void set_History(std::vector<Eigen::VectorXd> &obj_info_history,
@@ -699,6 +701,7 @@ class RaiboController {
   raisim::Vec<3> ee_Pos_w_, ee_Vel_w_, ee_Avel_w_;
   raisim::Mat<3,3> eeRot_w_;
   bool is_contact = false;
+  bool contact_switch = false;
   std::vector<Eigen::Vector2d> command_library_;
 
   // control variables
