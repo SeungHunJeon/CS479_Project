@@ -210,7 +210,7 @@ class LSTM(nn.Module):
         self.layer_num = layer_num
         self.num_env = num_env
         self.batch_num = batch_num
-        self.input_dim = input_dim*self.hist_num
+        self.input_dim = input_dim
         self.num_minibatch = num_minibatch
 
         self.block_dim = ext_dim + pro_dim + dyn_info_dim + act_dim
@@ -225,10 +225,11 @@ class LSTM(nn.Module):
         self.output_shape = [hidden_dim]
         self.h_0 = None
         self.c_0 = None
+        self.input_dim *= self.hist_num
 
     # Forward function is for encode one-step observation which incorporates number of (high-level controller frequency) / (low-level controller frequency)
     def forward(self, obs):
-        inputs = obs.reshape(-1, self.num_env // self.num_minibatch, self.input_dim)
+        inputs = obs.reshape(-1, self.num_env, int(self.input_dim / self.hist_num))
 
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
@@ -246,7 +247,7 @@ class LSTM(nn.Module):
     # Forward_update is for encode 1-iteration whole-step observation which incorporates number of
     # (number of step) * (high-level controller frequency) / (low-level controller frequency)
     def forward_update(self, obs):
-        inputs = obs.reshape((-1, self.num_env // self.num_minibatch, self.input_dim))
+        inputs = obs.reshape((-1, self.num_env, int(self.input_dim / self.hist_num)))
 
 
         # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
@@ -258,7 +259,7 @@ class LSTM(nn.Module):
 
         self.h_0 = h_n
         self.c_0 = c_n
-
+        outputs = outputs[self.hist_num-1::self.hist_num]
         output = outputs.reshape(-1, self.hidden_dim)
 
         return output

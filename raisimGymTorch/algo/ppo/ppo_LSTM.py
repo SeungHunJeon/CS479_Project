@@ -389,7 +389,7 @@ class PPO:
             for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, contact_batch \
                     in self.batch_sampler(self.num_mini_batches):
 
-                contact_batch = contact_batch.reshape((-1, self.num_envs, 1))
+                contact_batch = contact_batch.reshape((-1, self.num_envs // self.num_mini_batches, 1))
                 contact_mask = contact_batch.bool().squeeze(-1)
 
                 self.encoder.architecture.reset()
@@ -412,7 +412,7 @@ class PPO:
                 #     latent_estimation = self.encode(obs_batch[contact_mask])
 
                 latent = self.encode(obs_batch)
-                latent_estimation = latent.reshape((-1, self.num_envs, self.encoder.architecture.hidden_dim))[contact_mask]
+                latent_estimation = latent.reshape((-1, self.num_envs // self.num_mini_batches, self.encoder.architecture.hidden_dim))[contact_mask]
 
                 latent_d = latent.clone().detach()
                 latent_ROA = self.encode_ROA(obs_ROA_batch)

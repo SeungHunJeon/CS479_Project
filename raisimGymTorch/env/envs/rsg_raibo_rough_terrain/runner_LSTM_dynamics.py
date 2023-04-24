@@ -81,7 +81,7 @@ ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 num_learning_epochs = 16
-num_mini_batches = 1
+num_mini_batches = 4
 
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
