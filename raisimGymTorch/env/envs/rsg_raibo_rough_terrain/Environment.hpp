@@ -416,16 +416,14 @@ class ENVIRONMENT {
   }
 
   void get_env_value(Eigen::Ref<EigenVec> value){
-
-    value.head(3) << objectGenerator_.get_geometry().cast<float>();
-    value.segment(3,1) << Obj_->getMass();
-    value.segment(4,3) << Obj_->getCom().e().cast<float>();
-    value.segment(7,3) << Obj_->getInertiaMatrix_B().row(0).cast<float>();
-    value.segment(10,3) << Obj_->getInertiaMatrix_B().row(1).cast<float>();
-    value.segment(13,3) << Obj_->getInertiaMatrix_B().row(2).cast<float>();
-    value.segment(16,1) << friction;
-    value.segment(17,1) << air_damping;
-    value.segment(18,1) << controller_.getContact();
+    value.segment(0,1) << Obj_->getMass();
+    value.segment(1,3) << Obj_->getCom().e().cast<float>();
+    value.segment(4,3) << Obj_->getInertiaMatrix_B().row(0).cast<float>();
+    value.segment(7,3) << Obj_->getInertiaMatrix_B().row(1).cast<float>();
+    value.segment(10,3) << Obj_->getInertiaMatrix_B().row(2).cast<float>();
+    value.segment(13,1) << friction;
+    value.segment(14,1) << air_damping;
+    value.segment(15,1) << controller_.getContact();
   }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {

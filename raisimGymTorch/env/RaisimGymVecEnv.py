@@ -25,7 +25,7 @@ class RaisimGymVecEnv:
         self._done = np.zeros(self.num_envs, dtype=np.bool)
         self._success = np.zeros(self.num_envs, dtype=np.bool)
         self._contact = np.zeros(self.num_envs, dtype=np.bool)
-        self._env_val = np.zeros([self.num_envs, 17], dtype=np.float32)
+        self._env_val = np.zeros([self.num_envs, 16], dtype=np.float32)
         # 0-2 : H W D / 3-11 : Inertia row1+row2+row3 / 12-14 : COM / 15 : Mass / 16 : friction
         self.rewards = [[] for _ in range(self.num_envs)]
         self.wrapper.setSeed(seed)
@@ -134,8 +134,8 @@ class RaisimGymVecEnv:
 
         return self._contact
 
-    def get_envrionmental_value(self):
-        self.wrapper.get_environmental_value(self._env_val)
+    def get_privileged_info(self):
+        self.wrapper.getPrivilegedInformation(self._env_val)
         return self._env_val
 
     def get_step_data(self, data_size, data_mean, data_var, data_min, data_max):

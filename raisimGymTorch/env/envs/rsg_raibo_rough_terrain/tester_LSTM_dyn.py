@@ -311,13 +311,13 @@ else:
                     action_ll = actor.architecture(latent_ROA, actor=True).cpu().numpy()
                     # action_ll, actions_log_prob = actor.sample(latent_ROA)
 
-                    if (contact):
-                        inertia_predict = Estimator.predict(latent_ROA)
-                        inertia_true = obs[...,
+                    if (contact[0]):
+                        inertia_predict = Estimator.predict(latent_ROA[0])
+                        inertia_true = obs[0,
                                        (Encoder.architecture.block_dim)*(historyNum-1) +
                                        Encoder.architecture.pro_dim +
                                        Encoder.architecture.ext_dim -
-                                       Encoder.architecture.inertial_dim:
+                                       inertial_dim:
                                        (Encoder.architecture.block_dim)*(historyNum-1) +
                                        Encoder.architecture.pro_dim +
                                        Encoder.architecture.ext_dim]

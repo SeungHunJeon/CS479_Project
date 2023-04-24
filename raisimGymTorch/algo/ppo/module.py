@@ -264,7 +264,7 @@ class LSTM(nn.Module):
             inputs = torch.permute(inputs, (1,0,2)) # 200 300 a
 
         else:
-            inputs = obs.reshape((-1, self.num_env, self.input_dim))
+            inputs = obs.reshape((-1, self.num_env // self.num_minibatch, self.input_dim))
 
         # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
 
@@ -275,8 +275,12 @@ class LSTM(nn.Module):
 
         self.h_0 = h_n
         self.c_0 = c_n
-        outputs = outputs[self.hist_num-1::self.hist_num]
-        output = outputs.reshape(-1, self.hidden_dim)
+        if(self.is_decouple):
+            outputs = outputs[self.hist_num-1::self.hist_num]
+            output = outputs.reshape(-1, self.hidden_dim)
+
+        else:
+            output = outputs.reshape(-1, self.hidden_dim)
 
         return output
 

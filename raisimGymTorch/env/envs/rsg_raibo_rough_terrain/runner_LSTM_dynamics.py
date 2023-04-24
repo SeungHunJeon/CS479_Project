@@ -82,7 +82,7 @@ ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
 num_learning_epochs = 16
-num_mini_batches = 4
+num_mini_batches = 1
 
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
@@ -183,7 +183,7 @@ ppo = PPO.PPO(actor=actor,
 iteration_number = 0
 
 
-# wandb.init(group="jsh",project=task_name,name=name)
+wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -250,6 +250,7 @@ for update in range(iteration_number, 1000000):
             obs = env.observe(update < 10000)
 
             contact = env.get_contact()
+            privileged_info = env.get_privileged_info()
 
             # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
             latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
@@ -260,7 +261,7 @@ for update in range(iteration_number, 1000000):
 
             reward, dones = env.step(action)
 
-            ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones, contact=contact)
+            ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones, contact=contact, privileged_info=privileged_info)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
             # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
@@ -309,7 +310,7 @@ for update in range(iteration_number, 1000000):
 
     end = time.time()
 
-    # wandb.log(data_log)
+    wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))

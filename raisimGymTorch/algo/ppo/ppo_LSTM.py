@@ -141,13 +141,13 @@ class PPO:
             self.actions, self.actions_log_prob = self.actor.sample(torch.from_numpy(actor_obs).to(self.device))
         return self.actions
 
-    def step(self, value_obs, obs, rews, dones, contact=False):
+    def step(self, value_obs, obs, rews, dones, contact=False, privileged_info=None):
 
         """
         remove actor_obs, value_obs -> into encoder_obs
         """
         self.storage.add_transitions(self.actor_obs, value_obs, obs, self.actions, self.actor.action_mean, self.actor.distribution.std_np, rews, dones,
-                                     self.actions_log_prob, contact=contact)
+                                     self.actions_log_prob, contact=contact, privileged_info=privileged_info)
 
     def update(self, actor_obs, value_obs, log_this_iteration, update):
 
@@ -386,9 +386,9 @@ class PPO:
         self.lambda_ROA = pow(self.lambda_ROA, self.lambdaDecayFactor)
         print(self.lambda_ROA)
         for epoch in range(self.num_learning_epochs):
-            for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, contact_batch \
+            for obs_batch, actions_batch, old_sigma_batch, old_mu_batch, current_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, contact_batch, privileged_batch \
                     in self.batch_sampler(self.num_mini_batches):
-
+                privileged_batch = privileged_batch.reshape((-1, self.num_envs // self.num_mini_batches, self.inertial_dim))
                 contact_batch = contact_batch.reshape((-1, self.num_envs // self.num_mini_batches, 1))
                 contact_mask = contact_batch.bool().squeeze(-1)
 
@@ -399,8 +399,8 @@ class PPO:
 
                 obs_ROA_batch = self.get_obs_ROA(obs_batch)
 
-                estimator_true_data = self.filter_for_estimation(obs_batch, contact_mask)
-
+                # estimator_true_data = self.filter_for_estimation(obs_batch, contact_mask)
+                estimator_true_data = privileged_batch[contact_mask]
                 """
                 For model update, we'll use
                 1. action batch except last action -> splicing

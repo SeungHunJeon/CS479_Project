@@ -122,7 +122,7 @@ class VectorizedEnvironment {
     return environments_[0]->get_target_pos();
   }
 
-  void get_environmental_value(Eigen::Ref<EigenRowMajorMat> &value){
+  void getPrivilegedInformation(Eigen::Ref<EigenRowMajorMat> &value){
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       environments_[i]->get_env_value(value.row(i));
