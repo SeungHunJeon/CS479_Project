@@ -217,6 +217,7 @@ for update in range(iteration_number, 1000000):
         data_mean = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
         data_square_sum = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
+
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
         # env.turn_on_visualization()

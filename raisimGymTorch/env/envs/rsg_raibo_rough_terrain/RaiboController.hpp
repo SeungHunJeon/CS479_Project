@@ -306,9 +306,10 @@ class RaiboController {
       command_ = {position(0), position(1), 0};
     else
       command_ = {position(0), position(1), position(2)};
-    desired_pos_ = baseRot_.e() * command_.cast<double>();
-    desired_pos_ += current_pos_;
-    desired_pos_(2) = 0;
+    desired_pos_ = command_.cast<double>();
+//
+//    desired_pos_ += current_pos_;
+//    desired_pos_(2) = 0;
 
     is_achieved = false;
 
@@ -473,6 +474,7 @@ class RaiboController {
   }
 
   inline void setRewardConfig(const Yaml::Node &cfg) {
+    READ_YAML(bool, is_multiobject_, cfg["MultiObject"])
     READ_YAML(double, towardObjectRewardCoeff_, cfg["reward"]["towardObjectRewardCoeff_"])
     READ_YAML(double, stayObjectRewardCoeff_, cfg["reward"]["stayObjectRewardCoeff_"])
     READ_YAML(double, towardTargetRewardCoeff_, cfg["reward"]["towardTargetRewardCoeff_"])
@@ -485,6 +487,10 @@ class RaiboController {
     READ_YAML(double, stayTargetHeadingRewardCoeff_alpha_, cfg["reward"]["stayTargetHeadingRewardCoeff_alpha_"])
     READ_YAML(double, stayTargetRewardCoeff_alpha_, cfg["reward"]["stayTargetRewardCoeff_alpha_"])
     READ_YAML(double, stayTargetExtrinsicRewardCoeff_, cfg["reward"]["stayTargetExtrinsicRewardCoeff_"])
+
+    /// If multi object condition, dismiss the orientation reward
+    if(is_multiobject_)
+      stayTargetHeadingRewardCoeff_ = 0.;
   }
 
   void updateObject(raisim::SingleBodyObject* obj) {
@@ -572,13 +578,22 @@ class RaiboController {
 
     else
     {
-      stayTargetExtrinsicReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(stayTargetRewardCoeff_alpha_ * -stay_t);
+      stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * exp(stayTargetRewardCoeff_alpha_ * -stay_t);
+      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
+          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
       if (stay_t < 0.05)
-        stayTargetExtrinsicReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(0);
+        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * exp(0);
+      if (stay_t_heading > 0.985)
+        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+
     }
 
     intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;
     extrinsicReward_ = stayTargetExtrinsicReward_;
+  }
+
+  void get_privileged_information(Eigen::Ref<EigenVec> &privileged_information) {
+    privileged_information = Obj_Info_.tail(privilegedDim_).cast<float>();
   }
 
   void set_History(std::vector<Eigen::VectorXd> &obj_info_history,
@@ -643,6 +658,7 @@ class RaiboController {
   int historyNum_ = 19;
   int actionNum_ = 20;
   int obBlockDim_ = 0;
+  int privilegedDim_ = 16;
 
   static constexpr size_t obDim_ = 1640;
 
@@ -654,6 +670,7 @@ class RaiboController {
   static constexpr int gvDim_ = 18;
   static constexpr int nPosHist_ = 3;
   static constexpr int nVelHist_ = 4;
+
   raisim::SingleBodyObject* Obj_;
   static constexpr int nJoints_ = 12;
   static constexpr int is_foot_contact_ = 0;
@@ -716,6 +733,8 @@ class RaiboController {
 
   // For testing
   bool is_success_ = false;
+
+  bool is_multiobject_ = true;
 
   // reward variables
   double towardObjectRewardCoeff_ = 0., towardObjectReward_ = 0.;

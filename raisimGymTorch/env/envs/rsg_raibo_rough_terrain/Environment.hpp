@@ -29,7 +29,7 @@ class ENVIRONMENT {
   explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable, int id) :
       visualizable_(visualizable) {
     setSeed(id);
-
+    READ_YAML(bool, is_multiobject_, cfg["MultiObject"])
     READ_YAML(double, curriculumFactor_, cfg["curriculum"]["initial_factor"])
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
@@ -109,8 +109,8 @@ class ENVIRONMENT {
       command_Obj_ = server_->addVisualBox("command_Obj_", 0.5, 0.5, command_object_height_, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       command_Obj_->setOrientation(command_Obj_quat_);
-      target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
-      command_ball_ = server_->addVisualSphere("command_Ball", 0.1, 0, 1, 0, 1.0);
+//      target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
+      command_ball_ = server_->addVisualArrow("command_Arrow_", 0.2, 0.2, 1.0, 0.0, 0.0, 1.0);
       com_pos_ = server_->addVisualSphere("com_pos", 0.05, 0, 0.5, 0.5, 1.0);
       com_noisify_ = server_->addVisualSphere("com_nosify_pos", 0.05, 1.0, 0.5, 0.5, 1.0);
     }
@@ -190,7 +190,10 @@ class ENVIRONMENT {
   }
 
   void reset() {
-    object_type = intuniDist_(gen_);
+    if(is_multiobject_)
+      object_type = intuniDist_(gen_);
+    else
+      object_type = 2;
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
     if(curriculumFactor_ > 0.5)
@@ -234,14 +237,7 @@ class ENVIRONMENT {
 //      Low_controller_.setCommand(command);
 //    }
 
-    if(visualizable_)
-    {
-      if(is_position_goal)
-        target_pos_->setPosition(Low_controller_.getTargetPosition());
-      command_ball_->setPosition(controller_.get_desired_pos());
-      com_pos_->setPosition(controller_.get_com_pos());
-      com_noisify_->setPosition(controller_.get_noisify_com_pos());
-    }
+
     float dummy;
     int howManySteps;
     int lowlevelSteps;
@@ -370,6 +366,41 @@ class ENVIRONMENT {
     if(is_position_goal)
       Low_controller_.updateHistory();
 
+    if(visualizable_)
+    {
+      Eigen::Vector3d arrow_pos = raibo_->getBasePosition().e();
+      arrow_pos(2) += 0.1;
+      double arrow_angle = atan2(controller_.get_desired_pos()(1), controller_.get_desired_pos()(0));
+
+      double robot_angle = atan2((raibo_->getBaseOrientation().e()(0) - raibo_->getBaseOrientation().e()(1))/2, (raibo_->getBaseOrientation().e()(1) + raibo_->getBaseOrientation().e()(0))/2);
+      raisim::Mat<3,3> arrow_rotation_matrix;
+      arrow_rotation_matrix = {cos(arrow_angle), -sin(arrow_angle), 0,
+                               sin(arrow_angle), cos(arrow_angle), 0,
+                               0, 0, 1};
+
+      raisim::Mat<3,3> initial_matrix;
+      initial_matrix = {cos(M_PI/2), 0, sin(M_PI/2),
+                        0, 1, 0,
+                        -sin(M_PI/2), 0, cos(M_PI/2)};
+
+      raisim::Mat<3,3> robot_rotation_matrix = {
+          cos(robot_angle), -sin(robot_angle), 0,
+          sin(robot_angle), cos(robot_angle), 0,
+          0, 0, 1
+      };
+
+//      double robot_angle =
+      raisim::Mat<3,3> temp;
+      temp = initial_matrix  * robot_rotation_matrix * arrow_rotation_matrix;
+      raisim::Vec<4> arrow_quat;
+      raisim::rotMatToQuat(temp, arrow_quat);
+      command_ball_->setPosition(arrow_pos);
+      command_ball_->setOrientation(arrow_quat.e());
+
+      com_pos_->setPosition(controller_.get_com_pos());
+      com_noisify_->setPosition(controller_.get_noisify_com_pos());
+    }
+
     world_.integrate1();
     if(server_) server_->lockVisualizationServerMutex();
     world_.integrate2();
@@ -416,14 +447,7 @@ class ENVIRONMENT {
   }
 
   void get_env_value(Eigen::Ref<EigenVec> value){
-    value.segment(0,1) << Obj_->getMass();
-    value.segment(1,3) << Obj_->getCom().e().cast<float>();
-    value.segment(4,3) << Obj_->getInertiaMatrix_B().row(0).cast<float>();
-    value.segment(7,3) << Obj_->getInertiaMatrix_B().row(1).cast<float>();
-    value.segment(10,3) << Obj_->getInertiaMatrix_B().row(2).cast<float>();
-    value.segment(13,1) << friction;
-    value.segment(14,1) << air_damping;
-    value.segment(15,1) << controller_.getContact();
+    controller_.get_privileged_information(value);
   }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
@@ -465,7 +489,7 @@ class ENVIRONMENT {
   Eigen::Vector3d command_;
   bool visualizable_ = false;
   bool is_discrete_ = false;
-  int object_type = 0;
+  int object_type = 2;
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_;
   controller::raibotPositionController Low_controller_;
@@ -478,7 +502,7 @@ class ENVIRONMENT {
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
   raisim::SingleBodyObject *Obj_, *Manipulate_;
-  raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_, *command_ball_, *com_pos_, *com_noisify_;
+  raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *command_ball_, *com_pos_, *com_noisify_;
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
@@ -489,6 +513,7 @@ class ENVIRONMENT {
   double object_radius;
   int radial_ = 0;
   int tangential_ = 0;
+  bool is_multiobject_ = true;
 
 
   thread_local static std::mt19937 gen_;

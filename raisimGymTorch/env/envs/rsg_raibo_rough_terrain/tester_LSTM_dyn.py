@@ -302,7 +302,7 @@ else:
                 if(is_rollout == False):
                     obs = env.observe(False)
                     contact = env.get_contact()
-
+                    privilege_info = env.get_privileged_info()
                     obs_ROA = get_obs_ROA(Encoder, obs)
 
 
@@ -313,14 +313,7 @@ else:
 
                     if (contact[0]):
                         inertia_predict = Estimator.predict(latent_ROA[0])
-                        inertia_true = obs[0,
-                                       (Encoder.architecture.block_dim)*(historyNum-1) +
-                                       Encoder.architecture.pro_dim +
-                                       Encoder.architecture.ext_dim -
-                                       inertial_dim:
-                                       (Encoder.architecture.block_dim)*(historyNum-1) +
-                                       Encoder.architecture.pro_dim +
-                                       Encoder.architecture.ext_dim]
+                        inertia_true = privilege_info[0]
 
                         print(inertia_predict)
                         print(inertia_true)

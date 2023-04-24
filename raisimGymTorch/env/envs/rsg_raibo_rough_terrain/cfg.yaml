@@ -3,6 +3,7 @@ seed: 2
 task_name: "Multi Object"
 name: ""
 environment:
+  MultiObject: False
   Rollout: False
   position_goal: False
   discrete_action: False
@@ -35,9 +36,9 @@ environment:
     towardObjectRewardCoeff_: 1
     stayObjectRewardCoeff_: 1
     towardTargetRewardCoeff_: 2
-    stayTargetRewardCoeff_: 5
+    stayTargetRewardCoeff_: 4
     stayObjectHeadingRewardCoeff_ : 1
-    stayTargetHeadingRewardCoeff_ : 0
+    stayTargetHeadingRewardCoeff_ : 2
     stayTargetHeadingRewardCoeff_alpha_ : 1
     stayTargetRewardCoeff_alpha_ : 10
     stayTargetExtrinsicRewardCoeff_: 10
