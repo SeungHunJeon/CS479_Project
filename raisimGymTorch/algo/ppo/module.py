@@ -197,7 +197,7 @@ class Transformer(nn.Module):
     def reset(self):
         return True
 class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_minibatch, num_env, layer_num, device):
+    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_minibatch, num_env, layer_num, device, is_decouple=False):
         super(LSTM, self).__init__()
         self.ext_dim = ext_dim
         self.pro_dim = pro_dim
@@ -210,8 +210,14 @@ class LSTM(nn.Module):
         self.layer_num = layer_num
         self.num_env = num_env
         self.batch_num = batch_num
-        self.input_dim = input_dim
         self.num_minibatch = num_minibatch
+        self.is_decouple = is_decouple
+
+        if(self.is_decouple):
+            self.input_dim = input_dim
+
+        else:
+            self.input_dim = input_dim*self.hist_num
 
         self.block_dim = ext_dim + pro_dim + dyn_info_dim + act_dim
 
@@ -225,11 +231,15 @@ class LSTM(nn.Module):
         self.output_shape = [hidden_dim]
         self.h_0 = None
         self.c_0 = None
-        self.input_dim *= self.hist_num
 
     # Forward function is for encode one-step observation which incorporates number of (high-level controller frequency) / (low-level controller frequency)
     def forward(self, obs):
-        inputs = obs.reshape(-1, self.num_env, int(self.input_dim / self.hist_num))
+        if(self.is_decouple):
+            inputs = obs.reshape((self.num_env, -1, self.input_dim))
+            inputs = torch.permute(inputs, (1, 0, 2))
+
+        else:
+            inputs = obs.reshape(-1, self.num_env, self.input_dim)
 
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
@@ -247,8 +257,14 @@ class LSTM(nn.Module):
     # Forward_update is for encode 1-iteration whole-step observation which incorporates number of
     # (number of step) * (high-level controller frequency) / (low-level controller frequency)
     def forward_update(self, obs):
-        inputs = obs.reshape((-1, self.num_env, int(self.input_dim / self.hist_num)))
+        # inputs = obs.reshape((-1, self.num_env, int(self.input_dim / self.hist_num)))
+        if(self.is_decouple):
+            inputs = torch.permute(obs, (1,0,2)) # 40 300 5*a -> 300 40 5*a
+            inputs = torch.reshape(inputs, (self.num_env // self.num_minibatch, -1, self.input_dim)) # 300 200 a
+            inputs = torch.permute(inputs, (1,0,2)) # 200 300 a
 
+        else:
+            inputs = obs.reshape((-1, self.num_env, self.input_dim))
 
         # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
 

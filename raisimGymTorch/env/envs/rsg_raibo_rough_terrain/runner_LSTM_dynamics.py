@@ -73,6 +73,7 @@ Encoder_ob_dim = historyNum * (pro_dim + ext_dim + act_dim)
 hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
 layerNum = cfg['LSTM']['numLayer_']
+is_decouple = cfg['LSTM']['isDecouple_']
 
 # ROA Encoding
 ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
@@ -119,7 +120,8 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           batch_num=batchNum,
                                                           layer_num=layerNum,
                                                           num_minibatch = num_mini_batches,
-                                                          num_env=env.num_envs), device=device)
+                                                          num_env=env.num_envs,
+                                                              is_decouple=is_decouple), device=device)
 
 Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                           hidden_dim=hidden_dim,
@@ -133,7 +135,8 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_
                           layer_num=layerNum,
                           device=device,
                           num_minibatch = num_mini_batches,
-                          num_env=env.num_envs), device=device)
+                          num_env=env.num_envs,
+                                                          is_decouple=is_decouple), device=device)
 
 pytorch_total_params = sum(p.numel() for p in Encoder.architecture.parameters())
 
@@ -180,7 +183,7 @@ ppo = PPO.PPO(actor=actor,
 iteration_number = 0
 
 
-wandb.init(group="jsh",project=task_name,name=name)
+# wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -306,7 +309,7 @@ for update in range(iteration_number, 1000000):
 
     end = time.time()
 
-    wandb.log(data_log)
+    # wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))

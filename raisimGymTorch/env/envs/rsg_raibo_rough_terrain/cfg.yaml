@@ -84,6 +84,7 @@ LSTM:
   hiddendim_: 96
   batchNum_: 1
   numLayer_: 2
+  isDecouple_: False
 
 architecture:
   policy_net: [128, 64]
