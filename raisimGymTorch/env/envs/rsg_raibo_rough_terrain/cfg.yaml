@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
 task_name: "Random_Object_encod_LSTM_dyn"
-name: "Latent dim 128, orientation term update"
+name: ""
 environment:
   Rollout: False
   position_goal: False
