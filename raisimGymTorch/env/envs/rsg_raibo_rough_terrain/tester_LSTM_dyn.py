@@ -301,10 +301,22 @@ else:
             with torch.no_grad():
                 if(is_rollout == False):
                     obs = env.observe(False)
+                    contact = env.get_contact()
+                    privilege_info = env.get_privileged_info()
                     obs_ROA = get_obs_ROA(Encoder, obs)
+
+
+
                     latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
                     action_ll = actor.architecture(latent_ROA, actor=True).cpu().numpy()
                     # action_ll, actions_log_prob = actor.sample(latent_ROA)
+
+                    if (contact[0]):
+                        inertia_predict = Estimator.predict(latent_ROA[0])
+                        inertia_true = privilege_info[0]
+
+                        print(inertia_predict)
+                        print(inertia_true)
 
                     # For action plotting
                     y[idx] = action_ll[0][0]

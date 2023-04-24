@@ -29,7 +29,7 @@ class ENVIRONMENT {
   explicit ENVIRONMENT(const std::string &resourceDir, const Yaml::Node &cfg, bool visualizable, int id) :
       visualizable_(visualizable) {
     setSeed(id);
-
+    READ_YAML(bool, is_multiobject_, cfg["MultiObject"])
     READ_YAML(double, curriculumFactor_, cfg["curriculum"]["initial_factor"])
     READ_YAML(double, curriculumDecayFactor_, cfg["curriculum"]["decay_factor"])
     READ_YAML(double, low_level_control_dt_, cfg["low_level_control_dt"])
@@ -45,6 +45,7 @@ class ENVIRONMENT {
 
     world_.addGround(0.0, "ground");
     world_.setDefaultMaterial(1.1, 0.0, 0.01);
+    world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
 
     /// add objects
     raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
@@ -108,8 +109,8 @@ class ENVIRONMENT {
       command_Obj_ = server_->addVisualBox("command_Obj_", 0.5, 0.5, command_object_height_, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       command_Obj_->setOrientation(command_Obj_quat_);
-      target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
-      command_ball_ = server_->addVisualSphere("command_Ball", 0.1, 0, 1, 0, 1.0);
+//      target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
+      command_ball_ = server_->addVisualArrow("command_Arrow_", 0.2, 0.2, 1.0, 0.0, 0.0, 1.0);
       com_pos_ = server_->addVisualSphere("com_pos", 0.05, 0, 0.5, 0.5, 1.0);
       com_noisify_ = server_->addVisualSphere("com_nosify_pos", 0.05, 1.0, 0.5, 0.5, 1.0);
     }
@@ -178,28 +179,30 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void hard_reset () {
-    friction = 1.1 + 0.2*curriculumFactor_ * normDist_(gen_);
-    if (std::abs(friction - 1.1) > 0.3)
-      friction = 1.1;
-    world_.setMaterialPairProp("ground", "object", friction, 0.0, 0.01);
+    friction = 0.6 + 0.2*curriculumFactor_ * 2 * (uniDist_(gen_) - 0.5);
+    world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
 
     /// Update Object damping coefficient
     /// Deprecated (box doesn't necessary)
-//    Obj_->setAngularDamping({1.5*friction/1.1, 2.0*friction/1.1, 2.0*friction/1.1});
-//    Obj_->setLinearDamping(0.6*friction/1.1);
+    air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
+    Obj_->setAngularDamping({air_damping, air_damping, air_damping});
+    Obj_->setLinearDamping(air_damping);
   }
 
   void reset() {
-//    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
-
-    object_type = 2;
+    if(is_multiobject_)
+      object_type = intuniDist_(gen_);
+    else
+      object_type = 2;
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
     if(curriculumFactor_ > 0.5)
       hard_reset();
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
-    controller_.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction);
+    controller_.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction, air_damping);
+    Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
+    controller_.updateClassifyvector(temp);
     if(is_position_goal) {
       Low_controller_.reset(&world_);
       controller_.updateStateVariables();
@@ -234,14 +237,7 @@ class ENVIRONMENT {
 //      Low_controller_.setCommand(command);
 //    }
 
-    if(visualizable_)
-    {
-      if(is_position_goal)
-        target_pos_->setPosition(Low_controller_.getTargetPosition());
-      command_ball_->setPosition(controller_.get_desired_pos());
-      com_pos_->setPosition(controller_.get_com_pos());
-      com_noisify_->setPosition(controller_.get_noisify_com_pos());
-    }
+
     float dummy;
     int howManySteps;
     int lowlevelSteps;
@@ -303,8 +299,9 @@ class ENVIRONMENT {
     x += gc_init_[0];
     y += gc_init_[1];
 
-    Obj_->setPosition(x, y, object_height/2);
-    Obj_->setOrientation(1, 0, 0, 0);
+    phi_ = uniDist_(gen_) * M_PI * 2;;
+    Obj_->setPosition(x, y, object_height/2+1e-2);
+    Obj_->setOrientation(cos(phi_/2), 0, 0, sin(phi_/2));
     Obj_->setVelocity(0,0,0,0,0,0);
 
     /// Update Object damping coefficient
@@ -369,6 +366,41 @@ class ENVIRONMENT {
     if(is_position_goal)
       Low_controller_.updateHistory();
 
+    if(visualizable_)
+    {
+      Eigen::Vector3d arrow_pos = raibo_->getBasePosition().e();
+      arrow_pos(2) += 0.1;
+      double arrow_angle = atan2(controller_.get_desired_pos()(1), controller_.get_desired_pos()(0));
+
+      double robot_angle = atan2((raibo_->getBaseOrientation().e()(0) - raibo_->getBaseOrientation().e()(1))/2, (raibo_->getBaseOrientation().e()(1) + raibo_->getBaseOrientation().e()(0))/2);
+      raisim::Mat<3,3> arrow_rotation_matrix;
+      arrow_rotation_matrix = {cos(arrow_angle), -sin(arrow_angle), 0,
+                               sin(arrow_angle), cos(arrow_angle), 0,
+                               0, 0, 1};
+
+      raisim::Mat<3,3> initial_matrix;
+      initial_matrix = {cos(M_PI/2), 0, sin(M_PI/2),
+                        0, 1, 0,
+                        -sin(M_PI/2), 0, cos(M_PI/2)};
+
+      raisim::Mat<3,3> robot_rotation_matrix = {
+          cos(robot_angle), -sin(robot_angle), 0,
+          sin(robot_angle), cos(robot_angle), 0,
+          0, 0, 1
+      };
+
+//      double robot_angle =
+      raisim::Mat<3,3> temp;
+      temp = initial_matrix  * robot_rotation_matrix * arrow_rotation_matrix;
+      raisim::Vec<4> arrow_quat;
+      raisim::rotMatToQuat(temp, arrow_quat);
+      command_ball_->setPosition(arrow_pos);
+      command_ball_->setOrientation(arrow_quat.e());
+
+      com_pos_->setPosition(controller_.get_com_pos());
+      com_noisify_->setPosition(controller_.get_noisify_com_pos());
+    }
+
     world_.integrate1();
     if(server_) server_->lockVisualizationServerMutex();
     world_.integrate2();
@@ -386,6 +418,10 @@ class ENVIRONMENT {
     ob = obScaled_.cast<float>();
   }
 
+  bool get_contact() {
+    return controller_.getContact();
+  }
+
   bool isTerminalState(float& terminalReward) {
 //    return controller_.isTerminalState(terminalReward);
     return false;
@@ -401,9 +437,9 @@ class ENVIRONMENT {
 //    object_type = (object_type+1) % 3; /// rotate ground type for a visualization purpose
     curriculumFactor_ = std::pow(curriculumFactor_, curriculumDecayFactor_);
     /// create heightmap
-    updateObstacle(true);
-    Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
-    controller_.updateClassifyvector(temp);
+//    updateObstacle(true);
+//    Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
+//    controller_.updateClassifyvector(temp);
   }
 
   bool check_success() {
@@ -411,14 +447,7 @@ class ENVIRONMENT {
   }
 
   void get_env_value(Eigen::Ref<EigenVec> value){
-
-    value.head(3) << objectGenerator_.get_geometry().cast<float>();
-    value.segment(3,3) << Obj_->getInertiaMatrix_B().row(0).cast<float>();
-    value.segment(6,3) << Obj_->getInertiaMatrix_B().row(1).cast<float>();
-    value.segment(9,3) << Obj_->getInertiaMatrix_B().row(2).cast<float>();
-    value.segment(12,3) << Obj_->getBodyToComPosition_rs().e().cast<float>();
-    value(15) = Obj_->getMass();
-    value(16)= friction ;
+    controller_.get_privileged_information(value);
   }
 
   void moveControllerCursor(Eigen::Ref<EigenVec> pos) {
@@ -440,8 +469,9 @@ class ENVIRONMENT {
 
  protected:
   bool is_position_goal = true;
-  double obj_mass = 2.0;
-  double friction = 1.1;
+  double obj_mass = 6.0;
+  double friction = 0.6;
+  double air_damping = 0.5;
   static constexpr int nJoints_ = 12;
   raisim::World world_;
   double simulation_dt_;
@@ -449,7 +479,7 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 0.3;
+  double bound_ratio = 0.5;
   raisim::ArticulatedSystem* raibo_;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;
@@ -459,7 +489,7 @@ class ENVIRONMENT {
   Eigen::Vector3d command_;
   bool visualizable_ = false;
   bool is_discrete_ = false;
-  int object_type = 0;
+  int object_type = 2;
   RandomHeightMapGenerator terrainGenerator_;
   RaiboController controller_;
   controller::raibotPositionController Low_controller_;
@@ -472,7 +502,7 @@ class ENVIRONMENT {
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
   raisim::SingleBodyObject *Obj_, *Manipulate_;
-  raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *target_pos_, *command_ball_, *com_pos_, *com_noisify_;
+  raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *command_ball_, *com_pos_, *com_noisify_;
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
@@ -483,14 +513,17 @@ class ENVIRONMENT {
   double object_radius;
   int radial_ = 0;
   int tangential_ = 0;
+  bool is_multiobject_ = true;
 
 
   thread_local static std::mt19937 gen_;
   thread_local static std::normal_distribution<double> normDist_;
   thread_local static std::uniform_real_distribution<double> uniDist_;
+  thread_local static std::uniform_int_distribution<int> intuniDist_;
 };
 
 thread_local std::mt19937 raisim::ENVIRONMENT::gen_;
 thread_local std::normal_distribution<double> raisim::ENVIRONMENT::normDist_(0., 1.);
 thread_local std::uniform_real_distribution<double> raisim::ENVIRONMENT::uniDist_(0., 1.);
+thread_local std::uniform_int_distribution<int> raisim::ENVIRONMENT::intuniDist_(0, 2);
 }

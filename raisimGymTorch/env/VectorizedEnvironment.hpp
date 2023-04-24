@@ -122,7 +122,7 @@ class VectorizedEnvironment {
     return environments_[0]->get_target_pos();
   }
 
-  void get_environmental_value(Eigen::Ref<EigenRowMajorMat> &value){
+  void getPrivilegedInformation(Eigen::Ref<EigenRowMajorMat> &value){
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
       environments_[i]->get_env_value(value.row(i));
@@ -186,6 +186,13 @@ class VectorizedEnvironment {
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) {
     environments_[0]->getState(gc, gv);
+  }
+
+  void getContact(Eigen::Ref<EigenBoolVec> &contact) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < num_envs_; i++) {
+      contact[i] = environments_[i]->get_contact();
+    }
   }
 
   void getState_Rollout(Eigen::Ref<EigenRowMajorMat> gc, Eigen::Ref<EigenRowMajorMat> gv) {

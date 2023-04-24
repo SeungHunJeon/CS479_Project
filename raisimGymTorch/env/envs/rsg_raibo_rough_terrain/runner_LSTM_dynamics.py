@@ -73,6 +73,7 @@ Encoder_ob_dim = historyNum * (pro_dim + ext_dim + act_dim)
 hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
 layerNum = cfg['LSTM']['numLayer_']
+is_decouple = cfg['LSTM']['isDecouple_']
 
 # ROA Encoding
 ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
@@ -119,7 +120,8 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           batch_num=batchNum,
                                                           layer_num=layerNum,
                                                           num_minibatch = num_mini_batches,
-                                                          num_env=env.num_envs), device=device)
+                                                          num_env=env.num_envs,
+                                                              is_decouple=is_decouple), device=device)
 
 Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                           hidden_dim=hidden_dim,
@@ -133,7 +135,8 @@ Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_
                           layer_num=layerNum,
                           device=device,
                           num_minibatch = num_mini_batches,
-                          num_env=env.num_envs), device=device)
+                          num_env=env.num_envs,
+                                                          is_decouple=is_decouple), device=device)
 
 pytorch_total_params = sum(p.numel() for p in Encoder.architecture.parameters())
 
@@ -214,6 +217,7 @@ for update in range(iteration_number, 1000000):
         data_mean = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
         data_square_sum = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
+
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
         # env.turn_on_visualization()
@@ -246,6 +250,9 @@ for update in range(iteration_number, 1000000):
         with torch.no_grad():
             obs = env.observe(update < 10000)
 
+            contact = env.get_contact()
+            privileged_info = env.get_privileged_info()
+
             # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
             latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
 
@@ -255,7 +262,7 @@ for update in range(iteration_number, 1000000):
 
             reward, dones = env.step(action)
 
-            ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones)
+            ppo.step(value_obs=latent, obs=obs, rews=reward, dones=dones, contact=contact, privileged_info=privileged_info)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
             # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
