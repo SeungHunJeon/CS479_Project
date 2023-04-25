@@ -200,8 +200,12 @@ class RaiboController {
     raisim::Mat<3,3> command_Obj_Rot_;
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
     double stay_t_heading  = abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
-    if(obj_to_target.head(2).norm() < 0.05)
-      is_success_ = true;
+    if(is_multiobject_)
+      if(obj_to_target.head(2).norm() < 0.05)
+        is_success_ = true;
+    else
+      if(obj_to_target.head(2).norm() < 0.05 && stay_t_heading > 0.98)
+        is_success_ = true;
 
     std::rotate(success_batch_.begin(), success_batch_.begin()+1, success_batch_.end());
     success_batch_[success_batch_num_ - 1] = is_success_;
@@ -425,8 +429,9 @@ class RaiboController {
   [[nodiscard]] bool isTerminalState(float &terminalReward) {
     terminalReward = float(terminalRewardCoeff_);
 
-    if(std::find(success_batch_.begin(), success_batch_.end(), false) == success_batch_.end())
-      return true;
+    return is_success_;
+//    if(std::find(success_batch_.begin(), success_batch_.end(), false) == success_batch_.end())
+//      return true;
 
     terminalReward = 0.f;
 
@@ -558,7 +563,7 @@ class RaiboController {
 
     /// gathers intrinsic reward & extrinsic reward
     /// if the distance between object and target below threshold, from that moment, we doesn't consider the intrinsic reward (saturate)
-    if(obj_to_target.norm() < 0.1 && is_contact)
+    if(obj_to_target.norm() < 0.2 && is_contact)
     {
       intrinsic_switch = false;
     }
@@ -585,6 +590,7 @@ class RaiboController {
         stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * exp(0);
       if (stay_t_heading > 0.985)
         stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+
 
     }
 
@@ -741,7 +747,7 @@ class RaiboController {
   double stayObjectRewardCoeff_ = 0., stayObjectReward_ = 0.;
   double towardTargetRewardCoeff_ = 0., towardTargetReward_ = 0.;
   double stayTargetRewardCoeff_ = 0., stayTargetReward_ = 0., stayTargetExtrinsicReward_ = 0., stayTargetExtrinsicRewardCoeff_ = 0., stayTargetRewardCoeff_alpha_ = 0.;
-  double terminalRewardCoeff_ = 0.0;
+  double terminalRewardCoeff_ = 1000.0;
   double commandsmoothRewardCoeff_ = 0., commandsmoothReward_ = 0.;
   double commandsmooth2RewardCoeff_ = 0., commandsmooth2Reward_ = 0.;
   double torqueRewardCoeff_ = 0., torqueReward_ = 0.;

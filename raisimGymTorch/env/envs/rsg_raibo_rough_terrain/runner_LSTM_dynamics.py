@@ -83,6 +83,7 @@ n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['contro
 total_steps = n_steps * env.num_envs
 num_learning_epochs = 16
 num_mini_batches = 1
+Domain_Randomization = cfg['environment']['Domain_Randomization']
 
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
@@ -123,6 +124,21 @@ Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_
                                                           num_env=env.num_envs,
                                                               is_decouple=is_decouple), device=device)
 
+Encoder_DR = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
+                                                             hidden_dim=hidden_dim,
+                                                             ext_dim=ROA_ext_dim,
+                                                             pro_dim=pro_dim,
+                                                             act_dim=act_dim,
+                                                             dyn_info_dim=dynamics_info_dim,
+                                                             dyn_predict_dim=dynamics_predict_dim,
+                                                             hist_num=historyNum,
+                                                             device=device,
+                                                             batch_num=batchNum,
+                                                             layer_num=layerNum,
+                                                             num_minibatch = num_mini_batches,
+                                                             num_env=env.num_envs,
+                                                             is_decouple=is_decouple), device=device)
+
 Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                           hidden_dim=hidden_dim,
                           ext_dim=ext_dim,
@@ -159,6 +175,7 @@ saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name
 ppo = PPO.PPO(actor=actor,
               critic=critic,
               encoder=Encoder,
+              encoder_DR=Encoder_DR,
               obj_f_dynamics=obj_f_dynamics,
               latent_f_dynamics=latent_f_dynamics,
               num_envs=cfg['environment']['num_envs'],
@@ -193,6 +210,7 @@ for update in range(iteration_number, 1000000):
     start = time.time()
     env.reset()
     Encoder.architecture.reset()
+    Encoder_DR.architecture.reset()
     Encoder_ROA.architecture.reset()
     reward_ll_sum = 0
     done_sum = 0
@@ -206,6 +224,7 @@ for update in range(iteration_number, 1000000):
             'actor_distribution_state_dict': actor.distribution.state_dict(),
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'Encoder_state_dict' : Encoder.architecture.state_dict(),
+            'Encoder_DR_state_dict' : Encoder_DR.architecture.state_dict(),
             'Encoder_ROA_state_dict' : Encoder_ROA.architecture.state_dict(),
             'Inertial_estimator': Estimator.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
@@ -228,10 +247,10 @@ for update in range(iteration_number, 1000000):
                 obs = env.observe(False)
 
                 # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
-                latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
-                filtered_obs = ppo.filter_for_encode_from_obs(obs)
-                # print(latent)
-                # print(latent.shape)
+                if(Domain_Randomization):
+                    latent = Encoder_DR.evaluate(ppo.get_obs_ROA(obs).to(device))
+                else:
+                    latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
                 actions, actions_log_prob = actor.sample(latent)
                 reward, dones = env.step_visualize(actions)
                 data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
@@ -241,6 +260,7 @@ for update in range(iteration_number, 1000000):
         # env.turn_off_visualization()
         env.reset()
         Encoder.architecture.reset()
+        Encoder_DR.architecture.reset()
         Encoder_ROA.architecture.reset()
         env.save_scaling(saver.data_dir, str(update))
 
@@ -254,7 +274,10 @@ for update in range(iteration_number, 1000000):
             privileged_info = env.get_privileged_info()
 
             # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
-            latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
+            if(Domain_Randomization):
+                latent = Encoder_DR.evaluate(ppo.get_obs_ROA(obs).to(device))
+            else:
+                latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
 
             latent = latent.detach().cpu().numpy()
 
@@ -272,7 +295,11 @@ for update in range(iteration_number, 1000000):
     obs2 = env.observe(update < 10000)
     with torch.no_grad():
         # latent = Encoder.evaluate(torch.from_numpy(obs2).to(device))
-        latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs2).to(device))
+        if(Domain_Randomization):
+            latent = Encoder_DR.evaluate(ppo.get_obs_ROA(obs2).to(device))
+        else:
+            latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs2).to(device))
+        # latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs2).to(device))
         latent = latent.detach().cpu().numpy()
 
     ppo.update(actor_obs=latent, value_obs=latent, log_this_iteration=update % 10 == 0, update=update)

@@ -374,24 +374,24 @@ class ENVIRONMENT {
 
       double robot_angle = atan2((raibo_->getBaseOrientation().e()(0) - raibo_->getBaseOrientation().e()(1))/2, (raibo_->getBaseOrientation().e()(1) + raibo_->getBaseOrientation().e()(0))/2);
       raisim::Mat<3,3> arrow_rotation_matrix;
-      arrow_rotation_matrix = {cos(arrow_angle), -sin(arrow_angle), 0,
-                               sin(arrow_angle), cos(arrow_angle), 0,
+      arrow_rotation_matrix = {cos(arrow_angle), sin(arrow_angle), 0,
+                               -sin(arrow_angle), cos(arrow_angle), 0,
                                0, 0, 1};
 
       raisim::Mat<3,3> initial_matrix;
-      initial_matrix = {cos(M_PI/2), 0, sin(M_PI/2),
+      initial_matrix = {cos(M_PI/2), 0, -sin(M_PI/2),
                         0, 1, 0,
-                        -sin(M_PI/2), 0, cos(M_PI/2)};
+                        sin(M_PI/2), 0, cos(M_PI/2)};
 
       raisim::Mat<3,3> robot_rotation_matrix = {
-          cos(robot_angle), -sin(robot_angle), 0,
-          sin(robot_angle), cos(robot_angle), 0,
+          cos(robot_angle), sin(robot_angle), 0,
+          -sin(robot_angle), cos(robot_angle), 0,
           0, 0, 1
       };
 
 //      double robot_angle =
       raisim::Mat<3,3> temp;
-      temp = initial_matrix  * robot_rotation_matrix * arrow_rotation_matrix;
+      temp = raibo_->getBaseOrientation() * arrow_rotation_matrix * initial_matrix;
       raisim::Vec<4> arrow_quat;
       raisim::rotMatToQuat(temp, arrow_quat);
       command_ball_->setPosition(arrow_pos);
@@ -423,8 +423,8 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float& terminalReward) {
-//    return controller_.isTerminalState(terminalReward);
-    return false;
+    return controller_.isTerminalState(terminalReward);
+//    return false;
   }
 
   void setSeed(int seed) {
