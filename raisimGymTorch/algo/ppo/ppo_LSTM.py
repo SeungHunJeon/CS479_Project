@@ -427,7 +427,8 @@ class PPO:
                 latent_ROA = self.encode_ROA(obs_ROA_batch)
                 latent_ROA_d = latent_ROA.clone().detach()
 
-                latent_DR = self.encoder_DR.evaluate_update(obs_ROA_batch)
+                if(self.domain_randomization):
+                    latent_DR = self.encoder_DR.evaluate_update(obs_ROA_batch)
 
 
 

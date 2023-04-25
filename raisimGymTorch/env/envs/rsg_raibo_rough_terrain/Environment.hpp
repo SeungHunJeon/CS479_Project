@@ -283,17 +283,22 @@ class ENVIRONMENT {
 
     object_radius = objectGenerator_.get_dist();
 
-    double x, y, x_command, y_command, offset;
+    double x, y, x_command, y_command, offset, dist;
     double phi_;
-    offset = 1.0;
+    offset = 0.5;
+//    dist = uniDist_(gen_) * curriculumFactor_;
+    dist = uniDist_(gen_);
     phi_ = uniDist_(gen_);
-    x = (object_radius + offset*2)*cos(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
-    y = (object_radius + offset*2)*sin(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
+    x = (object_radius + offset + dist * 3)*cos(phi_*2*M_PI);
+    y = (object_radius + offset + dist * 3)*sin(phi_*2*M_PI);
 
     while (sqrt(std::pow(x,2) + std::pow(y,2)) < (object_radius + offset))
     {
-      x = (object_radius + offset*2)*cos(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
-      y = (object_radius + offset*2)*sin(phi_*2*M_PI) + normDist_(gen_)*0.5*curriculumFactor_;
+//      dist = uniDist_(gen_) * curriculumFactor_;
+      dist = uniDist_(gen_);
+      phi_ = uniDist_(gen_);
+      x = (object_radius + offset + dist * 3)*cos(phi_*2*M_PI);
+      y = (object_radius + offset + dist * 3)*sin(phi_*2*M_PI);
     }
 
     x += gc_init_[0];
@@ -310,9 +315,10 @@ class ENVIRONMENT {
 //    Obj_->setLinearDamping(0.5);
 
     phi_ = uniDist_(gen_);
-
-    x_command = x + sqrt(2)*cos(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
-    y_command = y + sqrt(2)*sin(phi_*2*M_PI) + normDist_(gen_)*1*curriculumFactor_;
+    dist = uniDist_(gen_) * 2;
+//    dist = uniDist_(gen_) * curriculumFactor_ * 2;
+    x_command = x + (offset + dist)*cos(phi_*2*M_PI);
+    y_command = y + (offset + dist)*sin(phi_*2*M_PI);
 
 
 
@@ -423,8 +429,8 @@ class ENVIRONMENT {
   }
 
   bool isTerminalState(float& terminalReward) {
-    return controller_.isTerminalState(terminalReward);
-//    return false;
+//    return controller_.isTerminalState(terminalReward);
+    return false;
   }
 
   void setSeed(int seed) {

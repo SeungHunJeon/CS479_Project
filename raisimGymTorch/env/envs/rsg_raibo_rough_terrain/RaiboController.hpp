@@ -364,6 +364,8 @@ class RaiboController {
     command_Obj_quat_ = command_obj_quat_;
     obj_geometry_ = obj_geometry;
 
+    Obj_->getPosition(Obj_Pos_);
+    distance = (command_obj_pos_.head(2) - Obj_Pos_.e().head(2)).norm();
     is_success_ = false;
     is_achieved = true;
     contact_switch = false;
@@ -563,18 +565,20 @@ class RaiboController {
 
     /// gathers intrinsic reward & extrinsic reward
     /// if the distance between object and target below threshold, from that moment, we doesn't consider the intrinsic reward (saturate)
-    if(obj_to_target.norm() < 0.2 && is_contact)
+    /// If reached rate == 0 => the object reached the target postion
+    double reached_rate = stay_t / distance;
+    if(reached_rate < 0.5)
     {
       intrinsic_switch = false;
     }
 
     if (intrinsic_switch) {
-      towardObjectReward_ += cf * towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
-      stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
-      stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
-      towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
-      stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
-      stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
+      towardObjectReward_ += towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
+      stayObjectReward_ += stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
+      stayObjectHeadingReward_ += stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
+      towardTargetReward_ += towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
+      stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(reached_rate + 0.05));
+      stayTargetHeadingReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
           * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
       commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
       commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
@@ -583,15 +587,17 @@ class RaiboController {
 
     else
     {
-      stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * exp(stayTargetRewardCoeff_alpha_ * -stay_t);
+      stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(reached_rate + 0.05);
       stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
           * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
       if (stay_t < 0.05)
-        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * exp(0);
+      {
+        double bound_rate = 0.05 / distance;
+        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
+      }
+
       if (stay_t_heading > 0.985)
         stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
-
-
     }
 
     intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;
@@ -723,6 +729,7 @@ class RaiboController {
   raisim::Mat<3,3> Obj_Rot_, Tar_Rot_;
   raisim::Vec<3> ee_Pos_w_, ee_Vel_w_, ee_Avel_w_;
   raisim::Mat<3,3> eeRot_w_;
+  double distance = 0.;
   bool is_contact = false;
   bool contact_switch = false;
   std::vector<Eigen::Vector2d> command_library_;
