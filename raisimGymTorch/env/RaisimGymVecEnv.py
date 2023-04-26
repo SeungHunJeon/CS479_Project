@@ -23,7 +23,8 @@ class RaisimGymVecEnv:
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
         self._done = np.zeros(self.num_envs, dtype=np.bool)
-        self._success = np.zeros(self.num_envs, dtype=np.bool)
+        self._success = np.zeros(self.num_envs, dtype=bool)
+        self._switch = np.zeros(self.num_envs, dtype=bool)
         self._contact = np.zeros(self.num_envs, dtype=np.bool)
         self._env_val = np.zeros([self.num_envs, 16], dtype=np.float32)
         # 0-2 : H W D / 3-11 : Inertia row1+row2+row3 / 12-14 : COM / 15 : Mass / 16 : friction
@@ -128,6 +129,13 @@ class RaisimGymVecEnv:
         self.wrapper.getSuccess(self._success)
 
         return self._success
+
+    def get_intrinsic_switch(self):
+        self.wrapper.getIntrinsicSwitch(self._switch)
+
+        return self._switch
+
+
 
     def get_contact(self):
         self.wrapper.getContact(self._contact)

@@ -180,7 +180,14 @@ class VectorizedEnvironment {
   void getSuccess(Eigen::Ref<EigenBoolVec> &success) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i< num_envs_; i++) {
-      success[i] = environments_[i]->check_success();
+      environments_[i]->check_success(success[i]);
+    }
+  }
+
+  void getIntrinsicSwitch(Eigen::Ref<EigenBoolVec> &intrinsic_switch) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i< num_envs_; i++) {
+       environments_[i]->check_intrinsic_switch(intrinsic_switch[i]);
     }
   }
 

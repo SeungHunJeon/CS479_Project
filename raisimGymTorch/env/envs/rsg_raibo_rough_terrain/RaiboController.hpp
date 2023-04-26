@@ -203,7 +203,7 @@ class RaiboController {
     if(is_multiobject_)
       if(obj_to_target.head(2).norm() < 0.05)
         is_success_ = true;
-    else
+      else
       if(obj_to_target.head(2).norm() < 0.05 && stay_t_heading > 0.98)
         is_success_ = true;
 
@@ -369,6 +369,7 @@ class RaiboController {
     is_success_ = false;
     is_achieved = true;
     contact_switch = false;
+    intrinsic_switch = true;
     friction_ = friction;
     air_damping = damping;
     pre_command_.setZero();
@@ -423,7 +424,7 @@ class RaiboController {
     intrinsicReward_ = 0.;
     extrinsicReward_ = 0.;
     stayTargetExtrinsicReward_ = 0.;
-    intrinsic_switch = true;
+//    intrinsic_switch = true;
 
     return float(stepData_.tail(2).sum());
   }
@@ -567,7 +568,7 @@ class RaiboController {
     /// if the distance between object and target below threshold, from that moment, we doesn't consider the intrinsic reward (saturate)
     /// If reached rate == 0 => the object reached the target postion
     double reached_rate = stay_t / distance;
-    if(reached_rate < 0.5)
+    if(stay_t < 0.2)
     {
       intrinsic_switch = false;
     }
@@ -577,7 +578,7 @@ class RaiboController {
       stayObjectReward_ += stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
       stayObjectHeadingReward_ += stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
       towardTargetReward_ += towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
-      stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(reached_rate + 0.05));
+      stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(stay_t + 0.05));
       stayTargetHeadingReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
           * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
       commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
@@ -587,13 +588,14 @@ class RaiboController {
 
     else
     {
-      stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(reached_rate + 0.05);
+      stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
       stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
           * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
       if (stay_t < 0.05)
       {
-        double bound_rate = 0.05 / distance;
-        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
+        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
+//        double bound_rate = 0.05 / distance;
+//        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
       }
 
       if (stay_t_heading > 0.985)
@@ -638,8 +640,12 @@ class RaiboController {
   [[nodiscard]] static constexpr double getSimDt() { return simDt_; }
   [[nodiscard]] static constexpr double getConDt() { return conDt_; }
 
-  bool is_success() {
-    return is_success_;
+  void is_success(bool &success) {
+    success = is_success_;
+  }
+
+  void get_intrinsic_switch(bool &switch_){
+    switch_ = not intrinsic_switch;
   }
 
   void getState(Eigen::Ref<EigenVec> gc, Eigen::Ref<EigenVec> gv) { gc = gc_.cast<float>(); gv = gv_.cast<float>(); }

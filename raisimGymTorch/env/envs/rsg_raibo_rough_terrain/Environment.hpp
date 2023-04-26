@@ -313,12 +313,11 @@ class ENVIRONMENT {
     /// Deprecated (box doesn't necessary)
 //    Obj_->setAngularDamping({1.0,1.0,1.0});
 //    Obj_->setLinearDamping(0.5);
-
     phi_ = uniDist_(gen_);
     dist = uniDist_(gen_) * 2;
 //    dist = uniDist_(gen_) * curriculumFactor_ * 2;
-    x_command = x + (offset + dist)*cos(phi_*2*M_PI);
-    y_command = y + (offset + dist)*sin(phi_*2*M_PI);
+    x_command = x + (0.3 + dist)*cos(phi_*2*M_PI);
+    y_command = y + (0.3 + dist)*sin(phi_*2*M_PI);
 
 
 
@@ -361,7 +360,9 @@ class ENVIRONMENT {
   }
 
   void subStep() {
-    if(controller_.is_success()) {
+    bool success;
+    controller_.is_success(success);
+    if(success) {
       Obj_->setAppearance("0, 0, 1, 0.7");
     }
 
@@ -448,8 +449,12 @@ class ENVIRONMENT {
 //    controller_.updateClassifyvector(temp);
   }
 
-  bool check_success() {
-    return controller_.is_success();
+  void check_success(bool& success) {
+    controller_.is_success(success);
+  }
+
+  void check_intrinsic_switch(bool& switch_) {
+    controller_.get_intrinsic_switch(switch_);
   }
 
   void get_env_value(Eigen::Ref<EigenVec> value){

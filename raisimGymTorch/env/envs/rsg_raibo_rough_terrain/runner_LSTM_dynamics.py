@@ -214,7 +214,11 @@ for update in range(iteration_number, 1000000):
     Encoder_ROA.architecture.reset()
     reward_ll_sum = 0
     done_sum = 0
+    switch_sum = 0
+    success_sum = 0
     average_dones = 0.
+    success_batch = np.zeros(shape=(env.num_envs), dtype=bool)
+    switch_batch = np.zeros(shape=(env.num_envs), dtype=bool)
 #
     if update % cfg['environment']['eval_every_n'] == 0:
         print("Visualizing and evaluating the current policy")
@@ -236,7 +240,6 @@ for update in range(iteration_number, 1000000):
         data_mean = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
         data_square_sum = np.zeros(shape=(len(data_tags), 1), dtype=np.double)
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
-
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
         # env.turn_on_visualization()
@@ -269,7 +272,9 @@ for update in range(iteration_number, 1000000):
     for step in range(n_steps):
         with torch.no_grad():
             obs = env.observe(update < 10000)
-
+            success_batch = np.logical_or(success_batch, env.get_success_state())
+            # print(success_batch)
+            switch_batch = np.logical_or(switch_batch, env.get_intrinsic_switch())
             contact = env.get_contact()
             privileged_info = env.get_privileged_info()
 
@@ -307,15 +312,15 @@ for update in range(iteration_number, 1000000):
 
     ### For logging encoder (LSTM)
     # wandb.watch(Encoder.architecture)
-
-
+    success_sum = np.sum(success_batch)
+    switch_sum = np.sum(switch_batch)
     average_ll_performance = reward_ll_sum / total_steps
     average_dones = done_sum / total_steps
     actor.distribution.enforce_minimum_std((torch.ones(act_dim)*(0.6*math.exp(-0.0002*update) + 0.4)).to(device))
     # actor.distribution.enforce_minimum_std((torch.ones(1)*(0.06*math.exp(-0.0002*update) + 0.04)).to(device))
     actor.update()
 
-    if update % 100 == 0:
+    if (success_sum / env.num_envs) * 100 > 10:
         env.curriculum_callback()
 
     if update % 10 == 0:
@@ -349,4 +354,6 @@ for update in range(iteration_number, 1000000):
     print('{:<40} {:>6}'.format("fps: ", '{:6.0f}'.format(total_steps / (end - start))))
     print('{:<40} {:>6}'.format("real time factor: ", '{:6.0f}'.format(total_steps / (end - start)
                                                                        * cfg['environment']['control_dt'])))
+    print('{:<40} {:>6}'.format("intrinsic switch off rate (%): ", '{:0.3f}'.format((switch_sum / env.num_envs)*100)))
+    print('{:<40} {:>6}'.format("success rate (%): ", '{:0.3f}'.format((success_sum / env.num_envs)*100)))
     print('----------------------------------------------------\n')

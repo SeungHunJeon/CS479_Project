@@ -17,7 +17,7 @@ environment:
   control_dt: 0.2
   #  low_level_control_dt: 0.005
   low_level_control_dt: 0.01
-  max_time: 12.0
+  max_time: 20.0
   entropy_coeff: 1e-2
   nSamples_: 300
   nHorizon_: 30
