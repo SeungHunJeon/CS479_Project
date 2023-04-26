@@ -536,5 +536,5 @@ class ENVIRONMENT {
 thread_local std::mt19937 raisim::ENVIRONMENT::gen_;
 thread_local std::normal_distribution<double> raisim::ENVIRONMENT::normDist_(0., 1.);
 thread_local std::uniform_real_distribution<double> raisim::ENVIRONMENT::uniDist_(0., 1.);
-thread_local std::uniform_int_distribution<int> raisim::ENVIRONMENT::intuniDist_(0, 2);
+thread_local std::uniform_int_distribution<int> raisim::ENVIRONMENT::intuniDist_(1, 2);
 }

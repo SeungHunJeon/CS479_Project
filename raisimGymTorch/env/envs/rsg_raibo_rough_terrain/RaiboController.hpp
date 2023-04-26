@@ -201,7 +201,7 @@ class RaiboController {
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
     double stay_t_heading  = abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
     if(is_multiobject_)
-      if(obj_to_target.head(2).norm() < 0.05)
+      if(obj_to_target.head(2).norm() < 0.03)
         is_success_ = true;
       else
       if(obj_to_target.head(2).norm() < 0.05 && stay_t_heading > 0.98)
@@ -553,7 +553,7 @@ class RaiboController {
     /// align object to the desired orientation (extrinsic)
     raisim::Mat<3,3> command_Obj_Rot_;
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
-    double stay_t_heading  = abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
+    double stay_t_heading  = 1 - abs(Obj_Rot_.e().row(0).head(2).dot(command_Obj_Rot_.e().row(0).head(2))/(Obj_Rot_.e().row(0).head(2).norm()*command_Obj_Rot_.e().row(0).head(2).norm() + 1e-8));
 //    stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
 //        * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
 
@@ -579,8 +579,8 @@ class RaiboController {
       stayObjectHeadingReward_ += stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
       towardTargetReward_ += towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
       stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(stay_t + 0.05));
-      stayTargetHeadingReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
-          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+      stayTargetHeadingReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * (-log(stay_t_heading + 0.05))
+          * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
       commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
       commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
       torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
@@ -589,7 +589,7 @@ class RaiboController {
     else
     {
       stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
+      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05)
           * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
       if (stay_t < 0.05)
       {
@@ -598,8 +598,8 @@ class RaiboController {
 //        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
       }
 
-      if (stay_t_heading > 0.985)
-        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * exp(1) * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+      if (stay_t_heading < 0.015)
+        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
     }
 
     intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;

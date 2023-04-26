@@ -4,7 +4,7 @@ task_name: "Multi_Object"
 name: ""
 environment:
   Domain_Randomization: False
-  MultiObject: True
+  MultiObject: False
   Rollout: False
   position_goal: False
   discrete_action: False

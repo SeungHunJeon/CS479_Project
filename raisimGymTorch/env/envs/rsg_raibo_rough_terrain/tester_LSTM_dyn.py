@@ -244,6 +244,9 @@ else:
     for i in range (int(int(iteration_number) / 100)):
         env.curriculum_callback()
 
+    for i in range(100):
+        env.curriculum_callback()
+
     traj_sampler = mppi.MPPI(latent_f_dynamics=latent_f_dynamics,
                              obj_f_dynamics=obj_f_dynamics,
                              encoder=Encoder,
@@ -266,7 +269,7 @@ else:
 
 
     for i in range (100):
-        # env.curriculum_callback()
+
         env.reset()
 
         # env_value = env.get_envrionmental_value()
@@ -278,18 +281,19 @@ else:
         idx = 0
         x = []
         y = []
-        x = np.linspace(0, 36, 180)
-        y = np.zeros(180)
-        y2 = np.zeros(180)
-        y3 = np.zeros(180)
+
+        x = np.linspace(0, total_steps, total_steps*5)
+        y = np.zeros(total_steps*5)
+        y2 = np.zeros(total_steps*5)
+        y3 = np.zeros(total_steps*5)
         plt.ion()
         figure, ax = plt.subplots(nrows=3, ncols=1, figsize=(8,6))
         line1, = ax[0].plot(x,y)
         line2, = ax[1].plot(x,y2)
         line3, = ax[2].plot(x,y3)
-        ax[0].set_xlim(0, 36)
-        ax[1].set_xlim(0, 36)
-        ax[2].set_xlim(0, 36)
+        ax[0].set_xlim(0, total_steps)
+        ax[1].set_xlim(0, total_steps)
+        ax[2].set_xlim(0, total_steps)
         ax[0].set_ylim(-5, 5)
         ax[1].set_ylim(-5, 5)
         ax[2].set_ylim(-5, 5)
@@ -315,8 +319,8 @@ else:
                         inertia_predict = Estimator.predict(latent_ROA[0])
                         inertia_true = privilege_info[0]
 
-                        print(inertia_predict)
-                        print(inertia_true)
+                        # print(inertia_predict)
+                        # print(inertia_true)
 
                     # For action plotting
                     y[idx] = action_ll[0][0]
