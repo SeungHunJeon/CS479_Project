@@ -573,6 +573,11 @@ class RaiboController {
       intrinsic_switch = false;
     }
 
+    else
+    {
+      intrinsic_switch = true;
+    }
+
     if (intrinsic_switch) {
       towardObjectReward_ += towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
       stayObjectReward_ += stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
@@ -593,13 +598,17 @@ class RaiboController {
           * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
       if (stay_t < 0.05)
       {
-        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
+//        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
+        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
 //        double bound_rate = 0.05 / distance;
 //        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
       }
 
-      if (stay_t_heading < 0.015)
-        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
+//      if (stay_t_heading < 0.015)
+//      {
+//        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
+//      }
+
     }
 
     intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;

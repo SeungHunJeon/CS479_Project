@@ -179,14 +179,18 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void hard_reset () {
-    friction = 0.6 + 0.2*curriculumFactor_ * 2 * (uniDist_(gen_) - 0.5);
+    friction = 0.6 + 0.2*curriculumFactor_ * (uniDist_(gen_) - 0.5);
     world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
 
     /// Update Object damping coefficient
     /// Deprecated (box doesn't necessary)
-    air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
-    Obj_->setAngularDamping({air_damping, air_damping, air_damping});
-    Obj_->setLinearDamping(air_damping);
+    if(is_multiobject_)
+    {
+      air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
+      Obj_->setAngularDamping({air_damping, air_damping, air_damping});
+      Obj_->setLinearDamping(air_damping);
+    }
+
   }
 
   void reset() {
