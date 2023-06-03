@@ -241,8 +241,8 @@ else:
     print('ww')
     env.turn_on_visualization()
     print('ww')
-    for i in range (int(int(iteration_number) / 100)):
-        env.curriculum_callback()
+    # for i in range (int(int(iteration_number) / 100)):
+    #     env.curriculum_callback()
 
     # for i in range(100):
     #     env.curriculum_callback()

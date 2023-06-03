@@ -50,7 +50,7 @@ environment:
 
   dimension:
     proprioceptiveDim_: 15
-    exteroceptiveDim_: 37
+    exteroceptiveDim_: 40
     inertialparamDim_: 16
     dynamicsInfoDim_: 27
     dynamicsPredictDim_: 30
