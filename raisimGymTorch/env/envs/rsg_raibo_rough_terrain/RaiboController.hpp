@@ -644,8 +644,8 @@ class RaiboController {
       stayObjectHeadingReward_ += stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
       towardTargetReward_ += towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
       stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(stay_t + 0.05));
-      stayTargetHeadingReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * (-log(stay_t_heading + 0.05))
-          * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
+//      stayTargetHeadingReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * (-log(stay_t_heading + 0.05))
+//          * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
       commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
       commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
       torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
@@ -654,12 +654,14 @@ class RaiboController {
     else
     {
       stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05)
-          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+//      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05)
+//          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(std::min(0.3,stay_t_heading) + 0.05);
       if (stay_t < 0.05)
       {
 //        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
+//        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
+        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(std::min(0.3,stay_t_heading) + 0.05);
 //        double bound_rate = 0.05 / distance;
 //        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
       }

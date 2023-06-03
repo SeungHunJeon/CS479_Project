@@ -39,7 +39,7 @@ environment:
     towardTargetRewardCoeff_: 2
     stayTargetRewardCoeff_: 4
     stayObjectHeadingRewardCoeff_ : 1
-    stayTargetHeadingRewardCoeff_ : 2
+    stayTargetHeadingRewardCoeff_ : 4
     stayTargetHeadingRewardCoeff_alpha_ : 1
     stayTargetRewardCoeff_alpha_ : 10
     stayTargetExtrinsicRewardCoeff_: 10

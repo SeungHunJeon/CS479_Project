@@ -226,9 +226,9 @@ else:
                                                                                cfg['seed']),
                              device)
 
-    Encoder_Rollout.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
-    actor_Rollout.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
-    actor_Rollout.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
+    # Encoder_Rollout.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
+    # actor_Rollout.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
+    # actor_Rollout.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
     actor.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
     actor.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
