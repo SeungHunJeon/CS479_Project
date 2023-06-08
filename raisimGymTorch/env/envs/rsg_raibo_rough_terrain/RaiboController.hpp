@@ -612,7 +612,7 @@ class RaiboController {
     double obj_to_target_heading_cos = obj_x_axis_norm.dot(target_x_axis_norm);
     double obj_to_target_heading_sin = obj_x_axis_norm(0)*target_x_axis_norm(1) - obj_x_axis_norm(1) * target_x_axis_norm(0);
 
-    double stay_t_heading  = -(obj_to_target_heading_cos - 1) / 2; /// 0 (align), 1 (180)
+    double stay_t_heading  = acos(obj_to_target_heading_cos) / M_PI; /// 0 (align), 1 (180)
 //    double stay_t_heading = 0;
 //    stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
 //        * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
@@ -656,12 +656,12 @@ class RaiboController {
       stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
 //      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05)
 //          * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
-      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(std::min(0.3,stay_t_heading) + 0.05);
+      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05);
       if (stay_t < 0.05)
       {
 //        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
 //        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
-        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(std::min(0.3,stay_t_heading) + 0.05);
+        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05);
 //        double bound_rate = 0.05 / distance;
 //        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
       }
