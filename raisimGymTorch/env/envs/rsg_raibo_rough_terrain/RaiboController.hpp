@@ -200,25 +200,25 @@ class RaiboController {
     raisim::Mat<3,3> command_Obj_Rot_;
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
 
-    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().col(0);
-    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
-    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().col(0);
-    base_x_axis(2) = 0;
-    obj_x_axis(2) = 0;
-    target_x_axis(2) = 0;
-    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
-    Eigen::Vector3d obj_x_axis_norm = obj_x_axis.normalized();
-    Eigen::Vector3d target_x_axis_norm = target_x_axis.normalized();
+    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().row(0);
+    Eigen::Vector3d base_x_axis = baseRot_.e().row(0);
+    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().row(0);
+//    base_x_axis(2) = 0;
+//    obj_x_axis(2) = 0;
+//    target_x_axis(2) = 0;
+//    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
+//    Eigen::Vector3d obj_x_axis_norm = obj_x_axis.normalized();
+//    Eigen::Vector3d target_x_axis_norm = target_x_axis.normalized();
 //    double stay_t_heading  = std::abs(std::acos(Eigen::Vector3d::UnitX().dot(((obj_x_axis_norm - base_x_axis_norm) + Eigen::Vector3d::UnitX()).normalized()))); /// 1 (align), -1 (180);
 
-    double robot_to_obj_heading_cos = base_x_axis_norm.dot(obj_x_axis_norm);
-    double robot_to_obj_heading_sin = (base_x_axis_norm(0)*obj_x_axis_norm(1) - base_x_axis_norm(1)*obj_x_axis_norm(0));
+    double robot_to_obj_heading_cos = base_x_axis.dot(obj_x_axis);
+    double robot_to_obj_heading_sin = (base_x_axis(0)*obj_x_axis(1) - base_x_axis(1)*obj_x_axis(0));
 
-    double robot_to_target_heading_cos = base_x_axis_norm.dot(target_x_axis_norm);
-    double robot_to_target_heading_sin = base_x_axis_norm(0)*target_x_axis_norm(1) - base_x_axis_norm(1)*target_x_axis_norm(0);
+    double robot_to_target_heading_cos = base_x_axis.dot(target_x_axis);
+    double robot_to_target_heading_sin = base_x_axis(0)*target_x_axis(1) - base_x_axis(1)*target_x_axis(0);
 
-    double obj_to_target_heading_cos = obj_x_axis_norm.dot(target_x_axis_norm);
-    double obj_to_target_heading_sin = obj_x_axis_norm(0)*target_x_axis_norm(1) - obj_x_axis_norm(1) * target_x_axis_norm(0);
+    double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
+    double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
 
     if(is_multiobject_)
     {
@@ -592,25 +592,24 @@ class RaiboController {
     raisim::Mat<3,3> command_Obj_Rot_;
     raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
 
-    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().col(0);
-    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
-    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().col(0);
-    base_x_axis(2) = 0;
-    obj_x_axis(2) = 0;
-    target_x_axis(2) = 0;
-    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
-    Eigen::Vector3d obj_x_axis_norm = obj_x_axis.normalized();
-    Eigen::Vector3d target_x_axis_norm = target_x_axis.normalized();
-//    double stay_t_heading  = std::abs(std::acos(Eigen::Vector3d::UnitX().dot(((obj_x_axis_norm - base_x_axis_norm) + Eigen::Vector3d::UnitX()).normalized()))); /// 1 (align), -1 (180);
+    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().row(0);
+    Eigen::Vector3d base_x_axis = baseRot_.e().row(0);
+    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().row(0);
+//    base_x_axis(2) = 0;
+//    obj_x_axis(2) = 0;
+//    target_x_axis(2) = 0;
+//    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
+//    Eigen::Vector3d obj_x_axis_norm = obj_x_axis.normalized();
+//    Eigen::Vector3d target_x_axis_norm = target_x_axis.normalized();
 
-    double robot_to_obj_heading_cos = base_x_axis_norm.dot(obj_x_axis_norm);
-    double robot_to_obj_heading_sin = (base_x_axis_norm(0)*obj_x_axis_norm(1) - base_x_axis_norm(1)*obj_x_axis_norm(0));
+    double robot_to_obj_heading_cos = base_x_axis.dot(obj_x_axis);
+    double robot_to_obj_heading_sin = (base_x_axis(0)*obj_x_axis(1) - base_x_axis(1)*obj_x_axis(0));
 
-    double robot_to_target_heading_cos = base_x_axis_norm.dot(target_x_axis_norm);
-    double robot_to_target_heading_sin = base_x_axis_norm(0)*target_x_axis_norm(1) - base_x_axis_norm(1)*target_x_axis_norm(0);
+    double robot_to_target_heading_cos = base_x_axis.dot(target_x_axis);
+    double robot_to_target_heading_sin = base_x_axis(0)*target_x_axis(1) - base_x_axis(1)*target_x_axis(0);
 
-    double obj_to_target_heading_cos = obj_x_axis_norm.dot(target_x_axis_norm);
-    double obj_to_target_heading_sin = obj_x_axis_norm(0)*target_x_axis_norm(1) - obj_x_axis_norm(1) * target_x_axis_norm(0);
+    double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
+    double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
 
     double stay_t_heading  = acos(obj_to_target_heading_cos) / M_PI; /// 0 (align), 1 (180)
 //    double stay_t_heading = 0;
