@@ -320,7 +320,7 @@ for update in range(iteration_number, 1000000):
     # actor.distribution.enforce_minimum_std((torch.ones(1)*(0.06*math.exp(-0.0002*update) + 0.04)).to(device))
     actor.update()
 
-    if (success_sum / env.num_envs) * 100 > 10:
+    if (success_sum / env.num_envs) * 100 > 30 and (update % 10 == 0):
         env.curriculum_callback()
 
     if update % 10 == 0:

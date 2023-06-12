@@ -53,10 +53,11 @@ class ENVIRONMENT {
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
     /// Object spawn
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, obj_mass, 0.5, 0.55, 1.0, 1.0);
+                                           normDist_, bound_ratio, obj_mass, 0.5, object_height, object_width_1, object_width_2);
 
-    object_height = objectGenerator_.get_height();
-    Obj_->setPosition(2, 2, object_height/2);
+
+    double height = objectGenerator_.get_height();
+    Obj_->setPosition(2, 2, height/2);
     Obj_->setOrientation(1, 0, 0, 0);
     /// create controller
     controller_.create(&world_, Obj_);
@@ -184,12 +185,12 @@ class ENVIRONMENT {
 
     /// Update Object damping coefficient
     /// Deprecated (box doesn't necessary)
-    if(is_multiobject_)
-    {
-      air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
-      Obj_->setAngularDamping({air_damping, air_damping, air_damping});
-      Obj_->setLinearDamping(air_damping);
-    }
+//    if(is_multiobject_)
+//    {
+//      air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
+//      Obj_->setAngularDamping({air_damping, air_damping, air_damping});
+//      Obj_->setLinearDamping(air_damping);
+//    }
 
   }
 
@@ -280,10 +281,10 @@ class ENVIRONMENT {
 
     world_.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, obj_mass, 0.5, 0.55, 1.0, 1.0);
+                                           normDist_, bound_ratio, obj_mass, 0.5, object_height, object_width_1, object_width_2);
     Obj_->setAppearance("0, 1, 0, 0.3");
     controller_.updateObject(Obj_);
-    object_height = objectGenerator_.get_height();
+    double height = objectGenerator_.get_height();
 
     object_radius = objectGenerator_.get_dist();
 
@@ -309,7 +310,7 @@ class ENVIRONMENT {
     y += gc_init_[1];
 
     phi_ = uniDist_(gen_) * M_PI * 2;;
-    Obj_->setPosition(x, y, object_height/2+1e-2);
+    Obj_->setPosition(x, y, height/2+1e-2);
     Obj_->setOrientation(cos(phi_/2), 0, 0, sin(phi_/2));
     Obj_->setVelocity(0,0,0,0,0,0);
 
@@ -325,7 +326,7 @@ class ENVIRONMENT {
 
 
 
-    command_Obj_Pos_ << x_command, y_command, command_object_height_/2;
+    command_Obj_Pos_ << x_command, y_command, height/2;
 
     double alpha = uniDist_(gen_) * M_PI * 2;
 
@@ -484,7 +485,7 @@ class ENVIRONMENT {
 
  protected:
   bool is_position_goal = true;
-  double obj_mass = 6.0;
+  double obj_mass = 4.0;
   double friction = 0.6;
   double air_damping = 0.5;
   static constexpr int nJoints_ = 12;
@@ -494,7 +495,9 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 0.5;
+  double bound_ratio = 0.3;
+  double object_width_1 = 1.0;
+  double object_width_2 = 1.0;
   raisim::ArticulatedSystem* raibo_;
   raisim::HeightMap* heightMap_;
   Eigen::VectorXd gc_init_, gv_init_, nominalJointConfig_;
@@ -523,7 +526,7 @@ class ENVIRONMENT {
   Eigen::Vector3d Dist_eo_, Dist_og_;
   raisim::Vec<3> Pos_e_;
   int command_order = 0;
-  double object_height = 0.55;
+  double object_height = 0.6;
   double command_object_height_ = 0.55;
   double object_radius;
   int radial_ = 0;

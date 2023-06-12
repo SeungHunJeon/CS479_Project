@@ -21,8 +21,8 @@ environment:
   entropy_coeff: 1e-2
   nSamples_: 300
   nHorizon_: 30
-  obj_mass: 6.0
-  bound_ratio: 0.5
+  obj_mass: 4.0
+  bound_ratio: 0.3
 
   discrete:
     radial: 1
