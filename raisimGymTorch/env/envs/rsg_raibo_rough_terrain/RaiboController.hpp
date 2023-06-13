@@ -134,7 +134,8 @@ class RaiboController {
     classify_vector_ << 1, 0, 0;
     pre_command_.setZero();
     prepre_command_.setZero();
-
+    target_anchor_points.resize(8);
+    object_anchor_points.resize(8);
     success_batch_.resize(success_batch_num_);
 
     return true;
@@ -219,6 +220,9 @@ class RaiboController {
 
     double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
     double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
+
+
+    get_anchor_points(object_anchor_points, Obj_Pos_.e(), Obj_Rot_.e(), obj_geometry_);
 
     if(is_multiobject_)
     {
@@ -328,6 +332,21 @@ class RaiboController {
     return contact_switch;
   }
 
+  void get_anchor_points(std::vector<Eigen::Vector3d>& anchor_points, Eigen::Vector3d COM, Eigen::Matrix3d Rot, Eigen::Vector3d geometry) {
+    /// i for x, j for y, k for z
+    /// Extract 8 points in total.
+    Eigen::Vector3d anchor_point;
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        for (int k = 0; k < 2; k++)
+        {
+          anchor_point = {geometry(0) * (static_cast<double>((i)) - 0.5), geometry(1) * (static_cast<double>((j)) - 0.5), geometry(2) * (static_cast<double>((k)) - 0.5)};
+          anchor_points[4*i + 2*j + k] = COM + Rot.transpose() * anchor_point;
+        }
+      }
+    }
+  }
+
   void getObservation(Eigen::VectorXd &observation) {
     observation = obDouble_;
   }
@@ -399,6 +418,9 @@ class RaiboController {
     command_Obj_quat_ = command_obj_quat_;
     obj_geometry_ = obj_geometry;
 
+    raisim::Mat<3,3> command_obj_rot;
+    raisim::quatToRotMat(command_Obj_quat_, command_obj_rot);
+    get_anchor_points(target_anchor_points, command_Obj_Pos_, command_obj_rot.e(), obj_geometry_);
     Obj_->getPosition(Obj_Pos_);
     distance = (command_obj_pos_.head(2) - Obj_Pos_.e().head(2)).norm();
     is_success_ = false;
@@ -566,7 +588,7 @@ class RaiboController {
     double toward_o = (ee_to_obj * (1. / (ee_to_obj.norm() + 1e-8))).transpose()*(ee_Vel_w_.e() * (1. / (ee_Vel_w_.e().norm() + 1e-8))) - 1;
 //    towardObjectReward_ += cf * towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
 
-    Eigen::Vector3d heading; heading << baseRot_[0], baseRot_[1], 0;
+    Eigen::Vector3d heading = baseRot_.e().col(0);
 
 
 //    raisim::quatToEulerVec()
@@ -578,15 +600,19 @@ class RaiboController {
 
     /// align robot head to the object
     double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 0, min : -1
-//    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
+    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
 
     /// move the object towards the target
     double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;
 //    towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
 
     /// keep the object close to the target (extrinsic)
-    double stay_t = obj_to_target.norm();
-//    stayTargetReward_ += cf * stayTargetRewardCoeff_ * simDt_ * exp(-stay_t);
+    double stay_t = 0;
+    for (int i = 0; i < object_anchor_points.size(); i++) {
+      stay_t += (target_anchor_points[i] - object_anchor_points[i]).norm();
+    }
+    /// Mean value
+    stay_t = stay_t / 8;
 
     /// align object to the desired orientation (extrinsic)
     raisim::Mat<3,3> command_Obj_Rot_;
@@ -611,7 +637,6 @@ class RaiboController {
     double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
     double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
 
-    double stay_t_heading  = acos(obj_to_target_heading_cos) / M_PI; /// 0 (align), 1 (180)
 //    double stay_t_heading = 0;
 //    stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
 //        * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
@@ -640,11 +665,8 @@ class RaiboController {
     if (intrinsic_switch) {
       towardObjectReward_ += towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
       stayObjectReward_ += stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
-//      stayObjectHeadingReward_ += stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
       towardTargetReward_ += towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
       stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(stay_t + 0.05));
-      stayTargetHeadingReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * (-log(stay_t_heading + 0.05))
-          * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
       commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
       commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
       torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
@@ -653,24 +675,10 @@ class RaiboController {
     else
     {
       stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-      stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05);
       if (stay_t < 0.05)
       {
-//        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-//        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
-        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05);
-        if(stay_t_heading < 0.05)
-        {
-          stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-        }
-//        double bound_rate = 0.05 / distance;
-//        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(std::min(reached_rate, bound_rate) + 0.05);
+        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
       }
-
-//      if (stay_t_heading < 0.015)
-//      {
-//        stayTargetExtrinsicReward_ += stayTargetHeadingRewardCoeff_ * simDt_ * -log(stay_t_heading + 0.05) * exp(-stayTargetHeadingRewardCoeff_alpha_ * stay_t);
-//      }
 
     }
 
@@ -809,6 +817,8 @@ class RaiboController {
   double air_damping = 0.5;
 
   // robot observation variables
+  std::vector<Eigen::Vector3d> target_anchor_points;
+  std::vector<Eigen::Vector3d> object_anchor_points;
   std::vector<raisim::VecDyn> heightScan_;
   Eigen::VectorXi scanConfig_;
   Eigen::VectorXd obDouble_;
