@@ -26,7 +26,7 @@ class RaisimGymVecEnv:
         self._success = np.zeros(self.num_envs, dtype=bool)
         self._switch = np.zeros(self.num_envs, dtype=bool)
         self._contact = np.zeros(self.num_envs, dtype=np.bool)
-        self._env_val = np.zeros([self.num_envs, 16], dtype=np.float32)
+        self._env_val = np.zeros([self.num_envs, 19], dtype=np.float32)
         # 0-2 : H W D / 3-11 : Inertia row1+row2+row3 / 12-14 : COM / 15 : Mass / 16 : friction
         self.rewards = [[] for _ in range(self.num_envs)]
         self.wrapper.setSeed(seed)

@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
-task_name: "Multi_Object"
-name: ""
+task_name: "Orientation"
+name: "dismiss geometry"
 environment:
   Domain_Randomization: False
   MultiObject: False
@@ -51,7 +51,7 @@ environment:
   dimension:
     proprioceptiveDim_: 15
     exteroceptiveDim_: 40
-    inertialparamDim_: 16
+    inertialparamDim_: 19
     dynamicsInfoDim_: 27
     dynamicsPredictDim_: 30
     dynamicsInputDim_: 33
