@@ -224,20 +224,22 @@ class RaiboController {
 
     get_anchor_points(object_anchor_points, Obj_Pos_.e(), Obj_Rot_.e(), obj_geometry_);
 
-    if(is_multiobject_)
-    {
-      if(obj_to_target.head(2).norm() < 0.03) {
-        is_success_ = true;
-      }
+//    if(is_multiobject_)
+//    {
+//      if(obj_to_target.head(2).norm() < 0.03) {
+//        is_success_ = true;
+//      }
+//    }
+//
+//    else
+//    {
+//      if(obj_to_target.head(2).norm() < 0.05 && obj_to_target_heading_cos > 0.98) {
+//        is_success_ = true;
+//      }
+//    }
+    if(obj_to_target.head(2).norm() < 0.05 && obj_to_target_heading_cos > 0.98 ) {
+	    is_success_ = true;
     }
-
-    else
-    {
-      if(obj_to_target.head(2).norm() < 0.05 && obj_to_target_heading_cos > 0.98) {
-        is_success_ = true;
-      }
-    }
-
 
     std::rotate(success_batch_.begin(), success_batch_.begin()+1, success_batch_.end());
     success_batch_[success_batch_num_ - 1] = is_success_;

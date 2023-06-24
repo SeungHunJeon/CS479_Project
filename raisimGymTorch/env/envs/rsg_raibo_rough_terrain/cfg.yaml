@@ -1,16 +1,16 @@
 record_video: no
 seed: 2
 task_name: "Orientation"
-name: "dismiss geometry"
+name: "dismiss geometry & shape"
 environment:
   Domain_Randomization: False
-  MultiObject: False
+  MultiObject: True
   Rollout: False
   position_goal: False
   discrete_action: False
   seed: 2
   render: False
-  num_envs: 100
+  num_envs: 500
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.0025

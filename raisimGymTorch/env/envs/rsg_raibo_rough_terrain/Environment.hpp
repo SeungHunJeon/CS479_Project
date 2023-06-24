@@ -53,7 +53,7 @@ class ENVIRONMENT {
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
     /// Object spawn
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, obj_mass, 0.5, object_height, object_width_1, object_width_2);
+                                           normDist_, bound_ratio, obj_mass, object_radius, object_height, object_width_1, object_width_2);
 
 
     double height = objectGenerator_.get_height();
@@ -281,12 +281,12 @@ class ENVIRONMENT {
 
     world_.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
-                                           normDist_, bound_ratio, obj_mass, 0.5, object_height, object_width_1, object_width_2);
+                                           normDist_, bound_ratio, obj_mass, object_radius, object_height, object_width_1, object_width_2);
     Obj_->setAppearance("0, 1, 0, 0.3");
     controller_.updateObject(Obj_);
     double height = objectGenerator_.get_height();
 
-    object_radius = objectGenerator_.get_dist();
+    double object_bound = objectGenerator_.get_dist();
 
     double x, y, x_command, y_command, offset, dist;
     double phi_;
@@ -294,16 +294,16 @@ class ENVIRONMENT {
 //    dist = uniDist_(gen_) * curriculumFactor_;
     dist = uniDist_(gen_);
     phi_ = uniDist_(gen_);
-    x = (object_radius + offset + dist * 3)*cos(phi_*2*M_PI);
-    y = (object_radius + offset + dist * 3)*sin(phi_*2*M_PI);
+    x = (object_bound + offset + dist * 3)*cos(phi_*2*M_PI);
+    y = (object_bound + offset + dist * 3)*sin(phi_*2*M_PI);
 
-    while (sqrt(std::pow(x,2) + std::pow(y,2)) < (object_radius + offset))
+    while (sqrt(std::pow(x,2) + std::pow(y,2)) < (object_bound + offset))
     {
 //      dist = uniDist_(gen_) * curriculumFactor_;
       dist = uniDist_(gen_);
       phi_ = uniDist_(gen_);
-      x = (object_radius + offset + dist * 3)*cos(phi_*2*M_PI);
-      y = (object_radius + offset + dist * 3)*sin(phi_*2*M_PI);
+      x = (object_bound + offset + dist * 3)*cos(phi_*2*M_PI);
+      y = (object_bound + offset + dist * 3)*sin(phi_*2*M_PI);
     }
 
     x += gc_init_[0];
@@ -528,7 +528,7 @@ class ENVIRONMENT {
   int command_order = 0;
   double object_height = 0.6;
   double command_object_height_ = 0.55;
-  double object_radius;
+  double object_radius = 0.4;
   int radial_ = 0;
   int tangential_ = 0;
   bool is_multiobject_ = true;
