@@ -21,8 +21,8 @@ environment:
   entropy_coeff: 1e-2
   nSamples_: 300
   nHorizon_: 30
-  obj_mass: 4.0
-  bound_ratio: 0.3
+  obj_mass: 5.0
+  bound_ratio: 0.5
 
   discrete:
     radial: 1
@@ -51,7 +51,7 @@ environment:
   dimension:
     proprioceptiveDim_: 15
     exteroceptiveDim_: 40
-    inertialparamDim_: 19
+    inertialparamDim_: 22
     dynamicsInfoDim_: 27
     dynamicsPredictDim_: 30
     dynamicsInputDim_: 33

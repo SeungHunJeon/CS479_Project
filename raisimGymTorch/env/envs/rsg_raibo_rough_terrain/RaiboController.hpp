@@ -770,7 +770,7 @@ class RaiboController {
   int historyNum_ = 19;
   int actionNum_ = 20;
   int obBlockDim_ = 0;
-  int privilegedDim_ = 19;
+  int privilegedDim_ = 22;
 
   static constexpr size_t obDim_ = 1700;
 

@@ -15,7 +15,7 @@ class RolloutStorage:
         self.actions = np.zeros([num_transitions_per_env, num_envs, *actions_shape], dtype=np.float32)
         self.dones = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.bool)
         self.contacts = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.bool)
-        self.privileged_infos = np.zeros([num_transitions_per_env, num_envs, 19], dtype=np.float32)
+        self.privileged_infos = np.zeros([num_transitions_per_env, num_envs, 22], dtype=np.float32)
 
         # For PPO
         self.actions_log_prob = np.zeros([num_transitions_per_env, num_envs, 1], dtype=np.float32)
