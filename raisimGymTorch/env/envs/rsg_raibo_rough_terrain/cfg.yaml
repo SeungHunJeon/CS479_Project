@@ -1,7 +1,7 @@
 record_video: no
 seed: 2
 task_name: "Conventional_ROA"
-name: "privileged"
+name: "privileged, add friciton, air damping, 10kg, 0.5 bound"
 environment:
   Domain_Randomization: False
   MultiObject: True
@@ -21,8 +21,8 @@ environment:
   entropy_coeff: 1e-2
   nSamples_: 300
   nHorizon_: 30
-  obj_mass: 4.0
-  bound_ratio: 0.3
+  obj_mass: 10.0
+  bound_ratio: 0.5
 
   discrete:
     radial: 1

@@ -180,16 +180,18 @@ class ENVIRONMENT {
   const Eigen::VectorXd& getStepData() { return controller_.getStepData(); }
 
   void hard_reset () {
-//    friction = 0.6 + 0.2*curriculumFactor_ * (uniDist_(gen_) - 0.5);
-//    world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
+    friction = 0.2 + 0.1*curriculumFactor_ * (uniDist_(gen_) - 0.5);
+    world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
+
+    air_damping = 0.4 + 0.2*curriculumFactor_ * (uniDist_(gen_) - 0.5);
+    Obj_->setAngularDamping({air_damping, air_damping, air_damping});
+    Obj_->setLinearDamping(air_damping);
 
     /// Update Object damping coefficient
     /// Deprecated (box doesn't necessary)
 //    if(is_multiobject_)
 //    {
-//      air_damping = 0.3 + 0.5*curriculumFactor_ * uniDist_(gen_);
-//      Obj_->setAngularDamping({air_damping, air_damping, air_damping});
-//      Obj_->setLinearDamping(air_damping);
+
 //    }
 
   }
@@ -485,8 +487,8 @@ class ENVIRONMENT {
 
  protected:
   bool is_position_goal = true;
-  double obj_mass = 4.0;
-  double friction = 0.6;
+  double obj_mass = 10.0;
+  double friction = 0.2;
   double air_damping = 0.5;
   static constexpr int nJoints_ = 12;
   raisim::World world_;
@@ -495,7 +497,7 @@ class ENVIRONMENT {
   double low_level_control_dt_;
   int gcDim_, gvDim_;
   std::array<size_t, 4> footFrameIndicies_;
-  double bound_ratio = 0.3;
+  double bound_ratio = 0.5;
   double object_width_1 = 1.0;
   double object_width_2 = 1.0;
   raisim::ArticulatedSystem* raibo_;
