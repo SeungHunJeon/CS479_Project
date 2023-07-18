@@ -197,7 +197,7 @@ class Transformer(nn.Module):
     def reset(self):
         return True
 class LSTM(nn.Module):
-    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_minibatch, num_env, layer_num, device, is_decouple=False):
+    def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, inertial_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_minibatch, num_env, layer_num, device, is_decouple=False):
         super(LSTM, self).__init__()
         self.ext_dim = ext_dim
         self.pro_dim = pro_dim
@@ -212,6 +212,7 @@ class LSTM(nn.Module):
         self.batch_num = batch_num
         self.num_minibatch = num_minibatch
         self.is_decouple = is_decouple
+        self.inertial_dim = inertial_dim
 
         if(self.is_decouple):
             self.input_dim = input_dim

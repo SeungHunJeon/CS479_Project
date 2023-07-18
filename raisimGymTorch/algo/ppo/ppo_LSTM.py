@@ -50,7 +50,6 @@ class PPO:
         self.critic = critic
         self.encoder = encoder
         self.encoder_ROA = encoder_ROA
-        self.encoder_DR = encoder_DR
         self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor.obs_shape, critic.obs_shape, obs_shape, actor.action_shape, device)
         self.lambda_ROA = lambda_ROA
         self.lambdaDecayFactor = lambdaDecayFactor
@@ -74,10 +73,6 @@ class PPO:
                                      # *self.decoder.parameters()
                                      ], lr=learning_rate)
 
-        self.optimizer_DR = optim.Adam([*self.actor.parameters(),
-                                     *self.critic.parameters(),
-                                     *self.encoder_DR.parameters()
-                                     ], lr=learning_rate)
 
         # self.dynamics_optimizer = optim.Adam([*self.obj_f_dynamics.parameters(),
         #                                       *self.latent_f_dynamics.parameters()],
@@ -286,11 +281,13 @@ class PPO:
         filtered_obs = []
         for i in range(self.num_history_batch):
             filtered_obs.append(obs_batch[...,
-                                (self.encoder.architecture.block_dim)*i:
                                 (self.encoder.architecture.block_dim)*i
                                 + self.encoder.architecture.pro_dim
                                 + self.encoder.architecture.ext_dim
-                                + self.encoder.architecture.act_dim])
+                                - self.encoder.architecture.inertial_dim:
+                                (self.encoder.architecture.block_dim)*i
+                                + self.encoder.architecture.pro_dim
+                                + self.encoder.architecture.ext_dim])
 
         if isinstance(filtered_obs[0], numpy.ndarray):
             filtered_obs = numpy.concatenate(filtered_obs, axis=-1)
@@ -379,6 +376,51 @@ class PPO:
 
         return estimator_true_data_masked
 
+    def filter_for_actor(self, obs_batch, latent_batch):
+        filtered_obs = []
+
+        filtered_obs.append(obs_batch[...,
+                              (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                              :
+                              (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                              + self.encoder.architecture.pro_dim
+                              + self.encoder.architecture.ext_dim - self.inertial_dim])
+
+        filtered_obs.append(obs_batch[...,
+                            (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                            + self.encoder.architecture.pro_dim
+                            + self.encoder.architecture.ext_dim
+                            :
+                            (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
+                            + self.encoder.architecture.pro_dim
+                            + self.encoder.architecture.ext_dim
+                            + self.encoder.architecture.act_dim])
+
+        if isinstance(filtered_obs[0], numpy.ndarray):
+            filtered_obs = numpy.concatenate(filtered_obs, axis=-1)
+            if isinstance(latent_batch[0], numpy.ndarray):
+                numpy.concatenate([latent_batch, filtered_obs], axis=-1)
+                # filtered_obs = torch.cat(filtered_obs, dim=-1)
+                return numpy.concatenate([latent_batch, filtered_obs], axis=-1)
+
+            if isinstance(latent_batch[0], torch.Tensor):
+                filtered_obs = torch.Tensor(filtered_obs)
+                filtered_obs = filtered_obs.reshape((-1, self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim - self.inertial_dim + self.encoder.architecture.act_dim))
+                filtered_obs = filtered_obs.to(self.device)
+
+                return torch.cat((latent_batch, filtered_obs), dim=-1)
+
+        if isinstance(filtered_obs[0], torch.Tensor):
+            filtered_obs = torch.cat(filtered_obs, dim=-1)
+
+            if isinstance(latent_batch[0], torch.Tensor):
+                # filtered_obs = torch.cat(filtered_obs, dim=-1)
+                filtered_obs = filtered_obs.reshape((-1, self.encoder.architecture.pro_dim + self.encoder.architecture.ext_dim - self.inertial_dim + self.encoder.architecture.act_dim))
+                filtered_obs = filtered_obs.to(self.device)
+
+                return torch.cat((latent_batch, filtered_obs), dim=-1)
+
+
     def _train_step(self, log_this_iteration):
         mean_value_loss = 0
         mean_surrogate_loss = 0
@@ -402,7 +444,6 @@ class PPO:
 
                 self.encoder.architecture.reset()
                 self.encoder_ROA.architecture.reset()
-                self.encoder_DR.architecture.reset()
 
 
 
@@ -427,9 +468,6 @@ class PPO:
                 latent_ROA = self.encode_ROA(obs_ROA_batch)
                 latent_ROA_d = latent_ROA.clone().detach()
 
-                if(self.domain_randomization):
-                    latent_DR = self.encoder_DR.evaluate_update(obs_ROA_batch)
-
 
 
                 # latent_f_dyn_input, latent_f_dyn_predict_true = self.filter_for_latent_f_dynamics_from_obs(obs_batch, latent_d)
@@ -451,12 +489,10 @@ class PPO:
                 lambda_loss_ROA = self.lambda_ROA * self.criteria(latent, latent_ROA_d)
                 loss_ROA = self.criteria(latent_d, latent_ROA)
 
-                if(self.domain_randomization):
-                    actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent_DR, actions_batch)
-                    value_batch = self.critic.evaluate(latent_DR)
-                else:
-                    actions_log_prob_batch, entropy_batch = self.actor.evaluate(latent, actions_batch)
-                    value_batch = self.critic.evaluate(latent)
+                actor_input = self.filter_for_actor(obs_batch, latent)
+
+                actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_input, actions_batch)
+                value_batch = self.critic.evaluate(actor_input)
 
                 # Adjusting the learning rate using KL divergence
                 mu_batch = self.actor.action_mean
@@ -506,15 +542,12 @@ class PPO:
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                if(self.domain_randomization):
-                    loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
-                else:
-                    loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
-                           + lambda_loss_ROA \
-                           + loss_ROA \
-                           + estimator_loss
-                           # + obj_f_dynamics_loss \
-                           # + latent_f_dyn_loss \
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean() \
+                       + lambda_loss_ROA \
+                       + loss_ROA \
+                       + estimator_loss
+                       # + obj_f_dynamics_loss \
+                       # + latent_f_dyn_loss \
 
 
                 # dynamics_loss = obj_f_dynamics_loss
@@ -522,17 +555,13 @@ class PPO:
                 # Add kl divergence term to normalize the latent vector
 
                 # Gradient step
-                if(self.domain_randomization):
-                    self.optimizer_DR.zero_grad()
-                else:
-                    self.optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 # self.dynamics_optimizer.zero_grad()
                 loss.backward()
 
                 nn.utils.clip_grad_norm_([*self.actor.parameters(),
                                           *self.critic.parameters(),
                                           *self.encoder.parameters(),
-                                          *self.encoder_DR.parameters(),
                                           *self.encoder_ROA.parameters(),
                                           *self.estimator.parameters()
                                           ], self.max_grad_norm)
@@ -545,10 +574,7 @@ class PPO:
                 # nn.utils.clip_grad_norm_([*self.actor.parameters(), *self.critic.parameters(), *self.encoder.parameters(), *self.encoder_ROA.parameters()], self.max_grad_norm)
 
 
-                if(self.domain_randomization):
-                    self.optimizer_DR.step()
-                else:
-                    self.optimizer.step()
+                self.optimizer.step()
                 # self.dynamics_optimizer.step()
                 # self.plot_grad_flow(self.encoder[0].architecture.named_parameters())
 
