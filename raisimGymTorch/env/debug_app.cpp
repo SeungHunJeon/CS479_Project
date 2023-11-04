@@ -4,7 +4,6 @@
 //----------------------------//
 
 #include "Environment.hpp"
-#include "Environment_Rollout.hpp"
 #include "VectorizedEnvironment.hpp"
 #include <chrono>
 
@@ -58,97 +57,64 @@ int main(int argc, char *argv[]) {
   Yaml::Node config;
   Yaml::Parse(config, config_str);
 
-  bool isRollout = config["Rollout"].template As<bool>();
-  if(isRollout)
-  {
-    VectorizedEnvironment<ENVIRONMENT_ROLLOUT> vecEnvRollout(resourceDir, config_str);
-    vecEnvRollout.init();
-    EigenRowMajorMat observation(config["num_envs"].template As<int>(), vecEnvRollout.getObDim());
-    EigenRowMajorMat action(config["num_envs"].template As<int>(), vecEnvRollout.getActionDim());
-    EigenVec reward(config["num_envs"].template As<int>(), 1);
-    EigenBoolVec dones(config["num_envs"].template As<int>(), 1);
-    action.setZero();
+  VectorizedEnvironment<ENVIRONMENT> vecEnv(resourceDir, config_str);
+  vecEnv.init();
+  RSINFO(1)
+  EigenRowMajorMat observation(config["num_envs"].template As<int>(), vecEnv.getObDim());
+  EigenRowMajorMat action(config["num_envs"].template As<int>(), vecEnv.getActionDim());
+  EigenVec reward(config["num_envs"].template As<int>(), 1);
+  EigenBoolVec dones(config["num_envs"].template As<int>(), 1);
+  action.setZero();
+  RSINFO(1)
+  Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
+  Eigen::Ref<EigenVec> reward_ref(reward);
+  Eigen::Ref<EigenBoolVec> dones_ref(dones);
+  vecEnv.reset();
+  RSINFO(1)
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  RSINFO(1)
+  vecEnv.observe(ob_ref);
+  RSINFO(1)
+  vecEnv.reset();
+  RSINFO(1)
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  RSINFO(1)
+  vecEnv.observe(ob_ref);
+  RSINFO(1)
+  vecEnv.curriculumUpdate();
+  RSINFO(1)
+  vecEnv.reset();
+  RSINFO(1)
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  RSINFO(1)
+  vecEnv.observe(ob_ref);
+  RSINFO(1)
+  vecEnv.curriculumUpdate();
+  RSINFO(1)
+  vecEnv.reset();
+  RSINFO(1)
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  RSINFO(1)
+  vecEnv.observe(ob_ref);
+  RSINFO(1)
 
-    Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
-    Eigen::Ref<EigenVec> reward_ref(reward);
-    Eigen::Ref<EigenBoolVec> dones_ref(dones);
+  vecEnv.curriculumUpdate();
+  RSINFO(1)
+  vecEnv.reset();
+  RSINFO(1)
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  RSINFO(1)
+  vecEnv.observe(ob_ref);
+  RSINFO(1)
 
-    vecEnvRollout.reset();
-    vecEnvRollout.step(action_ref, reward_ref, dones_ref);
-    vecEnvRollout.observe(ob_ref);
-
-    vecEnvRollout.reset();
-    vecEnvRollout.step(action_ref, reward_ref, dones_ref);
-    vecEnvRollout.observe(ob_ref);
-
-    vecEnvRollout.curriculumUpdate();
-    vecEnvRollout.reset();
-    vecEnvRollout.step(action_ref, reward_ref, dones_ref);
-    vecEnvRollout.observe(ob_ref);
-  }
-
-  else
-  {
-    VectorizedEnvironment<ENVIRONMENT> vecEnv(resourceDir, config_str);
-    vecEnv.init();
-    RSINFO(1)
-    EigenRowMajorMat observation(config["num_envs"].template As<int>(), vecEnv.getObDim());
-    EigenRowMajorMat action(config["num_envs"].template As<int>(), vecEnv.getActionDim());
-    EigenVec reward(config["num_envs"].template As<int>(), 1);
-    EigenBoolVec dones(config["num_envs"].template As<int>(), 1);
-    action.setZero();
-    RSINFO(1)
-    Eigen::Ref<EigenRowMajorMat> ob_ref(observation), action_ref(action);
-    Eigen::Ref<EigenVec> reward_ref(reward);
-    Eigen::Ref<EigenBoolVec> dones_ref(dones);
-    vecEnv.reset();
-    RSINFO(1)
-    vecEnv.step(action_ref, reward_ref, dones_ref);
-    RSINFO(1)
-    vecEnv.observe(ob_ref);
-    RSINFO(1)
-    vecEnv.reset();
-    RSINFO(1)
-    vecEnv.step(action_ref, reward_ref, dones_ref);
-    RSINFO(1)
-    vecEnv.observe(ob_ref);
-    RSINFO(1)
-    vecEnv.curriculumUpdate();
-    RSINFO(1)
-    vecEnv.reset();
-    RSINFO(1)
-    vecEnv.step(action_ref, reward_ref, dones_ref);
-    RSINFO(1)
-    vecEnv.observe(ob_ref);
-    RSINFO(1)
-    vecEnv.curriculumUpdate();
-    RSINFO(1)
-    vecEnv.reset();
-    RSINFO(1)
-    vecEnv.step(action_ref, reward_ref, dones_ref);
-    RSINFO(1)
-    vecEnv.observe(ob_ref);
-    RSINFO(1)
-
-    vecEnv.curriculumUpdate();
-    RSINFO(1)
-    vecEnv.reset();
-    RSINFO(1)
-    vecEnv.step(action_ref, reward_ref, dones_ref);
-    RSINFO(1)
-    vecEnv.observe(ob_ref);
-    RSINFO(1)
-
-    vecEnv.curriculumUpdate();
-    RSINFO(1)
-    vecEnv.reset();
-    RSINFO(1)
-    vecEnv.step(action_ref, reward_ref, dones_ref);
-    RSINFO(1)
-    vecEnv.observe(ob_ref);
-    RSINFO(1)
-
-  }
+  vecEnv.curriculumUpdate();
+  RSINFO(1)
+  vecEnv.reset();
+  RSINFO(1)
+  vecEnv.step(action_ref, reward_ref, dones_ref);
+  RSINFO(1)
+  vecEnv.observe(ob_ref);
+  RSINFO(1)
 
 
 

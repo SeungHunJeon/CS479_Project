@@ -59,6 +59,7 @@ class ENVIRONMENT {
     double height = objectGenerator_.get_height();
     Obj_->setPosition(2, 2, height/2);
     Obj_->setOrientation(1, 0, 0, 0);
+
     /// create controller
     controller_.create(&world_, Obj_);
 
@@ -203,8 +204,8 @@ class ENVIRONMENT {
       object_type = 2;
     updateObstacle();
     objectGenerator_.Inertial_Randomize(Obj_, bound_ratio, curriculumFactor_, gen_, uniDist_, normDist_);
-    if(curriculumFactor_ > 0.5)
-      hard_reset();
+//    if(curriculumFactor_ > 0.5)
+//      hard_reset();
     /// set the state
     raibo_->setState(gc_init_, gv_init_); /// set it again to ensure that foot is in contact
     controller_.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction, air_damping);
@@ -221,6 +222,10 @@ class ENVIRONMENT {
       controller_.updateStateVariables();
     }
 
+    command(0) = uniDist_(gen_) * 1.5;
+    command(1) = uniDist_(gen_) * 1.5;
+    command(2) = uniDist_(gen_);
+
 
   }
 
@@ -228,10 +233,13 @@ class ENVIRONMENT {
 
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
-    Eigen::Vector3f command;
 
-    command = controller_.advance(&world_, action);
-    controller_.update_actionHistory(&world_, action, curriculumFactor_);
+    command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.5, 1.5);
+    command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.5, 1.5);
+    command(2) = std::clamp(command(2) + normDist_(gen_) * 0.2, -1.0, 1.0);
+    command = controller_.advance(&world_, command);
+
+    controller_.update_actionHistory(&world_, command, curriculumFactor_);
 
     if(is_position_goal)
       Low_controller_.setCommand(command);
@@ -478,6 +486,10 @@ class ENVIRONMENT {
   }
 
 
+  void get_anchor_history(Eigen::Ref<EigenVec> anchors) {
+    controller_.get_anchor_history(anchors);
+  }
+
   static constexpr int getObDim() { return RaiboController::getObDim(); }
   static constexpr int getActionDim() { return RaiboController::getActionDim(); }
 
@@ -518,7 +530,7 @@ class ENVIRONMENT {
   RandomObjectGenerator objectGenerator_;
   raisim::RGBCamera* rgbCameras[1];
   raisim::DepthCamera* depthCameras[1];
-
+  Eigen::Vector3f command;
   std::unique_ptr<raisim::RaisimServer> server_;
   raisim::Visuals *commandSphere_, *controllerSphere_;
   raisim::SingleBodyObject *Obj_, *Manipulate_;

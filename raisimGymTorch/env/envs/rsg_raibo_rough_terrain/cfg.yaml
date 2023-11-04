@@ -17,17 +17,15 @@ environment:
   control_dt: 0.2
   #  low_level_control_dt: 0.005
   low_level_control_dt: 0.01
-  max_time: 20.0
+  max_time: 8.0
   entropy_coeff: 1e-2
   nSamples_: 300
   nHorizon_: 30
   obj_mass: 10.0
   bound_ratio: 0.5
-
   discrete:
     radial: 1
     tangential: 72
-
   reward:
     commandsmoothRewardCoeff_: 3
     commandsmooth2RewardCoeff_: 3
@@ -47,17 +45,15 @@ environment:
     initial_factor: .2
     decay_factor: 0.97
   hierarchical: True
-
   dimension:
-    proprioceptiveDim_: 15
-    exteroceptiveDim_: 40
-    inertialparamDim_: 22
-    dynamicsInfoDim_: 27
-    dynamicsPredictDim_: 30
-    dynamicsInputDim_: 33
+    proprioceptiveDim_: 38
+    exteroceptiveDim_: 0
+    inertialparamDim_: 0
+    dynamicsInfoDim_: 0
+    dynamicsPredictDim_: 0
+    dynamicsInputDim_: 0
     historyNum_: 20
     actionDim_: 3
-
   ROA_dimension:
     exteroceptiveDim_: 28
 
@@ -83,7 +79,7 @@ Transformer:
   d_model: 48
 
 LSTM:
-  hiddendim_: 96
+  hiddendim_: 64
   batchNum_: 1
   numLayer_: 2
   isDecouple_: False
@@ -101,7 +97,7 @@ architecture:
     module_dim: 32
 
   estimator:
-    net: [64, 64]
+    net: [128, 64]
 
   obj_f_dynamics:
     net: [256, 128, 64]

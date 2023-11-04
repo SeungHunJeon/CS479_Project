@@ -37,6 +37,7 @@ class VectorizedEnvironment {
     omp_set_num_threads(THREAD_COUNT);
     num_envs_ = cfg_["num_envs"].template As<int>();
     double simDt, conDt, low_conDt;
+    RSINFO(1)
     READ_YAML(bool, is_position_goal_, cfg_["position_goal"])
     READ_YAML(double, conDt, cfg_["control_dt"])
     READ_YAML(double, simDt, cfg_["simulation_dt"])
@@ -113,6 +114,12 @@ class VectorizedEnvironment {
 //    }
 //
 //  }
+
+  void getAnchorHistory(Eigen::Ref<EigenRowMajorMat> &anchor) {
+#pragma omp parallel for schedule(auto)
+    for (int i = 0; i < num_envs_; i++)
+      environments_[i]->get_anchor_history(anchor.row(i));
+  }
 
   void observe_Rollout(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics=false) {
     environments_[0]->observe_Rollout(ob);

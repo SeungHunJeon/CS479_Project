@@ -20,12 +20,13 @@ class RaisimGymVecEnv:
         self.wrapper.init()
         self.num_obs = self.wrapper.getObDim()
         self.num_acts = self.wrapper.getActionDim()
+        self.anchor_history = np.zeros([self.num_envs, 20*24], dtype=np.float32)
         self._observation = np.zeros([self.num_envs, self.num_obs], dtype=np.float32)
         self._reward = np.zeros(self.num_envs, dtype=np.float32)
-        self._done = np.zeros(self.num_envs, dtype=np.bool)
+        self._done = np.zeros(self.num_envs, dtype=bool)
         self._success = np.zeros(self.num_envs, dtype=bool)
         self._switch = np.zeros(self.num_envs, dtype=bool)
-        self._contact = np.zeros(self.num_envs, dtype=np.bool)
+        self._contact = np.zeros(self.num_envs, dtype=bool)
         self._env_val = np.zeros([self.num_envs, 22], dtype=np.float32)
         # 0-2 : H W D / 3-11 : Inertia row1+row2+row3 / 12-14 : COM / 15 : Mass / 16 : friction
         self.rewards = [[] for _ in range(self.num_envs)]
@@ -73,6 +74,10 @@ class RaisimGymVecEnv:
         return np.array(self.wrapper.getDepthImage(), dtype=np.float32).reshape(-1, self.height, self.width)
     def get_color_image(self): ## only for one env
         return np.array(self.wrapper.getColorImage()).reshape(-1, self.height, self.width,4)[..., [2,1,0]].astype(np.uint8)
+
+    def getAnchorHistory(self):
+        self.wrapper.getAnchorHistory(self.anchor_history)
+        return self.anchor_history
 
 
     def load_scaling(self, dir_name, iteration, count=1e5):

@@ -58,16 +58,17 @@ task_name = cfg['task_name']
 # Encoding
 historyNum = cfg['environment']['dimension']['historyNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
-ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
-inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
-dynamics_info_dim = cfg['environment']['dimension']['dynamicsInfoDim_']
-dynamics_input_dim = cfg['environment']['dimension']['dynamicsInputDim_']
-dynamics_predict_dim = cfg['environment']['dimension']['dynamicsPredictDim_']
+ext_dim = 0
+inertial_dim = 0
+dynamics_info_dim = 0
+dynamics_predict_dim = 0
 ROA_ext_dim = ext_dim - inertial_dim
 
 # shortcuts
 act_dim = env.num_acts
-Encoder_ob_dim = historyNum * inertial_dim
+# Encoder_ob_dim = historyNum * inertial_dim
+Encoder_ob_dim = historyNum * (pro_dim + act_dim)
+
 
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
@@ -76,7 +77,7 @@ layerNum = cfg['LSTM']['numLayer_']
 is_decouple = cfg['LSTM']['isDecouple_']
 
 # ROA Encoding
-ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
+ROA_Encoder_ob_dim = historyNum * (pro_dim + act_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
@@ -88,27 +89,32 @@ Domain_Randomization = cfg['environment']['Domain_Randomization']
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
 
-obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_input_dim
-
-obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
-                                                     nn.LeakyReLU,
-                                                     obj_f_dynamics_input_dim,
-                                                     dynamics_predict_dim),
-                                      device=device)
-
-latent_f_dynamics_input_dim = hidden_dim + act_dim
-
-latent_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
-                                                     nn.LeakyReLU,
-                                                     latent_f_dynamics_input_dim,
-                                                     hidden_dim),
-                                      device=device)
+# obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_input_dim
+#
+# obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
+#                                                      nn.LeakyReLU,
+#                                                      obj_f_dynamics_input_dim,
+#                                                      dynamics_predict_dim),
+#                                       device=device)
+#
+# latent_f_dynamics_input_dim = hidden_dim + act_dim
+#
+# latent_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
+#                                                      nn.LeakyReLU,
+#                                                      latent_f_dynamics_input_dim,
+#                                                      hidden_dim),
+#                                       device=device)
 
 
 Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                 nn.LeakyReLU,
-                                                hidden_dim,
-                                                inertial_dim), device=device)
+                                                hidden_dim + pro_dim,
+                                                24), device=device)
+
+Estimator_cov = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
+                                                    nn.LeakyReLU,
+                                                    hidden_dim + pro_dim,
+                                                    24), device=device)
 
 Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
                                                           hidden_dim=hidden_dim,
@@ -147,14 +153,14 @@ pytorch_total_params = sum(p.numel() for p in Encoder.architecture.parameters())
 
 print(pytorch_total_params)
 
-actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim + pro_dim + ROA_ext_dim + act_dim, act_dim, actor=True),
+actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim + pro_dim, act_dim, actor=True),
                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
                                                                            env.num_envs,
                                                                            1.0,
                                                                            NormalSampler(act_dim),
                                                                            cfg['seed']),
                          device)
-critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value_net'], nn.LeakyReLU, hidden_dim + pro_dim + ROA_ext_dim + act_dim, 1, actor=False),
+critic = ppo_module.Critic(ppo_module.MLP(cfg['architecture']['encoding']['value_net'], nn.LeakyReLU, hidden_dim + pro_dim, 1, actor=False),
                            device)
 
 saver = ConfigurationSaver(log_dir=home_path + "/raisimGymTorch/data/"+task_name,
@@ -165,8 +171,8 @@ ppo = PPO.PPO(actor=actor,
               critic=critic,
               encoder=Encoder,
               encoder_DR=None,
-              obj_f_dynamics=obj_f_dynamics,
-              latent_f_dynamics=latent_f_dynamics,
+              obj_f_dynamics=None,
+              latent_f_dynamics=None,
               num_envs=cfg['environment']['num_envs'],
               obs_shape=[env.num_obs],
               num_transitions_per_env=n_steps,
@@ -180,6 +186,7 @@ ppo = PPO.PPO(actor=actor,
               shuffle_batch=False,
               encoder_ROA=Encoder_ROA,
               estimator=Estimator,
+              estimator_cov=Estimator_cov,
               desired_kl=0.006,
               num_history_batch=historyNum,
               inertial_dim=inertial_dim,
@@ -217,10 +224,10 @@ for update in range(iteration_number, 20000):
             'critic_architecture_state_dict': critic.architecture.state_dict(),
             'Encoder_state_dict' : Encoder.architecture.state_dict(),
             'Encoder_ROA_state_dict' : Encoder_ROA.architecture.state_dict(),
-            'Inertial_estimator': Estimator.architecture.state_dict(),
+            # 'Inertial_estimator': Estimator.architecture.state_dict(),
             'optimizer_state_dict': ppo.optimizer.state_dict(),
-            'obj_f_dynamics_state_dict': obj_f_dynamics.architecture.state_dict(),
-            'latent_f_dynamics_state_dict': latent_f_dynamics.architecture.state_dict()
+            # 'obj_f_dynamics_state_dict': obj_f_dynamics.architecture.state_dict(),
+            # 'latent_f_dynamics_state_dict': latent_f_dynamics.architecture.state_dict()
         }, saver.data_dir+"/full_"+str(update)+'.pt')
         data_tags = env.get_step_data_tag()
         data_size = 0
@@ -229,19 +236,20 @@ for update in range(iteration_number, 20000):
         data_min = np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
         data_max = -np.inf * np.ones(shape=(len(data_tags), 1), dtype=np.double)
 
-        # env.turn_on_visualization()
+        env.turn_on_visualization()
         # env.start_video_recording(datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S") + "policy_"+str(update)+'.mp4')
 
+        actions = np.zeros((env.num_envs, 3), dtype=np.float32)
         for step in range(n_steps):
             with torch.no_grad():
                 obs = env.observe(False)
-
+                anchors = env.getAnchorHistory()
                 # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
                 latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
 
                 actor_input = ppo.filter_for_actor(obs, latent)
 
-                actions, actions_log_prob = actor.sample(actor_input)
+                # actions, actions_log_prob = actor.sample(actor_input)
                 reward, dones = env.step_visualize(actions)
                 data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
 
@@ -262,19 +270,18 @@ for update in range(iteration_number, 20000):
             # print(success_batch)
             switch_batch = np.logical_or(switch_batch, env.get_intrinsic_switch())
             contact = env.get_contact()
-            privileged_info = env.get_privileged_info()
+            # privileged_info = env.get_privileged_info()
 
             latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
 
             latent = latent.detach().cpu().numpy()
 
             actor_input = ppo.filter_for_actor(obs, latent)
-
-            action = ppo.act(actor_input)
-
+            anchors = env.getAnchorHistory()
+            action = np.zeros((actor_input.shape[0],3), dtype=np.float32)
             reward, dones = env.step(action)
 
-            ppo.step(value_obs=actor_input, obs=obs, rews=reward, dones=dones, contact=contact, privileged_info=privileged_info)
+            ppo.step(value_obs=actor_input, obs=obs, rews=reward, dones=dones, contact=contact)
             done_sum = done_sum + np.sum(dones)
             reward_ll_sum = reward_ll_sum + np.sum(reward)
             # data_size = env.get_step_data(data_size, data_mean, data_square_sum, data_min, data_max)
@@ -310,11 +317,7 @@ for update in range(iteration_number, 20000):
         data_log['Training/average_reward'] = average_ll_performance
         data_log['Training/dones'] = average_dones
         data_log['Training/learning_rate'] = ppo.learning_rate
-        data_log['PPO/value_function'] = ppo.mean_value_loss
-        data_log['PPO/surrogate'] = ppo.mean_surrogate_loss
-        data_log['PPO/mean_noise_std'] = ppo.mean_noise_std
-        data_log['PPO/loss_ROA'] = ppo.loss_ROA
-        data_log['PPO/lambda_loss_ROA'] = ppo.lambda_loss_ROA
+        data_log['PPO/mean_loss'] = ppo.mean_loss
         data_log['PPO/estimator_loss'] = ppo.estimator_loss
         data_log['PPO/obj_f_dynamics_loss'] = ppo.obj_f_dynamics_loss
         data_log['PPO/entropy'] = ppo.entropy_mean
@@ -330,7 +333,7 @@ for update in range(iteration_number, 20000):
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))
-    print('{:<40} {:>6}'.format("average ll reward: ", '{:0.10f}'.format(average_ll_performance)))
+    print('{:<40} {:>6}'.format("Loss: ", '{:0.10f}'.format(ppo.mean_loss)))
     print('{:<40} {:>6}'.format("dones: ", '{:0.6f}'.format(average_dones)))
     print('{:<40} {:>6}'.format("learning rate: ", '{:0.6f}'.format(ppo.learning_rate)))
     print('{:<40} {:>6}'.format("time elapsed in this iteration: ", '{:6.4f}'.format(end - start)))

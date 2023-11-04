@@ -81,27 +81,30 @@ class RaiboController {
     actionStd_<< Eigen::VectorXd::Constant(actionDim_, 1.0); /// joint target
 
     obDouble_.setZero(obDim_);
-
+    foot_contact_.setZero();
     state_Info_.setZero(proprioceptiveDim_);
-    Obj_Info_.setZero(exteroceptiveDim_);
-    dynamics_Info_.setZero(dynamicsInfoDim_);
 
     // Update History
     objectInfoHistory_.resize(historyNum_);
     stateInfoHistory_.resize(historyNum_);
     actionInfoHistory_.resize(actionNum_);
-    dynamicsInfoHistory_.resize(actionNum_);
+    anchorHistory_.resize(historyNum_);
+    anchorHistory_e.setZero(historyNum_ * 8 * 3);
 
     for (int i =0; i<historyNum_; i++) {
-      objectInfoHistory_[i].setZero(exteroceptiveDim_);
       stateInfoHistory_[i].setZero(proprioceptiveDim_);
+      anchorHistory_[i].resize(8);
+      for(int j = 0; j < 8; j ++) {
+        anchorHistory_[i][j].setZero();
+      }
     }
 
     for (int i = 0; i<actionNum_; i++)
     {
       actionInfoHistory_[i].setZero(actionDim_);
-      dynamicsInfoHistory_[i].setZero(dynamicsInfoDim_);
     }
+
+    for (auto &fs: footContactState_) fs = false;
 
 
     obBlockDim_ = proprioceptiveDim_ + exteroceptiveDim_ + actionDim_ + dynamicsInfoDim_;
@@ -136,6 +139,8 @@ class RaiboController {
     prepre_command_.setZero();
     target_anchor_points.resize(8);
     object_anchor_points.resize(8);
+    current_anchor_points.resize(8);
+    next_anchor_points.resize(8);
     success_batch_.resize(success_batch_num_);
 
     return true;
@@ -144,12 +149,11 @@ class RaiboController {
   void updateHistory() {
     /// joint angles
 
-    std::rotate(objectInfoHistory_.begin(), objectInfoHistory_.begin()+1, objectInfoHistory_.end());
-    objectInfoHistory_[historyNum_ - 1] = Obj_Info_;
-
-
     std::rotate(stateInfoHistory_.begin(), stateInfoHistory_.begin()+1, stateInfoHistory_.end());
     stateInfoHistory_[historyNum_ - 1] = state_Info_;
+
+    std::rotate(anchorHistory_.begin(), anchorHistory_.begin()+1, anchorHistory_.end());
+    anchorHistory_[historyNum_ - 1] = current_anchor_points;
   }
   /// Simdt
   void updateStateVariables() {
@@ -174,12 +178,33 @@ class RaiboController {
     raisim::Vec<3> LF_FOOT_Pos_w_, RF_FOOT_Pos_w_;
     raibo_->getFramePosition(raibo_->getFrameIdxByLinkName("LF_FOOT"), LF_FOOT_Pos_w_);
     raibo_->getFramePosition(raibo_->getFrameIdxByLinkName("RF_FOOT"), RF_FOOT_Pos_w_);
+
+    for (auto &fs: footContactState_) fs = false;
+    for (auto &contact: raibo_->getContacts()) {
+      auto it = std::find(footIndices_.begin(), footIndices_.end(), contact.getlocalBodyIndex());
+      size_t index = it - footIndices_.begin();
+      if (index < 4 && !contact.isSelfCollision()) {
+        footContactState_[index] = true;
+      }
+    }
+
     /// Update State Info
     state_Info_.segment(0,3) = baseRot_.e().row(2);
     state_Info_.segment(3,3) = bodyLinVel_;
     state_Info_.segment(6,3) = bodyAngVel_;
-    state_Info_.segment(9,3) = baseRot_.e().transpose()*(LF_FOOT_Pos_w_.e() - ee_Pos_w_.e());
-    state_Info_.segment(12,3) = baseRot_.e().transpose()*(RF_FOOT_Pos_w_.e() - ee_Pos_w_.e());
+    state_Info_.segment(9,12) = gc_.tail(nJoints_);
+    state_Info_.segment(21,12) = gv_.tail(nJoints_);
+    state_Info_.segment(33, 4) << static_cast<double>(footContactState_[0]), static_cast<double>(footContactState_[1]), static_cast<double>(footContactState_[2]), static_cast<double>(footContactState_[3]);
+    state_Info_.segment(37,1) <<  gc_[2];
+
+    Eigen::Vector3d geometry{1,1,1};
+    Eigen::Vector3d pos{gc_[0],gc_[1],0};
+    raisim::Mat<3,3> yaw_rot;
+    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
+    base_x_axis(2) = 0;
+    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
+    raisim::angleAxisToRotMat({0,0,1}, std::atan2(base_x_axis(1), base_x_axis(0)), yaw_rot);
+    get_anchor_points(current_anchor_points, pos, yaw_rot.e(), geometry);
 
     for (auto &contact : raibo_->getContacts()) {
       if (contact.getPairObjectIndex() == Obj_->getIndexInWorld()) {
@@ -188,22 +213,22 @@ class RaiboController {
         break;
       }
     }
-
-    Obj_->getPosition(Obj_Pos_);
-    Obj_->getOrientation(0, Obj_Rot_);
-    Obj_->getLinearVelocity(Obj_Vel_);
-    Obj_->getAngularVelocity(Obj_AVel_);
-    //TODO
-
-    Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
-    Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
-
-    raisim::Mat<3,3> command_Obj_Rot_;
-    raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
-
-    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().col(0);
-    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
-    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().col(0);
+//
+//    Obj_->getPosition(Obj_Pos_);
+//    Obj_->getOrientation(0, Obj_Rot_);
+//    Obj_->getLinearVelocity(Obj_Vel_);
+//    Obj_->getAngularVelocity(Obj_AVel_);
+//    //TODO
+//
+//    Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
+//    Eigen::Vector3d obj_to_target = (command_Obj_Pos_ - Obj_Pos_.e());
+//
+//    raisim::Mat<3,3> command_Obj_Rot_;
+//    raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
+//
+//    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().col(0);
+//    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
+//    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().col(0);
 //    base_x_axis(2) = 0;
 //    obj_x_axis(2) = 0;
 //    target_x_axis(2) = 0;
@@ -212,17 +237,17 @@ class RaiboController {
 //    Eigen::Vector3d target_x_axis_norm = target_x_axis.normalized();
 //    double stay_t_heading  = std::abs(std::acos(Eigen::Vector3d::UnitX().dot(((obj_x_axis_norm - base_x_axis_norm) + Eigen::Vector3d::UnitX()).normalized()))); /// 1 (align), -1 (180);
 
-    double robot_to_obj_heading_cos = base_x_axis.dot(obj_x_axis);
-    double robot_to_obj_heading_sin = (base_x_axis(0)*obj_x_axis(1) - base_x_axis(1)*obj_x_axis(0));
+//    double robot_to_obj_heading_cos = base_x_axis.dot(obj_x_axis);
+//    double robot_to_obj_heading_sin = (base_x_axis(0)*obj_x_axis(1) - base_x_axis(1)*obj_x_axis(0));
+//
+//    double robot_to_target_heading_cos = base_x_axis.dot(target_x_axis);
+//    double robot_to_target_heading_sin = base_x_axis(0)*target_x_axis(1) - base_x_axis(1)*target_x_axis(0);
+//
+//    double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
+//    double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
 
-    double robot_to_target_heading_cos = base_x_axis.dot(target_x_axis);
-    double robot_to_target_heading_sin = base_x_axis(0)*target_x_axis(1) - base_x_axis(1)*target_x_axis(0);
 
-    double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
-    double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
-
-
-    get_anchor_points(object_anchor_points, Obj_Pos_.e(), Obj_Rot_.e(), obj_geometry_);
+//    get_anchor_points(object_anchor_points, Obj_Pos_.e(), Obj_Rot_.e(), obj_geometry_);
 
 //    if(is_multiobject_)
 //    {
@@ -237,75 +262,75 @@ class RaiboController {
 //        is_success_ = true;
 //      }
 //    }
-    if(obj_to_target.head(2).norm() < 0.05 && obj_to_target_heading_cos > 0.98 ) {
-	    is_success_ = true;
-    }
+//    if(obj_to_target.head(2).norm() < 0.05 && obj_to_target_heading_cos > 0.98 ) {
+//	    is_success_ = true;
+//    }
 
-    std::rotate(success_batch_.begin(), success_batch_.begin()+1, success_batch_.end());
-    success_batch_[success_batch_num_ - 1] = is_success_;
-
-    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - ee_Pos_w_.e());
-    ee_to_obj(2) = 0;
-    obj_to_target(2) = 0;
-    ee_to_target(2) = 0;
-    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
-    obj_to_target = baseRot_.e().transpose() * obj_to_target;
-    ee_to_target = baseRot_.e().transpose() * ee_to_target;
-
-    Eigen::Vector2d pos_temp_;
-    double dist_temp_min_;
-
-    dist_temp_ = ee_to_obj.head(2).norm() + 1e-8;
-    pos_temp_ = ee_to_obj.head(2) * (1.0/dist_temp_);
-    Obj_Info_.segment(0, 2) << pos_temp_;
-    dist_temp_min_ = std::min(2.0, dist_temp_);
-    Obj_Info_.segment(2, 1) << dist_temp_min_;
-
-
-    dist_temp_ = obj_to_target.head(2).norm() + 1e-8;
-    pos_temp_ = obj_to_target.head(2) * (1.0/dist_temp_);
-
-    Obj_Info_.segment(3, 2) << pos_temp_;
-    dist_temp_min_ = std::min(2.0, dist_temp_);
-    Obj_Info_.segment(5, 1) << dist_temp_min_;
-
-
-    dist_temp_ = ee_to_target.head(2).norm() + 1e-8;
-    pos_temp_ = ee_to_target.head(2) * (1.0/dist_temp_);
-
-    Obj_Info_.segment(6, 2) << pos_temp_;
-    dist_temp_min_ = std::min(2.0, dist_temp_);
-    Obj_Info_.segment(8, 1) << dist_temp_min_;
-    Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
-
-//    baseRot_transform = rotMatTransform(baseRot_);
-//    objRot_transform = rotMatTransform(Obj_Rot_);
-//    base_to_obj_Rot_ = baseRot_transform.transpose() * objRot_transform;
-
-    Obj_Info_.segment(12,2) << robot_to_obj_heading_cos, robot_to_obj_heading_sin;
-    Obj_Info_.segment(14,2) << robot_to_target_heading_cos, robot_to_target_heading_sin;
-    Obj_Info_.segment(16,2) << obj_to_target_heading_cos, obj_to_target_heading_sin;
-    Obj_Info_.segment(18,3) = classify_vector_;
-    Obj_Info_.segment(21,3) = obj_geometry_;
-    Obj_Info_.segment(24, 1) << Obj_->getMass();
-    Obj_Info_.segment(25, 3) << Obj_->getCom().e();
-    Obj_Info_.segment(28,3) = Obj_->getInertiaMatrix_B().row(0);
-    Obj_Info_.segment(31,3) = Obj_->getInertiaMatrix_B().row(1);
-    Obj_Info_.segment(34,3) = Obj_->getInertiaMatrix_B().row(2);
-    Obj_Info_.segment(37,1) << friction_;
-    Obj_Info_.segment(38,1) << air_damping;
-    Obj_Info_.segment(39,1) << static_cast<double>(is_contact);
-
-
-    dynamics_Info_.segment(0,3) << Obj_Pos_.e();
-    dynamics_Info_.segment(3,3) << ee_Pos_w_.e();
-    dynamics_Info_.segment(6,3) << Obj_Vel_.e();
-    dynamics_Info_.segment(9,3) << gv_.segment(0,3);
-    dynamics_Info_.segment(12,3) << Obj_AVel_.e();
-    dynamics_Info_.segment(15,3) << gv_.segment(3,3);
-    dynamics_Info_.segment(18,3) = Obj_Rot_.e().row(0);
-    dynamics_Info_.segment(21,3) = baseRot_.e().row(0);
-    dynamics_Info_.segment(24,3) << obj_geometry_;
+//    std::rotate(success_batch_.begin(), success_batch_.begin()+1, success_batch_.end());
+//    success_batch_[success_batch_num_ - 1] = is_success_;
+//
+//    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - ee_Pos_w_.e());
+//    ee_to_obj(2) = 0;
+//    obj_to_target(2) = 0;
+//    ee_to_target(2) = 0;
+//    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
+//    obj_to_target = baseRot_.e().transpose() * obj_to_target;
+//    ee_to_target = baseRot_.e().transpose() * ee_to_target;
+//
+//    Eigen::Vector2d pos_temp_;
+//    double dist_temp_min_;
+//
+//    dist_temp_ = ee_to_obj.head(2).norm() + 1e-8;
+//    pos_temp_ = ee_to_obj.head(2) * (1.0/dist_temp_);
+//    Obj_Info_.segment(0, 2) << pos_temp_;
+//    dist_temp_min_ = std::min(2.0, dist_temp_);
+//    Obj_Info_.segment(2, 1) << dist_temp_min_;
+//
+//
+//    dist_temp_ = obj_to_target.head(2).norm() + 1e-8;
+//    pos_temp_ = obj_to_target.head(2) * (1.0/dist_temp_);
+//
+//    Obj_Info_.segment(3, 2) << pos_temp_;
+//    dist_temp_min_ = std::min(2.0, dist_temp_);
+//    Obj_Info_.segment(5, 1) << dist_temp_min_;
+//
+//
+//    dist_temp_ = ee_to_target.head(2).norm() + 1e-8;
+//    pos_temp_ = ee_to_target.head(2) * (1.0/dist_temp_);
+//
+//    Obj_Info_.segment(6, 2) << pos_temp_;
+//    dist_temp_min_ = std::min(2.0, dist_temp_);
+//    Obj_Info_.segment(8, 1) << dist_temp_min_;
+//    Obj_Info_.segment(9, 3) << baseRot_.e().transpose() * Obj_Vel_.e();
+//
+////    baseRot_transform = rotMatTransform(baseRot_);
+////    objRot_transform = rotMatTransform(Obj_Rot_);
+////    base_to_obj_Rot_ = baseRot_transform.transpose() * objRot_transform;
+//
+//    Obj_Info_.segment(12,2) << robot_to_obj_heading_cos, robot_to_obj_heading_sin;
+//    Obj_Info_.segment(14,2) << robot_to_target_heading_cos, robot_to_target_heading_sin;
+//    Obj_Info_.segment(16,2) << obj_to_target_heading_cos, obj_to_target_heading_sin;
+//    Obj_Info_.segment(18,3) = classify_vector_;
+//    Obj_Info_.segment(21,3) = obj_geometry_;
+//    Obj_Info_.segment(24, 1) << Obj_->getMass();
+//    Obj_Info_.segment(25, 3) << Obj_->getCom().e();
+//    Obj_Info_.segment(28,3) = Obj_->getInertiaMatrix_B().row(0);
+//    Obj_Info_.segment(31,3) = Obj_->getInertiaMatrix_B().row(1);
+//    Obj_Info_.segment(34,3) = Obj_->getInertiaMatrix_B().row(2);
+//    Obj_Info_.segment(37,1) << friction_;
+//    Obj_Info_.segment(38,1) << air_damping;
+//    Obj_Info_.segment(39,1) << static_cast<double>(is_contact);
+//
+//
+//    dynamics_Info_.segment(0,3) << Obj_Pos_.e();
+//    dynamics_Info_.segment(3,3) << ee_Pos_w_.e();
+//    dynamics_Info_.segment(6,3) << Obj_Vel_.e();
+//    dynamics_Info_.segment(9,3) << gv_.segment(0,3);
+//    dynamics_Info_.segment(12,3) << Obj_AVel_.e();
+//    dynamics_Info_.segment(15,3) << gv_.segment(3,3);
+//    dynamics_Info_.segment(18,3) = Obj_Rot_.e().row(0);
+//    dynamics_Info_.segment(21,3) = baseRot_.e().row(0);
+//    dynamics_Info_.segment(24,3) << obj_geometry_;
 
     /// height map
     controlFrameX_ =
@@ -316,11 +341,11 @@ class RaiboController {
 
     /// Check if the distance between command pos and robot base are under offset.
 
-    Eigen::Vector3d current_base_pos = raibo_->getBasePosition().e();
-    current_base_pos[2] = 0;
-    desired_dist_ = (current_base_pos - desired_pos_).norm();
-    if(desired_dist_ < 0.1)
-      is_achieved = true;
+//    Eigen::Vector3d current_base_pos = raibo_->getBasePosition().e();
+//    current_base_pos[2] = 0;
+//    desired_dist_ = (current_base_pos - desired_pos_).norm();
+//    if(desired_dist_ < 0.1)
+//      is_achieved = true;
 
   }
 
@@ -355,9 +380,7 @@ class RaiboController {
 
   Eigen::VectorXf advance(raisim::World *world, const Eigen::Ref<EigenVec> &action) {
     Eigen::VectorXf position;
-//    RSINFO(action)
     position = action.cast<float>().cwiseQuotient(actionStd_.cast<float>());
-
     Eigen::VectorXd current_pos_ = raibo_->getBasePosition().e();
     position += actionMean_.cast<float>();
     prepre_command_ = pre_command_;
@@ -386,9 +409,6 @@ class RaiboController {
     std::rotate(actionInfoHistory_.begin(), actionInfoHistory_.begin()+1, actionInfoHistory_.end());
     actionInfoHistory_[actionNum_ - 1] = action.cast<double>();
 
-    std::rotate(dynamicsInfoHistory_.begin(), dynamicsInfoHistory_.begin()+1, dynamicsInfoHistory_.end());
-    dynamicsInfoHistory_[actionNum_ - 1] = dynamics_Info_;
-
     return true;
   }
 
@@ -400,45 +420,51 @@ class RaiboController {
     return Obj_Pos_.e() + Obj_->getCom().e();
   }
 
-  void reset_Rollout(Eigen::Vector3d command_obj_pos_, Eigen::Vector4d command_obj_quat_, Eigen::Vector3d obj_geometry, double friction) {
-    raibo_->getState(gc_, gv_);
-    is_success_ = false;
-    is_achieved = true;
-    command_Obj_Pos_ = command_obj_pos_;
-    command_Obj_quat_ = command_obj_quat_;
-    obj_geometry_ = obj_geometry;
-    friction_ = friction;
-
-    std::fill(success_batch_.begin(), success_batch_.end(), false);
+  void get_anchor_history(Eigen::Ref<EigenVec> &anchor_points) {
+    for(int i = 0; i < historyNum_; i ++) {
+      for (int j = 0; j < 8; j++) {
+        anchorHistory_e.segment(24 * i + 3 * j, 3) = anchorHistory_[i][j];
+      }
+    }
+    anchor_points = anchorHistory_e.cast<float>();
   }
+
+//  void reset_Rollout(Eigen::Vector3d command_obj_pos_, Eigen::Vector4d command_obj_quat_, Eigen::Vector3d obj_geometry, double friction) {
+//    raibo_->getState(gc_, gv_);
+//    is_success_ = false;
+//    is_achieved = true;
+//    command_Obj_Pos_ = command_obj_pos_;
+//    command_Obj_quat_ = command_obj_quat_;
+//    obj_geometry_ = obj_geometry;
+//    friction_ = friction;
+//
+//    std::fill(success_batch_.begin(), success_batch_.end(), false);
+//  }
 
   void reset(std::mt19937 &gen_,
              std::normal_distribution<double> &normDist_, Eigen::Vector3d command_obj_pos_, Eigen::Vector4d command_obj_quat_, Eigen::Vector3d obj_geometry, double friction, double damping) {
     raibo_->getState(gc_, gv_);
 //    jointTarget_ = gc_.segment(7, nJoints_);
-    command_Obj_Pos_ = command_obj_pos_;
-    command_Obj_quat_ = command_obj_quat_;
-    obj_geometry_ = obj_geometry;
+//    command_Obj_Pos_ = command_obj_pos_;
+//    command_Obj_quat_ = command_obj_quat_;
+//    obj_geometry_ = obj_geometry;
 
-    raisim::Mat<3,3> command_obj_rot;
-    raisim::quatToRotMat(command_Obj_quat_, command_obj_rot);
-    get_anchor_points(target_anchor_points, command_Obj_Pos_, command_obj_rot.e(), obj_geometry_);
-    Obj_->getPosition(Obj_Pos_);
-    distance = (command_obj_pos_.head(2) - Obj_Pos_.e().head(2)).norm();
-    is_success_ = false;
-    is_achieved = true;
-    contact_switch = false;
-    intrinsic_switch = true;
-    friction_ = friction;
-    air_damping = damping;
+//    raisim::Mat<3,3> command_obj_rot;
+//    raisim::quatToRotMat(command_Obj_quat_, command_obj_rot);
+//    get_anchor_points(target_anchor_points, command_Obj_Pos_, command_obj_rot.e(), obj_geometry_);
+//    Obj_->getPosition(Obj_Pos_);
+//    distance = (command_obj_pos_.head(2) - Obj_Pos_.e().head(2)).norm();
+//    is_success_ = false;
+//    is_achieved = true;
+//    contact_switch = false;
+//    intrinsic_switch = true;
+//    friction_ = friction;
+//    air_damping = damping;
     pre_command_.setZero();
     prepre_command_.setZero();
     // history
     for (int i = 0; i < historyNum_; i++)
     {
-      for (int j=0; j < exteroceptiveDim_; j++)
-        objectInfoHistory_[i](j) = normDist_(gen_) * 0.1;
-
       for (int j=0; j < proprioceptiveDim_; j++)
         stateInfoHistory_[i](j) = normDist_(gen_) * 0.1;
     }
@@ -448,11 +474,6 @@ class RaiboController {
         actionInfoHistory_[i](j) = normDist_(gen_) * 0.1;
     }
 
-
-    for (int i = 0; i<actionNum_; i++)
-    {
-      dynamicsInfoHistory_[i].setZero();
-    }
 
     std::fill(success_batch_.begin(), success_batch_.end(), false);
 
@@ -511,33 +532,21 @@ class RaiboController {
     for (int i=0; i< historyNum_; i++) {
       obDouble_.segment((obBlockDim_)*i,
                         proprioceptiveDim_) = stateInfoHistory_[i];
-      obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_,
-                        exteroceptiveDim_) = objectInfoHistory_[i];
       obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_ + exteroceptiveDim_,
                         actionDim_) = actionInfoHistory_[i];
-      obDouble_.segment((obBlockDim_)*i + proprioceptiveDim_ + exteroceptiveDim_ + actionDim_,
-                        dynamicsInfoDim_) = dynamicsInfoHistory_[i];
     }
 
     obDouble_.segment((obBlockDim_)*historyNum_, proprioceptiveDim_)
         = state_Info_;
 
-    obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_, exteroceptiveDim_)
-        = Obj_Info_;
-
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_, actionDim_)
         = actionInfoHistory_.back();
-
-    obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_+actionDim_, dynamicsInfoDim_)
-        = dynamicsInfoHistory_.back();
   }
 
   inline void checkConfig(const Yaml::Node &cfg) {
     READ_YAML(int, proprioceptiveDim_, cfg["dimension"]["proprioceptiveDim_"])
-    READ_YAML(int, exteroceptiveDim_, cfg["dimension"]["exteroceptiveDim_"])
     READ_YAML(int, historyNum_, cfg["dimension"]["historyNum_"])
     READ_YAML(int, actionNum_, cfg["dimension"]["actionhistoryNum_"])
-    READ_YAML(int, dynamicsInfoDim_, cfg["dimension"]["dynamicsInfoDim_"])
   }
 
   inline void setRewardConfig(const Yaml::Node &cfg) {
@@ -573,119 +582,119 @@ class RaiboController {
 
   inline void accumulateRewards(double cf, const Eigen::Vector3d &cm) {
     /// move towards the object
-
-    Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
-    Eigen::Vector3d obj_to_target (command_Obj_Pos_ - Obj_Pos_.e());
-    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - ee_Pos_w_.e());
-
-    ee_to_obj(2) = 0;
-    obj_to_target(2) = 0;
-    ee_to_target(2) = 0;
-    Obj_Vel_(2) = 0;
-
-//    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
-//    obj_to_target = baseRot_.e().transpose() * obj_to_target;
-//    ee_to_target = baseRot_.e().transpose() * ee_to_target;
-
-    double toward_o = (ee_to_obj * (1. / (ee_to_obj.norm() + 1e-8))).transpose()*(ee_Vel_w_.e() * (1. / (ee_Vel_w_.e().norm() + 1e-8))) - 1;
-//    towardObjectReward_ += cf * towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
-
-    Eigen::Vector3d heading = baseRot_.e().col(0);
-
-
-//    raisim::quatToEulerVec()
-
-    /// stay close to the object
-    double stay_o = ee_to_obj.norm(); /// max : inf, min : 0
-//    double o_bound = obj_geometry_.head(2).norm() / 2 + 5e-2;
-//    stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
-
-    /// align robot head to the object
-    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 0, min : -1
-    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
-
-    /// move the object towards the target
-    double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;
-//    towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
-
-    /// keep the object close to the target (extrinsic)
-    double stay_t = 0;
-    for (int i = 0; i < object_anchor_points.size(); i++) {
-      stay_t += (target_anchor_points[i] - object_anchor_points[i]).norm();
-    }
-    /// Mean value
-    stay_t = stay_t / 8;
-
-    /// align object to the desired orientation (extrinsic)
-    raisim::Mat<3,3> command_Obj_Rot_;
-    raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
-
-    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().col(0);
-    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
-    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().col(0);
-//    base_x_axis(2) = 0;
-//    obj_x_axis(2) = 0;
-//    target_x_axis(2) = 0;
-//    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
-//    Eigen::Vector3d obj_x_axis_norm = obj_x_axis.normalized();
-//    Eigen::Vector3d target_x_axis_norm = target_x_axis.normalized();
-
-    double robot_to_obj_heading_cos = base_x_axis.dot(obj_x_axis);
-    double robot_to_obj_heading_sin = (base_x_axis(0)*obj_x_axis(1) - base_x_axis(1)*obj_x_axis(0));
-
-    double robot_to_target_heading_cos = base_x_axis.dot(target_x_axis);
-    double robot_to_target_heading_sin = base_x_axis(0)*target_x_axis(1) - base_x_axis(1)*target_x_axis(0);
-
-    double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
-    double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
-
-//    double stay_t_heading = 0;
-//    stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
-//        * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
-
-    /// Smooth reward (intrinsic)
-    double command_smooth = (command_ - pre_command_).squaredNorm();
-    double command_smooth2 = (command_ - 2*pre_command_ + prepre_command_).squaredNorm();
-//    commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
-//    commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
-//    torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
-
-    /// gathers intrinsic reward & extrinsic reward
-    /// if the distance between object and target below threshold, from that moment, we doesn't consider the intrinsic reward (saturate)
-    /// If reached rate == 0 => the object reached the target postion
-    double reached_rate = stay_t / distance;
-    if(stay_t < 0.2)
-    {
-      intrinsic_switch = false;
-    }
-
-    else
-    {
-      intrinsic_switch = true;
-    }
-
-    if (intrinsic_switch) {
-      towardObjectReward_ += towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
-      stayObjectReward_ += stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
-      towardTargetReward_ += towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
-      stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(stay_t + 0.05));
-      commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
-      commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
-      torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
-    }
-
-    else
-    {
-      stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-      if (stay_t < 0.05)
-      {
-        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
-      }
-
-    }
-
-    intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;
-    extrinsicReward_ = stayTargetExtrinsicReward_;
+//
+//    Eigen::Vector3d ee_to_obj = (Obj_Pos_.e()-ee_Pos_w_.e());
+//    Eigen::Vector3d obj_to_target (command_Obj_Pos_ - Obj_Pos_.e());
+//    Eigen::Vector3d ee_to_target = (command_Obj_Pos_ - ee_Pos_w_.e());
+//
+//    ee_to_obj(2) = 0;
+//    obj_to_target(2) = 0;
+//    ee_to_target(2) = 0;
+//    Obj_Vel_(2) = 0;
+//
+////    ee_to_obj = baseRot_.e().transpose() * ee_to_obj;
+////    obj_to_target = baseRot_.e().transpose() * obj_to_target;
+////    ee_to_target = baseRot_.e().transpose() * ee_to_target;
+//
+//    double toward_o = (ee_to_obj * (1. / (ee_to_obj.norm() + 1e-8))).transpose()*(ee_Vel_w_.e() * (1. / (ee_Vel_w_.e().norm() + 1e-8))) - 1;
+////    towardObjectReward_ += cf * towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
+//
+//    Eigen::Vector3d heading = baseRot_.e().col(0);
+//
+//
+////    raisim::quatToEulerVec()
+//
+//    /// stay close to the object
+//    double stay_o = ee_to_obj.norm(); /// max : inf, min : 0
+////    double o_bound = obj_geometry_.head(2).norm() / 2 + 5e-2;
+////    stayObjectReward_ += cf * stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
+//
+//    /// align robot head to the object
+//    double stay_o_heading = Obj_Vel_.e().dot(heading) / (heading.norm() * Obj_Vel_.e().norm() + 1e-8) - 1; /// max : 0, min : -1
+//    stayObjectHeadingReward_ += cf * stayObjectHeadingRewardCoeff_ * simDt_ * exp(stay_o_heading);
+//
+//    /// move the object towards the target
+//    double toward_t = (obj_to_target * (1. / (obj_to_target.norm() + 1e-8))).transpose()*(Obj_Vel_.e() * (1./ (Obj_Vel_.e().norm() + 1e-8))) - 1;
+////    towardTargetReward_ += cf * towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
+//
+//    /// keep the object close to the target (extrinsic)
+//    double stay_t = 0;
+//    for (int i = 0; i < object_anchor_points.size(); i++) {
+//      stay_t += (target_anchor_points[i] - object_anchor_points[i]).norm();
+//    }
+//    /// Mean value
+//    stay_t = stay_t / 8;
+//
+//    /// align object to the desired orientation (extrinsic)
+//    raisim::Mat<3,3> command_Obj_Rot_;
+//    raisim::quatToRotMat(command_Obj_quat_, command_Obj_Rot_);
+//
+//    Eigen::Vector3d target_x_axis = command_Obj_Rot_.e().col(0);
+//    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
+//    Eigen::Vector3d obj_x_axis = Obj_Rot_.e().col(0);
+////    base_x_axis(2) = 0;
+////    obj_x_axis(2) = 0;
+////    target_x_axis(2) = 0;
+////    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
+////    Eigen::Vector3d obj_x_axis_norm = obj_x_axis.normalized();
+////    Eigen::Vector3d target_x_axis_norm = target_x_axis.normalized();
+//
+//    double robot_to_obj_heading_cos = base_x_axis.dot(obj_x_axis);
+//    double robot_to_obj_heading_sin = (base_x_axis(0)*obj_x_axis(1) - base_x_axis(1)*obj_x_axis(0));
+//
+//    double robot_to_target_heading_cos = base_x_axis.dot(target_x_axis);
+//    double robot_to_target_heading_sin = base_x_axis(0)*target_x_axis(1) - base_x_axis(1)*target_x_axis(0);
+//
+//    double obj_to_target_heading_cos = obj_x_axis.dot(target_x_axis);
+//    double obj_to_target_heading_sin = obj_x_axis(0)*target_x_axis(1) - obj_x_axis(1) * target_x_axis(0);
+//
+////    double stay_t_heading = 0;
+////    stayTargetHeadingReward_ += cf * stayTargetHeadingRewardCoeff_ * simDt_ * exp(stay_t_heading)
+////        * exp(-stayTargetHeadingRewardCoeff_alpha_ * obj_to_target.norm());
+//
+//    /// Smooth reward (intrinsic)
+//    double command_smooth = (command_ - pre_command_).squaredNorm();
+//    double command_smooth2 = (command_ - 2*pre_command_ + prepre_command_).squaredNorm();
+////    commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
+////    commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
+////    torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
+//
+//    /// gathers intrinsic reward & extrinsic reward
+//    /// if the distance between object and target below threshold, from that moment, we doesn't consider the intrinsic reward (saturate)
+//    /// If reached rate == 0 => the object reached the target postion
+//    double reached_rate = stay_t / distance;
+//    if(stay_t < 0.2)
+//    {
+//      intrinsic_switch = false;
+//    }
+//
+//    else
+//    {
+//      intrinsic_switch = true;
+//    }
+//
+//    if (intrinsic_switch) {
+//      towardObjectReward_ += towardObjectRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_o), 2));
+//      stayObjectReward_ += stayObjectRewardCoeff_ * simDt_ * exp(-stay_o);
+//      towardTargetReward_ += towardTargetRewardCoeff_ * simDt_ * exp(-std::pow(std::min(0.0, toward_t), 2));
+//      stayTargetReward_ += stayTargetRewardCoeff_ * simDt_ * (-log(stay_t + 0.05));
+//      commandsmoothReward_ += cf * commandsmoothRewardCoeff_ * simDt_ * exp(-command_smooth);
+//      commandsmooth2Reward_ += cf * commandsmooth2RewardCoeff_ * simDt_ * exp(-command_smooth2);
+//      torqueReward_ += cf * torqueRewardCoeff_ * simDt_ * raibo_->getGeneralizedForce().norm();
+//    }
+//
+//    else
+//    {
+//      stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
+//      if (stay_t < 0.05)
+//      {
+//        stayTargetExtrinsicReward_ += stayTargetRewardCoeff_ * simDt_ * -log(stay_t + 0.05);
+//      }
+//
+//    }
+//
+//    intrinsicReward_ = towardObjectReward_ + stayObjectReward_ + stayObjectHeadingReward_ + towardTargetReward_ + commandsmoothReward_ + commandsmooth2Reward_ + torqueReward_ + stayTargetHeadingReward_ + stayTargetReward_;
+//    extrinsicReward_ = stayTargetExtrinsicReward_;
   }
 
   Eigen::Matrix3d rotMatTransform(raisim::Mat<3,3> rot) {
@@ -708,20 +717,20 @@ class RaiboController {
                    std::vector<Eigen::VectorXd> &state_info_history,
                    std::vector<Eigen::VectorXd> &action_info_history,
                    std::vector<Eigen::VectorXd> &dynamics_info_history) {
-    objectInfoHistory_ = obj_info_history;
-    stateInfoHistory_ = state_info_history;
-    actionInfoHistory_ = action_info_history;
-    dynamicsInfoHistory_ = dynamics_info_history;
+//    objectInfoHistory_ = obj_info_history;
+//    stateInfoHistory_ = state_info_history;
+//    actionInfoHistory_ = action_info_history;
+//    dynamicsInfoHistory_ = dynamics_info_history;
   }
 
   void get_History(std::vector<Eigen::VectorXd> &obj_info_history,
                    std::vector<Eigen::VectorXd> &state_info_history,
                    std::vector<Eigen::VectorXd> &action_info_history,
                    std::vector<Eigen::VectorXd> &dynamics_info_history) {
-    obj_info_history = objectInfoHistory_;
-    state_info_history = stateInfoHistory_;
-    action_info_history = actionInfoHistory_;
-    dynamics_info_history = dynamicsInfoHistory_;
+//    obj_info_history = objectInfoHistory_;
+//    state_info_history = stateInfoHistory_;
+//    action_info_history = actionInfoHistory_;
+//    dynamics_info_history = dynamicsInfoHistory_;
   }
 
   inline void setStandingMode(bool mode) { standingMode_ = mode; }
@@ -763,16 +772,16 @@ class RaiboController {
   Eigen::VectorXd nominalConfig_;
   /// output dim : joint action 12 + task space action 6 + gain dim 4
 
-  int proprioceptiveDim_ = 15;
-  int exteroceptiveDim_ = 40;
-  int dynamicsInfoDim_ = 27;
+  int proprioceptiveDim_ = 38;
+  int exteroceptiveDim_ = 0;
+  int dynamicsInfoDim_ = 0;
   static constexpr int actionDim_ = 3;
   int historyNum_ = 19;
   int actionNum_ = 20;
   int obBlockDim_ = 0;
-  int privilegedDim_ = 22;
+  int privilegedDim_ = 0;
 
-  static constexpr size_t obDim_ = 1700;
+  static constexpr size_t obDim_ = 820;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
@@ -798,6 +807,8 @@ class RaiboController {
   Eigen::VectorXd historyTempMemory_;
   std::vector<Eigen::VectorXd> objectInfoHistory_;
   std::vector<Eigen::VectorXd> stateInfoHistory_;
+  std::vector<std::vector<Eigen::Vector3d>> anchorHistory_;
+  Eigen::VectorXd anchorHistory_e;
   std::vector<Eigen::VectorXd> actionInfoHistory_;
   std::vector<Eigen::VectorXd> dynamicsInfoHistory_;
   Eigen::VectorXd historyTempMemory_2;
@@ -821,6 +832,10 @@ class RaiboController {
   // robot observation variables
   std::vector<Eigen::Vector3d> target_anchor_points;
   std::vector<Eigen::Vector3d> object_anchor_points;
+  std::vector<Eigen::Vector3d> current_anchor_points;
+  std::vector<Eigen::Vector3d> next_anchor_points;
+//  Eigen::VectorXd current_anchor_points_e;
+
   std::vector<raisim::VecDyn> heightScan_;
   Eigen::VectorXi scanConfig_;
   Eigen::VectorXd obDouble_;
@@ -848,6 +863,7 @@ class RaiboController {
   Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d obj_geometry_;
   Eigen::VectorXd classify_vector_;
+  Eigen::Vector4d foot_contact_;
 
   // For testing
   bool is_success_ = false;
