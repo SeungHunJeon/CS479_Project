@@ -56,11 +56,7 @@ else:
 
 
 #
-if (is_rollout):
-    print(1)
-    env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain_ROLLOUT(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
-else:
-    env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
 
 print('env create success')
 # shortcuts
@@ -74,65 +70,68 @@ weight_dir = weight_path.rsplit('/', 1)[0] + '/'
 # Encoding
 historyNum = cfg['environment']['dimension']['historyNum_']
 pro_dim = cfg['environment']['dimension']['proprioceptiveDim_']
-ext_dim = cfg['environment']['dimension']['exteroceptiveDim_']
-inertial_dim = cfg['environment']['dimension']['inertialparamDim_']
-dynamics_info_dim = cfg['environment']['dimension']['dynamicsInfoDim_']
-dynamics_input_dim = cfg['environment']['dimension']['dynamicsInputDim_']
-dynamics_predict_dim = cfg['environment']['dimension']['dynamicsPredictDim_']
+ext_dim = 0
+inertial_dim = 0
+dynamics_info_dim = 0
+dynamics_predict_dim = 0
 ROA_ext_dim = ext_dim - inertial_dim
 
 # shortcuts
 act_dim = env.num_acts
-Encoder_ob_dim = historyNum * (pro_dim + ext_dim + act_dim)
+# Encoder_ob_dim = historyNum * inertial_dim
+Encoder_ob_dim = historyNum * (pro_dim + act_dim)
+
 
 # LSTM
 hidden_dim = cfg['LSTM']['hiddendim_']
 batchNum = cfg['LSTM']['batchNum_']
 layerNum = cfg['LSTM']['numLayer_']
+is_decouple = cfg['LSTM']['isDecouple_']
 
 # ROA Encoding
-ROA_Encoder_ob_dim = historyNum * (pro_dim + ROA_ext_dim + act_dim)
+ROA_Encoder_ob_dim = historyNum * (pro_dim + act_dim)
 
 # Training
 n_steps = math.floor(cfg['environment']['max_time'] / cfg['environment']['control_dt'])
 total_steps = n_steps * env.num_envs
-num_learning_epochs = 1
+num_learning_epochs = 16
 num_mini_batches = 1
+Domain_Randomization = cfg['environment']['Domain_Randomization']
+
 # PPO coeff
 entropy_coeff_ = cfg['environment']['entropy_coeff']
 
+def actor_input_concat(encoder, latent, obs):
+    actor_input = []
 
-def get_obs_ROA(encoder, obs_batch):
-    obs_ROA_batch = []
+    actor_input.apend(obs[...,
+                      0
+                      :
+                      encoder.architecture.block_dim])
+    actor_input.append(obs[...,
+    (encoder.architecture.block_dim)*(historyNum-1)
+                       :
+    (encoder.architecture.block_dim)*(historyNum-1)
+                       + encoder.architecture.pro_dim])
+
+    actor_input = np.concatenate(actor_input, axis=-1)
+
+    return torch.cat((latent, torch.Tensor(actor_input)), dim=-1)
+
+def obs_post_process(encoder, obs_batch):
+    obs = []
 
 
     for i in range(historyNum):
         # Get proprioceptive part of observation
-        obs_ROA_batch.append(obs_batch[...,
+        obs.append(obs_batch[...,
                              (encoder.architecture.block_dim)*i:
                              (encoder.architecture.block_dim)*i
-                             + encoder.architecture.pro_dim])
+                             + encoder.architecture.pro_dim + encoder.architecture.act_dim])
 
-        # Get Exteroceptive part of observation except inertial parameter
-        obs_ROA_batch.append(obs_batch[...,
-                             (encoder.architecture.block_dim)*i
-                             + encoder.architecture.pro_dim:
-                             (encoder.architecture.block_dim)*i
-                             + encoder.architecture.pro_dim
-                             + encoder.architecture.ext_dim - inertial_dim])
+    obs = np.concatenate(obs, axis=-1)
 
-        obs_ROA_batch.append(obs_batch[...,
-                             (encoder.architecture.block_dim)*i
-                             + encoder.architecture.pro_dim
-                             + encoder.architecture.ext_dim:
-                             (encoder.architecture.block_dim)*i
-                             + encoder.architecture.pro_dim
-                             + encoder.architecture.ext_dim
-                             + encoder.architecture.act_dim])
-
-    obs_ROA_batch = np.concatenate(obs_ROA_batch, axis=-1)
-
-    return obs_ROA_batch
+    return obs
 
 if weight_path == "":
     print("Can't find trained weight, please provide a trained weight with --weight switch\n")
@@ -145,41 +144,30 @@ else:
 
     print("Visualizing and evaluating the policy: ", weight_path)
 
-    obj_f_dynamics_input_dim = hidden_dim + act_dim + dynamics_input_dim
-
-    obj_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
-                                                         nn.LeakyReLU,
-                                                         obj_f_dynamics_input_dim,
-                                                         dynamics_predict_dim),
-                                          device=device)
-
-    latent_f_dynamics_input_dim = hidden_dim + act_dim
-
-    latent_f_dynamics = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['obj_f_dynamics']['net'],
-                                                            nn.LeakyReLU,
-                                                            latent_f_dynamics_input_dim,
-                                                            hidden_dim),
-                                             device=device)
-
-
     Estimator = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
                                                     nn.LeakyReLU,
-                                                    hidden_dim,
-                                                    int((Encoder_ob_dim-ROA_Encoder_ob_dim)/historyNum)), device=device)
+                                                    hidden_dim + pro_dim * 2 + act_dim,
+                                                    24), device=device)
 
-    Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
-                                                                  hidden_dim=hidden_dim,
-                                                                  ext_dim=ROA_ext_dim,
-                                                                  pro_dim=pro_dim,
-                                                                  act_dim=act_dim,
-                                                                  dyn_info_dim=dynamics_info_dim,
-                                                                  dyn_predict_dim=dynamics_predict_dim,
-                                                                  hist_num=historyNum,
-                                                                  device=device,
-                                                                  batch_num=batchNum,
-                                                                  layer_num=layerNum,
-                                                                  num_minibatch = num_mini_batches,
-                                                                  num_env=num_env), device=device)
+    Estimator_cov = ppo_module.Estimator(ppo_module.MLP(cfg['architecture']['estimator']['net'],
+                                                        nn.LeakyReLU,
+                                                        hidden_dim + pro_dim * 2 + act_dim,
+                                                        24), device=device)
+#
+
+    # Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
+    #                                                               hidden_dim=hidden_dim,
+    #                                                               ext_dim=ROA_ext_dim,
+    #                                                               pro_dim=pro_dim,
+    #                                                               act_dim=act_dim,
+    #                                                               dyn_info_dim=dynamics_info_dim,
+    #                                                               dyn_predict_dim=dynamics_predict_dim,
+    #                                                               hist_num=historyNum,
+    #                                                               device=device,
+    #                                                               batch_num=batchNum,
+    #                                                               layer_num=layerNum,
+    #                                                               num_minibatch = num_mini_batches,
+    #                                                               num_env=num_env), device=device)
 
     Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                                                               hidden_dim=hidden_dim,
@@ -196,69 +184,61 @@ else:
                                                               num_env=num_env), device=device)
 
 
-    actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
-                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
-                                                                               num_env,
-                                                                               1.0,
-                                                                               NormalSampler(act_dim),
-                                                                               cfg['seed']),
-                             device)
+    # actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
+    #                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
+    #                                                                            num_env,
+    #                                                                            1.0,
+    #                                                                            NormalSampler(act_dim),
+    #                                                                            cfg['seed']),
+    #                          device)
 
-    Encoder_Rollout = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
-                                                                      hidden_dim=hidden_dim,
-                                                                      ext_dim=ROA_ext_dim,
-                                                                      pro_dim=pro_dim,
-                                                                      act_dim=act_dim,
-                                                                      dyn_info_dim=dynamics_info_dim,
-                                                                      dyn_predict_dim=dynamics_predict_dim,
-                                                                      hist_num=historyNum,
-                                                                      device=device,
-                                                                      batch_num=batchNum,
-                                                                      layer_num=layerNum,
-                                                                      num_minibatch = num_mini_batches,
-                                                                      num_env=num_env), device=device)
+    # Encoder_Rollout = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
+    #                                                                   hidden_dim=hidden_dim,
+    #                                                                   ext_dim=ROA_ext_dim,
+    #                                                                   pro_dim=pro_dim,
+    #                                                                   act_dim=act_dim,
+    #                                                                   dyn_info_dim=dynamics_info_dim,
+    #                                                                   dyn_predict_dim=dynamics_predict_dim,
+    #                                                                   hist_num=historyNum,
+    #                                                                   device=device,
+    #                                                                   batch_num=batchNum,
+    #                                                                   layer_num=layerNum,
+    #                                                                   num_minibatch = num_mini_batches,
+    #                                                                   num_env=num_env), device=device)
+    #
+    # actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
+    #                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
+    #                                                                            n_samples,
+    #                                                                            1.0,
+    #                                                                            NormalSampler(act_dim),
+    #                                                                            cfg['seed']),
+    #                          device)
 
-    actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
-                             ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
-                                                                               n_samples,
-                                                                               1.0,
-                                                                               NormalSampler(act_dim),
-                                                                               cfg['seed']),
-                             device)
-
-    # Encoder_Rollout.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
-    # actor_Rollout.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
-    # actor_Rollout.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
-    actor.architecture.load_state_dict(torch.load(weight_path)['actor_architecture_state_dict'])
-    actor.distribution.load_state_dict(torch.load(weight_path)['actor_distribution_state_dict'])
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
-    Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
-    Estimator.architecture.load_state_dict(torch.load(weight_path)['Inertial_estimator'])
-    obj_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['obj_f_dynamics_state_dict'])
-    latent_f_dynamics.architecture.load_state_dict(torch.load(weight_path)['latent_f_dynamics_state_dict'])
+    # Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
+    Estimator.architecture.load_state_dict(torch.load(weight_path)['Estimator_state_dict'])
+    Estimator_cov.architecture.load_state_dict(torch.load(weight_path)['Estimator_cov_state_dict'])
 
     env.load_scaling(weight_dir, int(iteration_number))
-    print('ww')
     env.turn_on_visualization()
-    print('ww')
     # for i in range (int(int(iteration_number) / 100)):
     #     env.curriculum_callback()
 
     # for i in range(100):
     #     env.curriculum_callback()
-
-    traj_sampler = mppi.MPPI(latent_f_dynamics=latent_f_dynamics,
-                             obj_f_dynamics=obj_f_dynamics,
-                             encoder=Encoder,
-                             encoder_ROA=Encoder_Rollout,
-                             actor=actor_Rollout,
-                             environment=env,
-                             n_samples=n_samples,
-                             horizon=n_horizon,
-                             gamma=gamma,
-                             device=device,
-                             use_dynamics=use_dynamics,
-                             inertial_dim=inertial_dim)
+    #
+    # traj_sampler = mppi.MPPI(latent_f_dynamics=latent_f_dynamics,
+    #                          obj_f_dynamics=obj_f_dynamics,
+    #                          encoder=Encoder,
+    #                          encoder_ROA=Encoder_Rollout,
+    #                          actor=actor_Rollout,
+    #                          environment=env,
+    #                          n_samples=n_samples,
+    #                          horizon=n_horizon,
+    #                          gamma=gamma,
+    #                          device=device,
+    #                          use_dynamics=use_dynamics,
+    #                          inertial_dim=inertial_dim)
 
 
 
@@ -275,7 +255,7 @@ else:
         # env_value = env.get_envrionmental_value()
         # print(env_value.shape)
         Encoder.architecture.reset()
-        Encoder_ROA.architecture.reset()
+        # Encoder_ROA.architecture.reset()
 
         # For action plotting
         idx = 0
@@ -301,94 +281,44 @@ else:
 
         if(is_rollout):
             target_pos = env.get_target_pos()
+
+        actions = np.zeros((env.num_envs, 3), dtype=np.float32)
         for step in range(total_steps):
             with torch.no_grad():
-                if(is_rollout == False):
-                    obs = env.observe(False)
-                    contact = env.get_contact()
-                    privilege_info = env.get_privileged_info()
-                    obs_ROA = get_obs_ROA(Encoder, obs)
+                obs = env.observe(False)
+                obs_processed = obs_post_process(Encoder, obs)
+                latent = Encoder.evaluate(torch.from_numpy(obs_processed).to(device))
+                actor_input = actor_input_concat(Encoder, latent, obs)
 
+                estimated_anchors = Estimator.predict(actor_input)
 
+                # latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
+                # action_ll = actor.architecture(latent_ROA, actor=True).cpu().numpy()
+                # action_ll, actions_log_prob = actor.sample(latent_ROA)
 
-                    latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
-                    action_ll = actor.architecture(latent_ROA, actor=True).cpu().numpy()
-                    # action_ll, actions_log_prob = actor.sample(latent_ROA)
-
-                    if (contact[0]):
-                        inertia_predict = Estimator.predict(latent_ROA[0])
-                        inertia_true = privilege_info[0]
-
-                        # print(inertia_predict)
-                        # print(inertia_true)
-
-                    # For action plotting
-                    y[idx] = action_ll[0][0]
-                    y2[idx] = action_ll[0][1]
-                    y3[idx] = action_ll[0][2]
-                    idx+=1
-                    line1.set_xdata(x)
-                    line1.set_ydata(y)
-                    line2.set_xdata(x)
-                    line2.set_ydata(y2)
-                    line3.set_xdata(x)
-                    line3.set_ydata(y3)
-                    figure.canvas.draw()
-                    figure.canvas.flush_events()
-
-                    success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
-                    env.step_visualize_success(action_ll, success)
-
-
-                if (is_rollout == True):
-                    cur_pos = env.get_obj_pos()
-                    tic = time.time()
-                    cur_observation = env.observe_Rollout(False)
-
-                    action_rollout, predict_states = traj_sampler.compute_rollout(goal_state=target_pos, cur_state=cur_pos, cur_observation=cur_observation)
-                    env.synchronize()
-                    toc = time.time()
-                    print("time consuming : ", toc - tic)
-                    env.predict_obj_update(predict_states.numpy())
-                    env.step_visualize(action_rollout.cpu().detach().numpy())
-                    env.synchronize()
-
-                    # gc = np.array([1]*19, dtype=np.float32)
-                    # gv = np.array([1]*18, dtype=np.float32)
-                    # env.get_state(gc, gv)
-                    # print(gc)
-                    # print(gv)
-
-                    # gc_batch = np.ones((n_samples,19), dtype=np.float32)
-                    # gv_batch = np.ones((n_samples,18), dtype=np.float32)
-                    # env.get_state_rollout(gc_batch, gv_batch)
-                    # print(gc_batch)
-                    # print(gv_batch)
-
-
-
-                    """
-                    Encoder 넣을 때 적절한 시기에 clone해서 넣어줘야 할 듯 ? LSTM이라
-                    """
-
-
-
-                    # gc_batch = np.ones((n_samples,19), dtype=np.float32)
-                    # gv_batch = np.ones((n_samples,18), dtype=np.float32)
-                    # env.get_state_rollout(gc_batch, gv_batch)
-                    # print(gc_batch)
-                    # print(gv_batch)
+                # For action plotting
+                # y[idx] = action_ll[0][0]
+                # y2[idx] = action_ll[0][1]
+                # y3[idx] = action_ll[0][2]
+                # idx+=1
+                # line1.set_xdata(x)
+                # line1.set_ydata(y)
+                # line2.set_xdata(x)
+                # line2.set_ydata(y2)
+                # line3.set_xdata(x)
+                # line3.set_ydata(y3)
+                # figure.canvas.draw()
+                # figure.canvas.flush_events()
 
                 # success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
-                # TODO add MPPI here
-                '''
-                action_traj = MPPI(state, e, o)
+                env.step_visualize(actions)
+
                 '''
         # For action plotting
-        plt.close(figure)
-        print( "Trial : {} ".format(i))
-        print(success.sum().item())
-        success_npy = success.numpy()
+        # plt.close(figure)
+        # print( "Trial : {} ".format(i))
+        # print(success.sum().item())
+        # success_npy = success.numpy()
         # env_value = np.concatenate([env_value, success_npy], axis=-1)
         # print(env_value.shape)
 
@@ -404,12 +334,13 @@ else:
         # success_sum = torch.sum(success, dim=0) / success.shape(0)
         # print(success_sum)
         # success_batch.append(success)
-    success_batch = torch.cat(success_batch, dim=0)
-    print(torch.sum(success_batch, dim=0))
-
-
-
-    env.turn_off_visualization()
-    env.reset()
+    # success_batch = torch.cat(success_batch, dim=0)
+    # print(torch.sum(success_batch, dim=0))
+    # 
+    # 
+    # 
+    # env.turn_off_visualization()
+    # env.reset()
+    '''
 
 

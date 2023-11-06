@@ -259,6 +259,7 @@ class ENVIRONMENT {
 
     /// Low level frequency 0.01
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
+      controller_.updateStateVariables();
       controller_.updateHistory();
       if(is_position_goal) {
         Low_controller_.updateObservation(&world_);

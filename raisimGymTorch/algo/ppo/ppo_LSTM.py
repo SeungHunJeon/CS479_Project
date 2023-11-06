@@ -65,7 +65,6 @@ class PPO:
         else:
             self.batch_sampler = self.storage.mini_batch_generator_inorder
 
-        self.encoder_input_dim = self.encoder.architecture.input_shape[0]
         self.optimizer = optim.Adam([
             # *self.actor.parameters(),
             #                          *self.critic.parameters(),
@@ -84,7 +83,8 @@ class PPO:
 
         # remove estimator
         self.device = device
-        self.criteria = nn.GaussianNLLLoss()
+        self.GaussianNLLLoss = nn.GaussianNLLLoss()
+        self.MSELoss = nn.MSELoss()
 
         # env parameters
         self.num_transitions_per_env = num_transitions_per_env
@@ -167,7 +167,7 @@ class PPO:
         # last_values = self.critic.predict(torch.from_numpy(value_obs).to(self.device))
 
         # Learning step
-        # self.storage.compute_returns(last_values.to(self.device), self.critic, self.gamma, self.lam)
+        self.storage.compute_returns()
         _, infos = self._train_step(log_this_iteration)
         # self.mean_value_loss = infos['mean_value_loss']
         # self.mean_surrogate_loss = infos['mean_surrogate_loss']
@@ -207,10 +207,10 @@ class PPO:
 
         return output
 
-    def encode_ROA(self, obs):
-        output = self.encoder_ROA.evaluate_update(obs)
-
-        return output
+    # def encode_ROA(self, obs):
+    #     output = self.encoder_ROA.evaluate_update(obs)
+    #
+    #     return output
     # def plot_grad_flow(self, named_parameters):
     #     ave_grads = []
     #     layers = []
@@ -286,6 +286,11 @@ class PPO:
         filtered_obs = []
 
         filtered_obs.append(obs_batch[...,
+                            0
+                            :
+                            self.encoder.architecture.block_dim])
+
+        filtered_obs.append(obs_batch[...,
                             (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
                             :
                             (self.encoder.architecture.block_dim)*(self.num_history_batch-1)
@@ -300,7 +305,7 @@ class PPO:
 
             if isinstance(latent_batch[0], torch.Tensor):
                 filtered_obs = torch.Tensor(filtered_obs)
-                filtered_obs = filtered_obs.reshape((-1, self.encoder.architecture.pro_dim))
+                filtered_obs = filtered_obs.reshape((-1, self.encoder.architecture.pro_dim * 2 + self.encoder.architecture.act_dim))
                 filtered_obs = filtered_obs.to(self.device)
 
                 return torch.cat((latent_batch, filtered_obs), dim=-1)
@@ -310,7 +315,7 @@ class PPO:
 
             if isinstance(latent_batch[0], torch.Tensor):
                 # filtered_obs = torch.cat(filtered_obs, dim=-1)
-                filtered_obs = filtered_obs.reshape((-1, self.encoder.architecture.pro_dim))
+                filtered_obs = filtered_obs.reshape((-1, self.encoder.architecture.pro_dim * 2 + self.encoder.architecture.act_dim))
                 filtered_obs = filtered_obs.to(self.device)
 
                 return torch.cat((latent_batch, filtered_obs), dim=-1)
@@ -332,18 +337,18 @@ class PPO:
         self.lambda_ROA = pow(self.lambda_ROA, self.lambdaDecayFactor)
         print(self.lambda_ROA)
         for epoch in range(self.num_learning_epochs):
-            for obs_batch, actions_batch, _, _, _, _, _, _, _, _, anchors_batch \
+            for obs_batch, _, _, _, _, _, _, _, _, _, anchors_batch \
                     in self.batch_sampler(self.num_mini_batches):
                 # privileged_batch = privileged_batch.reshape((-1, self.num_envs // self.num_mini_batches, self.inertial_dim))
                 # contact_batch = contact_batch.reshape((-1, self.num_envs // self.num_mini_batches, 1))
                 # contact_mask = contact_batch.bool().squeeze(-1)
 
                 self.encoder.architecture.reset()
-                self.encoder_ROA.architecture.reset()
+                # self.encoder_ROA.architecture.reset()
 
 
 
-                obs_ROA_batch = self.get_obs_ROA(obs_batch)
+                # obs_ROA_batch = self.get_obs_ROA(obs_batch)
 
                 # estimator_true_data = self.filter_for_estimation(obs_batch, contact_mask)
                 # estimator_true_data = privileged_batch[contact_mask]
@@ -388,7 +393,12 @@ class PPO:
                 actor_input = self.filter_for_actor(obs_batch, latent)
                 mean = self.estimator.evaluate(actor_input)
                 cov = torch.exp_(2*self.estimator_cov.evaluate(actor_input))
-                estimator_loss = self.criteria(mean, self.estimator_pre_process(anchors_batch), cov)
+                target = self.estimator_pre_process(anchors_batch)
+
+                # estimator_loss = self.GaussianNLLLoss(mean, target, cov)
+
+                estimator_loss = self.MSELoss(mean, target)
+
                 # actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_input, actions_batch)
                 # value_batch = self.critic.evaluate(actor_input)
 
@@ -439,7 +449,7 @@ class PPO:
                 #        + estimator_loss
                        # + obj_f_dynamics_loss \
                        # + latent_f_dyn_loss \
-                loss = estimator_loss * 1e4
+                loss = estimator_loss
 
                 # dynamics_loss = obj_f_dynamics_loss
 

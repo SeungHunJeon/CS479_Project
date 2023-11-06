@@ -62,6 +62,7 @@ class RaiboController {
     raibo_ = reinterpret_cast<raisim::ArticulatedSystem *>(world->getObject("robot"));
     gc_.setZero(raibo_->getGeneralizedCoordinateDim());
     gv_.setZero(raibo_->getDOF());
+    gc_[3] = 1;
     jointVelocity_.resize(nJoints_);
     nominalConfig_.setZero(nJoints_);
     nominalConfig_ << 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672, 0.0, 0.559836, -1.119672, -0.0, 0.559836, -1.119672;
@@ -88,20 +89,21 @@ class RaiboController {
     objectInfoHistory_.resize(historyNum_);
     stateInfoHistory_.resize(historyNum_);
     actionInfoHistory_.resize(actionNum_);
-    anchorHistory_.resize(historyNum_);
-    anchorHistory_e.setZero(historyNum_ * 8 * 3);
+    anchorHistory_.resize(actionNum_);
+    anchorHistory_e.setZero(actionNum_ * 8 * 3);
 
     for (int i =0; i<historyNum_; i++) {
       stateInfoHistory_[i].setZero(proprioceptiveDim_);
-      anchorHistory_[i].resize(8);
-      for(int j = 0; j < 8; j ++) {
-        anchorHistory_[i][j].setZero();
-      }
+
     }
 
     for (int i = 0; i<actionNum_; i++)
     {
       actionInfoHistory_[i].setZero(actionDim_);
+      anchorHistory_[i].resize(8);
+      for(int j = 0; j < 8; j ++) {
+        anchorHistory_[i][j].setZero();
+      }
     }
 
     for (auto &fs: footContactState_) fs = false;
@@ -153,7 +155,7 @@ class RaiboController {
     stateInfoHistory_[historyNum_ - 1] = state_Info_;
 
     std::rotate(anchorHistory_.begin(), anchorHistory_.begin()+1, anchorHistory_.end());
-    anchorHistory_[historyNum_ - 1] = current_anchor_points;
+    anchorHistory_[actionNum_ - 1] = current_anchor_points;
   }
   /// Simdt
   void updateStateVariables() {
@@ -197,7 +199,7 @@ class RaiboController {
     state_Info_.segment(33, 4) << static_cast<double>(footContactState_[0]), static_cast<double>(footContactState_[1]), static_cast<double>(footContactState_[2]), static_cast<double>(footContactState_[3]);
     state_Info_.segment(37,1) <<  gc_[2];
 
-    Eigen::Vector3d geometry{1,1,1};
+    Eigen::Vector3d geometry{0.2,0.2,0.2};
     Eigen::Vector3d pos{gc_[0],gc_[1],0};
     raisim::Mat<3,3> yaw_rot;
     Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
@@ -384,6 +386,7 @@ class RaiboController {
     Eigen::VectorXd current_pos_ = raibo_->getBasePosition().e();
     position += actionMean_.cast<float>();
     prepre_command_ = pre_command_;
+    start_rot_ = baseRot_.e();
     pre_command_ = command_;
     if(is_position_goal)
       command_ = {position(0), position(1), 0};
@@ -406,8 +409,13 @@ class RaiboController {
 
   bool update_actionHistory(raisim::World *world, const Eigen::Ref<EigenVec> &action, double curriculumFactor) {
     /// action scaling
-    std::rotate(actionInfoHistory_.begin(), actionInfoHistory_.begin()+1, actionInfoHistory_.end());
-    actionInfoHistory_[actionNum_ - 1] = action.cast<double>();
+//    std::rotate(actionInfoHistory_.begin(), actionInfoHistory_.begin()+1, actionInfoHistory_.end());
+//    actionInfoHistory_[actionNum_ - 1] = action.cast<double>();
+//
+//    actionInfoHistory_.fill
+    for (int i = 0; i < actionNum_; i++) {
+      actionInfoHistory_[i] = command_.cast<double>();
+    }
 
     return true;
   }
@@ -421,9 +429,9 @@ class RaiboController {
   }
 
   void get_anchor_history(Eigen::Ref<EigenVec> &anchor_points) {
-    for(int i = 0; i < historyNum_; i ++) {
+    for(int i = 0; i < actionNum_; i ++) {
       for (int j = 0; j < 8; j++) {
-        anchorHistory_e.segment(24 * i + 3 * j, 3) = anchorHistory_[i][j];
+        anchorHistory_e.segment(24 * i + 3 * j, 3) = start_rot_.transpose()*anchorHistory_[i][j];
       }
     }
     anchor_points = anchorHistory_e.cast<float>();
@@ -808,6 +816,7 @@ class RaiboController {
   std::vector<Eigen::VectorXd> objectInfoHistory_;
   std::vector<Eigen::VectorXd> stateInfoHistory_;
   std::vector<std::vector<Eigen::Vector3d>> anchorHistory_;
+  Eigen::VectorXd rotHistory_e;
   Eigen::VectorXd anchorHistory_e;
   std::vector<Eigen::VectorXd> actionInfoHistory_;
   std::vector<Eigen::VectorXd> dynamicsInfoHistory_;
@@ -817,6 +826,7 @@ class RaiboController {
   Eigen::Matrix3d baseRot_transform;
   Eigen::Matrix3d objRot_transform;
   Eigen::Matrix3d base_to_obj_Rot_;
+  Eigen::Matrix3d start_rot_;
   Eigen::Vector3f command_, pre_command_, prepre_command_;
   Eigen::Vector3d desired_pos_;
   double desired_dist_;

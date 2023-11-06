@@ -196,6 +196,62 @@ class Transformer(nn.Module):
         return output
     def reset(self):
         return True
+
+class CausalTransformer(nn.Module):
+    def __init__(self, d_model, nhead, num_encoder_layers, dim_feedforward, hist_num, num_env, pro_dim, act_dim, device='cpu'):
+        super(CausalTransformer, self).__init__()
+
+        self.hist_num = hist_num
+        self.num_env = num_env
+        self.pro_dim = pro_dim
+        self.act_dim = act_dim
+        self.device = device
+        self.state_embedding = nn.Linear(pro_dim, d_model)
+        self.action_embedding = nn.Linear(act_dim, d_model)
+
+        self.pe = PositionalEncoding(d_model=d_model, max_len=self.hist_num*2-1)
+
+        self.transformer_layer = nn.TransformerEncoderLayer(d_model=d_model,
+                                                            dim_feedforward=dim_feedforward,
+                                                            nhead=nhead)
+
+        self.transformer = nn.TransformerEncoder(encoder_layer=self.transformer_layer,
+                                                 num_layers=num_encoder_layers)
+        #
+        # self.transformer = nn.Transformer(
+        #     d_model=d_model,
+        #     nhead=nhead,
+        #     num_encoder_layers=num_encoder_layers,
+        #     dim_feedforward=dim_feedforward,
+        # )
+    def forward(self, obs):
+        # Create a causal mask to ensure autoregressive behavior
+        obs_sliced = obs.reshape(self.hist_num, self.num_env, -1)
+        state_inputs = obs_sliced[..., :self.pro_dim]
+        action_inputs = obs_sliced[:-1, :, self.pro_dim:]
+
+        state_latent = self.state_embedding(state_inputs) # Hist x num_env x d_model
+        action_latent = self.action_embedding(action_inputs) # Hist x num_env x d_model
+
+        combined_latents = torch.empty(state_latent.shape[0] * 2 - 1, state_latent.shape[1], state_latent.shape[2]).to(self.device)
+
+        combined_latents[0::2] = state_latent
+        combined_latents[1::2] = action_latent
+
+        inputs = self.pe(combined_latents)
+
+        input_len = inputs.size(0)
+        causal_mask = torch.triu(torch.ones(input_len, input_len), diagonal=1).bool()
+        causal_mask = causal_mask.unsqueeze(0).expand(self.num_env, -1, -1)
+        # Pass the source through the transformer with the causal mask
+        output = self.transformer(inputs, src_key_padding_mask=~causal_mask)
+
+        # return output[0::2]
+
+        return output[-1]
+
+
+
 class LSTM(nn.Module):
     def __init__(self, input_dim, hidden_dim, ext_dim, pro_dim, dyn_info_dim, inertial_dim, dyn_predict_dim, act_dim, hist_num, batch_num, num_minibatch, num_env, layer_num, device, is_decouple=False):
         super(LSTM, self).__init__()
@@ -222,7 +278,7 @@ class LSTM(nn.Module):
 
         self.block_dim = ext_dim + pro_dim + dyn_info_dim + act_dim
 
-        self.lstm = nn.LSTM(input_size=self.input_dim,
+        self.lstm = nn.LSTM(input_size=int(self.input_dim / self.hist_num),
                             hidden_size=self.hidden_dim,
                             num_layers=self.layer_num,
                             batch_first=False)
@@ -235,12 +291,7 @@ class LSTM(nn.Module):
 
     # Forward function is for encode one-step observation which incorporates number of (high-level controller frequency) / (low-level controller frequency)
     def forward(self, obs):
-        if(self.is_decouple):
-            inputs = obs.reshape((self.num_env, -1, self.input_dim))
-            inputs = torch.permute(inputs, (1, 0, 2))
-
-        else:
-            inputs = obs.reshape(-1, self.num_env, self.input_dim)
+        inputs = obs.reshape(self.hist_num, self.num_env, int(self.input_dim/self.hist_num))
 
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
@@ -259,30 +310,22 @@ class LSTM(nn.Module):
     # (number of step) * (high-level controller frequency) / (low-level controller frequency)
     def forward_update(self, obs):
         # inputs = obs.reshape((-1, self.num_env, int(self.input_dim / self.hist_num)))
-        if(self.is_decouple):
-            inputs = torch.permute(obs, (1,0,2)) # 40 300 5*a -> 300 40 5*a
-            inputs = torch.reshape(inputs, (self.num_env // self.num_minibatch, -1, self.input_dim)) # 300 200 a
-            inputs = torch.permute(inputs, (1,0,2)) # 200 300 a
+        output = []
+        for i in range(obs.shape[0]):
+            inputs = obs[i].reshape((-1, self.num_env // self.num_minibatch, int(self.input_dim / self.hist_num)))
 
-        else:
-            inputs = obs.reshape((-1, self.num_env // self.num_minibatch, self.input_dim))
+            # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
 
-        # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
+            if (self.h_0 == None):
+                outputs, (h_n, c_n) = self.lstm(inputs)
+            else:
+                outputs, (h_n, c_n) = self.lstm(inputs, (self.h_0, self.c_0))
 
-        if (self.h_0 == None):
-            outputs, (h_n, c_n) = self.lstm(inputs)
-        else:
-            outputs, (h_n, c_n) = self.lstm(inputs, (self.h_0, self.c_0))
+            self.h_0 = h_n
+            self.c_0 = c_n
 
-        self.h_0 = h_n
-        self.c_0 = c_n
-        if(self.is_decouple):
-            outputs = outputs[self.hist_num-1::self.hist_num]
-            output = outputs.reshape(-1, self.hidden_dim)
-
-        else:
-            output = outputs.reshape(-1, self.hidden_dim)
-
+            output.append(outputs[-1].reshape(-1, self.hidden_dim))
+        output = torch.stack(output, dim=0).reshape(-1, self.hidden_dim)
         return output
 
     def reset(self):

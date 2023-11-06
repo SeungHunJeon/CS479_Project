@@ -67,24 +67,24 @@ class RolloutStorage:
     def clear(self):
         self.step = 0
 
-    def compute_returns(self, last_values, critic, gamma, lam):
-        with torch.inference_mode():
-            self.values = critic.predict(torch.from_numpy(self.critic_obs).to(self.device)).cpu().numpy()
-
-        advantage = 0
-
-        for step in reversed(range(self.num_transitions_per_env)):
-            if step == self.num_transitions_per_env - 1:
-                next_values = last_values.cpu().numpy()
-                # next_is_not_terminal = 1.0 - self.dones[step].float()
-            else:
-                next_values = self.values[step + 1]
-                # next_is_not_terminal = 1.0 - self.dones[step+1].float()
-
-            next_is_not_terminal = 1.0 - self.dones[step]
-            delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
-            advantage = delta + next_is_not_terminal * gamma * lam * advantage
-            self.returns[step] = advantage + self.values[step]
+    def compute_returns(self):
+        # with torch.inference_mode():
+        #     self.values = critic.predict(torch.from_numpy(self.critic_obs).to(self.device)).cpu().numpy()
+        #
+        # advantage = 0
+        #
+        # for step in reversed(range(self.num_transitions_per_env)):
+        #     if step == self.num_transitions_per_env - 1:
+        #         next_values = last_values.cpu().numpy()
+        #         # next_is_not_terminal = 1.0 - self.dones[step].float()
+        #     else:
+        #         next_values = self.values[step + 1]
+        #         # next_is_not_terminal = 1.0 - self.dones[step+1].float()
+        #
+        #     next_is_not_terminal = 1.0 - self.dones[step]
+        #     delta = self.rewards[step] + next_is_not_terminal * gamma * next_values - self.values[step]
+        #     advantage = delta + next_is_not_terminal * gamma * lam * advantage
+        #     self.returns[step] = advantage + self.values[step]
 
         # Compute and normalize the advantages
         self.advantages = self.returns - self.values
