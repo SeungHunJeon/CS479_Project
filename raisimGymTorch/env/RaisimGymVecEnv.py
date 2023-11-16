@@ -60,6 +60,10 @@ class RaisimGymVecEnv:
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
 
+    def step_evaluate(self, action, anchors):
+        self.wrapper.step_evaluate(action, anchors, self._reward, self._done)
+        return self._reward.copy(), self._done.copy()
+
     def predict_obj_update(self, predict_state_batch):
         self.wrapper.predict_obj_update(predict_state_batch)
 

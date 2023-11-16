@@ -237,7 +237,18 @@ class VectorizedEnvironment {
       perAgentStep(i, action, reward, done, true);
   }
 
-  void step_visualize_success(Eigen::Ref<EigenRowMajorMat> &action,
+
+  void step_evaluate(Eigen::Ref<EigenRowMajorMat> &action,
+                     Eigen::Ref<EigenRowMajorMat> &anchors,
+                        Eigen::Ref<EigenVec> &reward,
+                        Eigen::Ref<EigenBoolVec> &done) {
+#pragma omp parallel for schedule(auto)
+        for (int i = 0; i < num_envs_; i++)
+            perAgentStep_eval(i, action,anchors, reward, done, true);
+    }
+
+
+    void step_visualize_success(Eigen::Ref<EigenRowMajorMat> &action,
                               Eigen::Ref<EigenVec> &reward,
                               Eigen::Ref<EigenBoolVec> &done,
                               Eigen::Ref<EigenBoolVec> &success) {
@@ -372,6 +383,24 @@ class VectorizedEnvironment {
       reward[agentId] += terminalReward;
     }
   }
+
+    inline void perAgentStep_eval(int agentId,
+                             Eigen::Ref<EigenRowMajorMat> &action,
+                             Eigen::Ref<EigenRowMajorMat> &anchors,
+                             Eigen::Ref<EigenVec> &reward,
+                             Eigen::Ref<EigenBoolVec> &done,
+                             bool visualize) {
+        reward[agentId] = environments_[agentId]->step_evaluate(action.row(agentId), visualize, anchors.row(agentId));
+
+        float terminalReward = 0;
+        done[agentId] = environments_[agentId]->isTerminalState(terminalReward);
+
+        if (done[agentId]) {
+            environments_[agentId]->reset();
+//      std::cout << "agentID : " << agentId << "Done !" << std::endl;
+            reward[agentId] += terminalReward;
+        }
+    }
 
   std::vector<ChildEnvironment *> environments_;
 

@@ -48,12 +48,12 @@ cfg['environment']['curriculum']['initial_factor'] = 1.
 is_rollout = cfg['environment']['Rollout']
 # create environment from the configuration file
 # cfg['environment']['num_envs'] = 1 + n_samples
-if(is_rollout):
-    num_env = cfg['environment']['num_envs']
-else:
-    num_env = 100
-    cfg['environment']['num_envs'] = 100
-
+# if(is_rollout):
+#     num_env = cfg['environment']['num_envs']
+# else:
+#     num_env = 1
+#     cfg['environment']['num_envs'] = 1
+num_env = 1
 
 #
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
@@ -104,7 +104,7 @@ entropy_coeff_ = cfg['environment']['entropy_coeff']
 def actor_input_concat(encoder, latent, obs):
     actor_input = []
 
-    actor_input.apend(obs[...,
+    actor_input.append(obs[...,
                       0
                       :
                       encoder.architecture.block_dim])
@@ -116,7 +116,7 @@ def actor_input_concat(encoder, latent, obs):
 
     actor_input = np.concatenate(actor_input, axis=-1)
 
-    return torch.cat((latent, torch.Tensor(actor_input)), dim=-1)
+    return torch.cat((latent, torch.Tensor(actor_input).to(device)), dim=-1)
 
 def obs_post_process(encoder, obs_batch):
     obs = []
@@ -129,7 +129,7 @@ def obs_post_process(encoder, obs_batch):
                              (encoder.architecture.block_dim)*i
                              + encoder.architecture.pro_dim + encoder.architecture.act_dim])
 
-    obs = np.concatenate(obs, axis=-1)
+    obs = np.concatenate(obs, axis=0)
 
     return obs
 
@@ -181,7 +181,9 @@ else:
                                                               layer_num=layerNum,
                                                               device=device,
                                                               num_minibatch = num_mini_batches,
-                                                              num_env=num_env), device=device)
+                                                              num_env=num_env,
+                                                              inertial_dim= 0
+                                                            ), device=device)
 
 
     # actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
@@ -257,28 +259,6 @@ else:
         Encoder.architecture.reset()
         # Encoder_ROA.architecture.reset()
 
-        # For action plotting
-        idx = 0
-        x = []
-        y = []
-
-        x = np.linspace(0, total_steps, total_steps*5)
-        y = np.zeros(total_steps*5)
-        y2 = np.zeros(total_steps*5)
-        y3 = np.zeros(total_steps*5)
-        plt.ion()
-        figure, ax = plt.subplots(nrows=3, ncols=1, figsize=(8,6))
-        line1, = ax[0].plot(x,y)
-        line2, = ax[1].plot(x,y2)
-        line3, = ax[2].plot(x,y3)
-        ax[0].set_xlim(0, total_steps)
-        ax[1].set_xlim(0, total_steps)
-        ax[2].set_xlim(0, total_steps)
-        ax[0].set_ylim(-5, 5)
-        ax[1].set_ylim(-5, 5)
-        ax[2].set_ylim(-5, 5)
-
-
         if(is_rollout):
             target_pos = env.get_target_pos()
 
@@ -291,27 +271,10 @@ else:
                 actor_input = actor_input_concat(Encoder, latent, obs)
 
                 estimated_anchors = Estimator.predict(actor_input)
+                # print(estimated_anchors.shape)
+                env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())
 
-                # latent_ROA = Encoder_ROA.evaluate(torch.from_numpy(obs_ROA).to(device))
-                # action_ll = actor.architecture(latent_ROA, actor=True).cpu().numpy()
-                # action_ll, actions_log_prob = actor.sample(latent_ROA)
 
-                # For action plotting
-                # y[idx] = action_ll[0][0]
-                # y2[idx] = action_ll[0][1]
-                # y3[idx] = action_ll[0][2]
-                # idx+=1
-                # line1.set_xdata(x)
-                # line1.set_ydata(y)
-                # line2.set_xdata(x)
-                # line2.set_ydata(y2)
-                # line3.set_xdata(x)
-                # line3.set_ydata(y3)
-                # figure.canvas.draw()
-                # figure.canvas.flush_events()
-
-                # success = torch.Tensor(env.get_success_state()).unsqueeze(-1)
-                env.step_visualize(actions)
 
                 '''
         # For action plotting

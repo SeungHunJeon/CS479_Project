@@ -375,6 +375,18 @@ class RaiboController {
       }
     }
   }
+    void estimate_anchor_points(std::vector<Eigen::Vector3d>& current_anchor_points,std::vector<Eigen::Vector3d>& prev_anchor_points, const Eigen::Ref<EigenVec>& anchors,  Eigen::Matrix3d Rot) {
+        /// i for x, j for y, k for z
+        /// Extract 8 points in total.
+        for (int i = 0; i < 2; i++) {
+            for (int j = 0; j < 2; j++) {
+                for (int k = 0; k < 2; k++)
+                {
+                    current_anchor_points[4*i + 2*j + k] = prev_anchor_points[4*i + 2*j + k] + Rot*anchors.segment(3*(4*i + 2*j + k),3).cast<double>();
+                }
+            }
+        }
+    }
 
   void getObservation(Eigen::VectorXd &observation) {
     observation = obDouble_;

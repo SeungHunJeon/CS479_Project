@@ -83,6 +83,11 @@ class ENVIRONMENT {
     gc_init_from_.setZero(gcDim_);
     gv_init_from_.setZero(gvDim_);
 
+
+    current_anchor_points.resize(8);
+    prev_anchor_points.resize(8);
+    anchors_pred.resize(8);
+
     /// set pd gains
     jointPGain_.setZero(gvDim_);
     jointDGain_.setZero(gvDim_);
@@ -111,6 +116,11 @@ class ENVIRONMENT {
       command_Obj_ = server_->addVisualBox("command_Obj_", 0.5, 0.5, command_object_height_, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       command_Obj_->setOrientation(command_Obj_quat_);
+
+      for(int i =0; i<8; i++){
+          anchors_pred[i] = server_->addVisualSphere("anchor"+std::to_string(i), 0.05,0,1,0,1.0);
+      }
+
 //      target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
       command_ball_ = server_->addVisualArrow("command_Arrow_", 0.2, 0.2, 1.0, 0.0, 0.0, 1.0);
       com_pos_ = server_->addVisualSphere("com_pos", 0.05, 0, 0.5, 0.5, 1.0);
@@ -211,6 +221,19 @@ class ENVIRONMENT {
     controller_.reset(gen_, normDist_, command_Obj_Pos_, command_Obj_quat_, objectGenerator_.get_geometry(), friction, air_damping);
     Eigen::VectorXd temp = objectGenerator_.get_classify_vector();
     controller_.updateClassifyvector(temp);
+    prev_pos_={gc_init_[0],gc_init_[1],0};
+    raisim::Vec<4> quat;
+    raisim::Mat<3, 3> baseRot;
+    quat[0] = gc_init_[3];
+    quat[1] = gc_init_[4];
+    quat[2] = gc_init_[5];
+    quat[3] = gc_init_[6];
+    raisim::quatToRotMat(quat, baseRot);
+    Eigen::Vector3d base_x_axis = baseRot.e().col(0);
+    base_x_axis(2) = 0;
+    Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
+    raisim::angleAxisToRotMat({0,0,1}, std::atan2(base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
+
     if(is_position_goal) {
       Low_controller_.reset(&world_);
       controller_.updateStateVariables();
@@ -234,6 +257,8 @@ class ENVIRONMENT {
   double step(const Eigen::Ref<EigenVec>& action, bool visualize) {
     /// action scaling
 
+
+
     command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.5, 1.5);
     command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.5, 1.5);
     command(2) = std::clamp(command(2) + normDist_(gen_) * 0.2, -1.0, 1.0);
@@ -256,6 +281,8 @@ class ENVIRONMENT {
     float dummy;
     int howManySteps;
     int lowlevelSteps;
+
+
 
     /// Low level frequency 0.01
     for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
@@ -285,6 +312,85 @@ class ENVIRONMENT {
 
     return controller_.getRewardSum(visualize);
   }
+
+
+    double step_evaluate(const Eigen::Ref<EigenVec>& action, bool visualize, const Eigen::Ref<EigenVec>& anchors) {
+        /// action scaling
+        Eigen::Vector3d geometry{0.2,0.2,0.2};
+        controller_.get_anchor_points(prev_anchor_points, prev_pos_, prev_yaw_rot.e(), geometry);
+        controller_.estimate_anchor_points(current_anchor_points, prev_anchor_points, anchors,prev_yaw_rot.e());
+
+        for(int i=0; i<8;i++){
+            anchors_pred[i]->setPosition(current_anchor_points[i]);
+        }
+        current_anchor_points;
+
+        Eigen::VectorXd gc;
+        gc.resize(raibo_->getGeneralizedCoordinateDim());
+        gc = raibo_->getGeneralizedCoordinate().e();
+        prev_pos_={gc[0],gc[1],0};
+        raisim::Vec<4> quat;
+        raisim::Mat<3, 3> baseRot;
+        quat[0] = gc[3];
+        quat[1] = gc[4];
+        quat[2] = gc[5];
+        quat[3] = gc[6];
+        raisim::quatToRotMat(quat, baseRot);
+        Eigen::Vector3d base_x_axis = baseRot.e().col(0);
+        base_x_axis(2) = 0;
+        Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
+        raisim::angleAxisToRotMat({0,0,1}, std::atan2(base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
+
+        command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.5, 1.5);
+        command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.5, 1.5);
+        command(2) = std::clamp(command(2) + normDist_(gen_) * 0.2, -1.0, 1.0);
+        command = controller_.advance(&world_, command);
+
+        controller_.update_actionHistory(&world_, command, curriculumFactor_);
+
+        if(is_position_goal)
+            Low_controller_.setCommand(command);
+        else
+            Low_controller_2_.setCommand(command);
+
+//    if (controller_.is_achieved)
+//    {
+//      command = controller_.advance(&world_, action);
+//      Low_controller_.setCommand(command);
+//    }
+
+        float dummy;
+        int howManySteps;
+        int lowlevelSteps;
+
+        /// Low level frequency 0.01
+        for (lowlevelSteps = 0; lowlevelSteps < int(high_level_control_dt_ / low_level_control_dt_ + 1e-10); lowlevelSteps++) {
+            controller_.updateStateVariables();
+            controller_.updateHistory();
+            if(is_position_goal) {
+                Low_controller_.updateObservation(&world_);
+                Low_controller_.advance(&world_);
+            }
+            else
+                Low_controller_2_.advance(&world_);
+
+
+            /// Simulation frequency
+            for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
+
+                subStep();
+//        if(visualize)
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+//
+                if(isTerminalState(dummy)) {
+                    howManySteps++;
+                    break;
+                }
+            }
+        }
+
+        return controller_.getRewardSum(visualize);
+    }
 
 
 
@@ -536,9 +642,15 @@ class ENVIRONMENT {
   raisim::Visuals *commandSphere_, *controllerSphere_;
   raisim::SingleBodyObject *Obj_, *Manipulate_;
   raisim::Visuals *command_Obj_, *cur_head_Obj_, *tar_head_Obj_, *command_ball_, *com_pos_, *com_noisify_;
+
   Eigen::Vector3d command_Obj_Pos_;
   Eigen::Vector4d command_Obj_quat_;
   Eigen::Vector3d Dist_eo_, Dist_og_;
+  Eigen::Vector3d prev_pos_;
+  raisim::Mat<3,3> prev_yaw_rot;
+  std::vector<Eigen::Vector3d> prev_anchor_points;
+  std::vector<Eigen::Vector3d> current_anchor_points;
+  std::vector<raisim::Visuals *> anchors_pred;
   raisim::Vec<3> Pos_e_;
   int command_order = 0;
   double object_height = 0.6;

@@ -188,6 +188,7 @@ class PPO:
 
     def filter_for_encode_from_obs(self, obs_batch):
         filtered_obs = []
+        # print(obs_batch.shape)
         for i in range(self.num_history_batch):
             filtered_obs.append(obs_batch[...,
                                 (self.encoder.architecture.block_dim)*i:
@@ -202,9 +203,7 @@ class PPO:
             filtered_obs = torch.cat(filtered_obs, dim=-1)
             return filtered_obs
     def encode(self, obs_batch):
-        obs_batch = self.filter_for_encode_from_obs(obs_batch)
-        output = self.encoder.evaluate_update(obs_batch)
-
+        output = self.encoder.evaluate_update(self.filter_for_encode_from_obs(obs_batch))
         return output
 
     # def encode_ROA(self, obs):
@@ -335,7 +334,7 @@ class PPO:
         # self.decoder_loss = 0
 
         self.lambda_ROA = pow(self.lambda_ROA, self.lambdaDecayFactor)
-        print(self.lambda_ROA)
+        # print(self.lambda_ROA)
         for epoch in range(self.num_learning_epochs):
             for obs_batch, _, _, _, _, _, _, _, _, _, anchors_batch \
                     in self.batch_sampler(self.num_mini_batches):
@@ -361,7 +360,8 @@ class PPO:
 
                 # if(estimator_true_data.shape[0] != 0):
                 #     latent_estimation = self.encode(obs_batch[contact_mask])
-
+                #obs_batch [40, 500, 820]=>
+                # print(obs_batch.shape)
                 latent = self.encode(obs_batch)
                 # latent_estimation = latent.reshape((-1, self.num_envs // self.num_mini_batches, self.encoder.architecture.hidden_dim))[contact_mask]
 
@@ -393,6 +393,7 @@ class PPO:
                 actor_input = self.filter_for_actor(obs_batch, latent)
                 mean = self.estimator.evaluate(actor_input)
                 cov = torch.exp_(2*self.estimator_cov.evaluate(actor_input))
+                print(anchors_batch.shape)
                 target = self.estimator_pre_process(anchors_batch)
 
                 # estimator_loss = self.GaussianNLLLoss(mean, target, cov)

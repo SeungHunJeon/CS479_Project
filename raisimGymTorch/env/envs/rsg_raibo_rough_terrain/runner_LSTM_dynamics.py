@@ -209,7 +209,7 @@ ppo = PPO.PPO(actor=actor,
 iteration_number = 0
 
 
-wandb.init(group="jsh",project=task_name,name=name)
+# wandb.init(group="jsh",project=task_name,name=name)
 
 if mode == 'retrain':
     iteration_number = load_param(weight_path, env, actor, critic, ppo.optimizer, saver.data_dir)
@@ -293,6 +293,7 @@ for update in range(iteration_number, 20000):
 
             actor_input = ppo.filter_for_actor(obs, latent)
             anchors = env.getAnchorHistory()
+
             action = np.zeros((actor_input.shape[0],3), dtype=np.float32)
             reward, dones = env.step(action)
 
@@ -344,7 +345,7 @@ for update in range(iteration_number, 20000):
 
     end = time.time()
 
-    wandb.log(data_log)
+    # wandb.log(data_log)
 
     print('----------------------------------------------------')
     print('{:>6}th iteration'.format(update))

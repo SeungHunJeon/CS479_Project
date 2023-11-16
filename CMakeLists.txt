@@ -37,7 +37,7 @@ find_package(OpenMP REQUIRED)
 
 if (UNIX AND NOT APPLE AND NOT ANDROID AND NOT WEBGL AND NOT WIN32)
     set(RAISIM_OS linux)
-    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../raisimLib/raisim/${RAISIM_OS})
+    list(APPEND CMAKE_PREFIX_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../raisim_ws/raisimLib/raisim/${RAISIM_OS})
 elseif(APPLE)
     set(RAISIM_OS mac)
     list(APPEND CMAKE_PREFIX_PATH ../raisim/${RAISIM_OS})
@@ -52,7 +52,7 @@ elseif(WIN32)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/raisimGymTorch/env/bin)
 endif()
 
-find_package(raisim REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../raisimLib/raisim/${RAISIM_OS})
+find_package(raisim REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../../raisim_ws/raisimLib/raisim/${RAISIM_OS})
 
 #find_package(raisim REQUIRED PATHS /home/oem/workspace/raisimLib/raisim/linux)
 

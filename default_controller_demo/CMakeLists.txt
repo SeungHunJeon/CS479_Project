@@ -17,9 +17,9 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
 
-list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../raisimLib/raisim/linux")
+list(APPEND CMAKE_PREFIX_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../../raisim_ws/raisimLib/raisim/linux")
 
-find_package(raisim REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../../raisimLib/raisim/linux)
+find_package(raisim REQUIRED PATHS ${CMAKE_CURRENT_SOURCE_DIR}/../../../raisim_ws/raisimLib/raisim/linux)
 #find_package(raisim REQUIRED PATHS /home/oem/workspace/raisimLib/raisim/linux)
 
 include_directories (${EIGEN3_INCLUDE_DIRS})

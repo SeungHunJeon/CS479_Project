@@ -84,6 +84,7 @@ class Encoder:
         return self.architecture(obs)
 
     def evaluate_update(self, obs):
+
         return self.architecture.forward_update(obs)
 
 
@@ -292,7 +293,6 @@ class LSTM(nn.Module):
     # Forward function is for encode one-step observation which incorporates number of (high-level controller frequency) / (low-level controller frequency)
     def forward(self, obs):
         inputs = obs.reshape(self.hist_num, self.num_env, int(self.input_dim/self.hist_num))
-
         if (self.h_0 == None):
             outputs, (h_n, c_n) = self.lstm(inputs)
         else:
@@ -303,7 +303,6 @@ class LSTM(nn.Module):
 
         # print(outputs.shape)
         output = outputs[-1, :, :]
-
         return output
 
     # Forward_update is for encode 1-iteration whole-step observation which incorporates number of
@@ -311,7 +310,9 @@ class LSTM(nn.Module):
     def forward_update(self, obs):
         # inputs = obs.reshape((-1, self.num_env, int(self.input_dim / self.hist_num)))
         output = []
+        # print(obs.shape)6
         for i in range(obs.shape[0]):
+            self.reset()
             inputs = obs[i].reshape((-1, self.num_env // self.num_minibatch, int(self.input_dim / self.hist_num)))
 
             # inputs = torch.reshape(obs, (200, self.num_env, -1)) # 200 300 52
