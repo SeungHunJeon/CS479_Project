@@ -393,7 +393,7 @@ class PPO:
                 actor_input = self.filter_for_actor(obs_batch, latent)
                 mean = self.estimator.evaluate(actor_input)
                 cov = torch.exp_(2*self.estimator_cov.evaluate(actor_input))
-                print(anchors_batch.shape)
+                # print(anchors_batch.shape)
                 target = self.estimator_pre_process(anchors_batch)
 
                 # estimator_loss = self.GaussianNLLLoss(mean, target, cov)

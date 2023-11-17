@@ -87,7 +87,8 @@ class ENVIRONMENT {
     current_anchor_points.resize(8);
     prev_anchor_points.resize(8);
     anchors_pred.resize(8);
-
+    anchors_prev.resize(8);
+    anchors_gt.resize(8);
     /// set pd gains
     jointPGain_.setZero(gvDim_);
     jointDGain_.setZero(gvDim_);
@@ -118,7 +119,9 @@ class ENVIRONMENT {
       command_Obj_->setOrientation(command_Obj_quat_);
 
       for(int i =0; i<8; i++){
-          anchors_pred[i] = server_->addVisualSphere("anchor"+std::to_string(i), 0.05,0,1,0,1.0);
+          anchors_pred[i] = server_->addVisualSphere("anchor"+std::to_string(i), 0.05,1-i/7,i/7,0,1.0);
+          anchors_gt[i] = server_->addVisualSphere("anchor_gt"+std::to_string(i), 0.05,i/7,i/7,1-i/7,1.0);
+          anchors_prev[i] = server_->addVisualSphere("anchor_prev"+std::to_string(i), 0.05,i/7,1-i/7,1-i/7,0.5);
       }
 
 //      target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
@@ -245,9 +248,9 @@ class ENVIRONMENT {
       controller_.updateStateVariables();
     }
 
-    command(0) = uniDist_(gen_) * 1.5;
-    command(1) = uniDist_(gen_) * 1.5;
-    command(2) = uniDist_(gen_);
+    command(0) = uniDist_(gen_) * 1.0;
+    command(1) = uniDist_(gen_) * 1.0;
+    command(2) = uniDist_(gen_)-0.5;
 
 
   }
@@ -259,9 +262,9 @@ class ENVIRONMENT {
 
 
 
-    command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.5, 1.5);
-    command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.5, 1.5);
-    command(2) = std::clamp(command(2) + normDist_(gen_) * 0.2, -1.0, 1.0);
+    command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.0, 1.0);
+    command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.0, 1.0);
+    command(2) = std::clamp(command(2) + normDist_(gen_) * 0.2, -0.5, 0.5);
     command = controller_.advance(&world_, command);
 
     controller_.update_actionHistory(&world_, command, curriculumFactor_);
@@ -321,14 +324,17 @@ class ENVIRONMENT {
         controller_.estimate_anchor_points(current_anchor_points, prev_anchor_points, anchors,prev_yaw_rot.e());
 
         for(int i=0; i<8;i++){
+            anchors_prev[i]->setPosition(prev_anchor_points[i]);
+        }
+        for(int i=0; i<8;i++){
             anchors_pred[i]->setPosition(current_anchor_points[i]);
         }
-        current_anchor_points;
+
 
         Eigen::VectorXd gc;
         gc.resize(raibo_->getGeneralizedCoordinateDim());
         gc = raibo_->getGeneralizedCoordinate().e();
-        prev_pos_={gc[0],gc[1],0};
+        prev_pos_={gc[0],gc[1],0.4725};
         raisim::Vec<4> quat;
         raisim::Mat<3, 3> baseRot;
         quat[0] = gc[3];
@@ -336,10 +342,15 @@ class ENVIRONMENT {
         quat[2] = gc[5];
         quat[3] = gc[6];
         raisim::quatToRotMat(quat, baseRot);
-        Eigen::Vector3d base_x_axis = baseRot.e().col(0);
+        Eigen::Vector3d base_x_axis = baseRot.e().row(0);
         base_x_axis(2) = 0;
         Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
         raisim::angleAxisToRotMat({0,0,1}, std::atan2(base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
+
+        controller_.get_anchor_points(prev_anchor_points, prev_pos_, prev_yaw_rot.e(), geometry);
+        for(int i=0; i<8;i++){
+            anchors_gt[i]->setPosition(prev_anchor_points[i]);
+        }
 
         command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.5, 1.5);
         command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.5, 1.5);
@@ -651,6 +662,8 @@ class ENVIRONMENT {
   std::vector<Eigen::Vector3d> prev_anchor_points;
   std::vector<Eigen::Vector3d> current_anchor_points;
   std::vector<raisim::Visuals *> anchors_pred;
+  std::vector<raisim::Visuals *> anchors_prev;
+  std::vector<raisim::Visuals *> anchors_gt;
   raisim::Vec<3> Pos_e_;
   int command_order = 0;
   double object_height = 0.6;

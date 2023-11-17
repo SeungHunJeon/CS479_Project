@@ -202,7 +202,7 @@ class RaiboController {
     Eigen::Vector3d geometry{0.2,0.2,0.2};
     Eigen::Vector3d pos{gc_[0],gc_[1],0};
     raisim::Mat<3,3> yaw_rot;
-    Eigen::Vector3d base_x_axis = baseRot_.e().col(0);
+    Eigen::Vector3d base_x_axis = baseRot_.e().row(0);
     base_x_axis(2) = 0;
     Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
     raisim::angleAxisToRotMat({0,0,1}, std::atan2(base_x_axis(1), base_x_axis(0)), yaw_rot);
@@ -382,7 +382,7 @@ class RaiboController {
             for (int j = 0; j < 2; j++) {
                 for (int k = 0; k < 2; k++)
                 {
-                    current_anchor_points[4*i + 2*j + k] = prev_anchor_points[4*i + 2*j + k] + Rot*anchors.segment(3*(4*i + 2*j + k),3).cast<double>();
+                    current_anchor_points[4*i + 2*j + k] = prev_anchor_points[4*i + 2*j + k] + Rot.transpose()*anchors.segment(3*(4*i + 2*j + k),3).cast<double>();
                 }
             }
         }
@@ -443,7 +443,7 @@ class RaiboController {
   void get_anchor_history(Eigen::Ref<EigenVec> &anchor_points) {
     for(int i = 0; i < actionNum_; i ++) {
       for (int j = 0; j < 8; j++) {
-        anchorHistory_e.segment(24 * i + 3 * j, 3) = start_rot_.transpose()*anchorHistory_[i][j];
+        anchorHistory_e.segment(24 * i + 3 * j, 3) = start_rot_*anchorHistory_[i][j];
       }
     }
     anchor_points = anchorHistory_e.cast<float>();
@@ -877,7 +877,7 @@ class RaiboController {
   std::vector<Eigen::Vector2d> command_library_;
 
   // control variables
-  static constexpr double conDt_ = 0.2;
+  static constexpr double conDt_ = 0.1;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_;
   Eigen::VectorXd actionTarget_;

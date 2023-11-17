@@ -1,6 +1,6 @@
 record_video: no
 seed: 2
-task_name: "Nerf Navigation"
+task_name: "Nerf_Navigation"
 name: "First init"
 environment:
   Domain_Randomization: False
@@ -14,7 +14,7 @@ environment:
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.0025
-  control_dt: 0.2
+  control_dt: 0.1
   #  low_level_control_dt: 0.005
   low_level_control_dt: 0.01
   max_time: 8.0
@@ -97,7 +97,7 @@ architecture:
     module_dim: 32
 
   estimator:
-    net: [128, 64]
+    net: [256, 128]
 
   obj_f_dynamics:
     net: [256, 128, 64]
