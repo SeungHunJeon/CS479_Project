@@ -260,6 +260,7 @@ for update in range(iteration_number, 20000):
                 obs = env.observe(False)
                 anchors = env.getAnchorHistory()
                 # latent = Encoder.evaluate(torch.from_numpy(obs).to(device))
+                Encoder.architecture.reset()
                 latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
                 # latent = Encoder.evaluate(torch.Tensor(obs).to(device))
                 actor_input = ppo.filter_for_actor(obs, latent)
@@ -272,7 +273,6 @@ for update in range(iteration_number, 20000):
         # env.stop_video_recording()
         # env.turn_off_visualization()
         env.reset()
-        Encoder.architecture.reset()
         # Encoder_ROA.architecture.reset()
         env.save_scaling(saver.data_dir, str(update))
 
@@ -286,7 +286,7 @@ for update in range(iteration_number, 20000):
             switch_batch = np.logical_or(switch_batch, env.get_intrinsic_switch())
             contact = env.get_contact()
             # privileged_info = env.get_privileged_info()
-
+            Encoder.architecture.reset()
             latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs).to(device))
 
             latent = latent.detach().cpu().numpy()
@@ -307,6 +307,7 @@ for update in range(iteration_number, 20000):
     obs2 = env.observe(update < 10000)
     with torch.no_grad():
         # latent = Encoder.evaluate(torch.from_numpy(obs2).to(device))
+        Encoder.architecture.reset()
         latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs2).to(device))
         # latent = Encoder.evaluate(ppo.filter_for_encode_from_obs(obs2).to(device))
         latent = latent.detach().cpu().numpy()
