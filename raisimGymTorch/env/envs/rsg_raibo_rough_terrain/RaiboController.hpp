@@ -370,7 +370,7 @@ class RaiboController {
         for (int k = 0; k < 2; k++)
         {
           anchor_point = {geometry(0) * (static_cast<double>((i)) - 0.5), geometry(1) * (static_cast<double>((j)) - 0.5), geometry(2) * (static_cast<double>((k)) - 0.5)};
-          anchor_points[4*i + 2*j + k] = COM + Rot.transpose() * anchor_point;
+          anchor_points[4*i + 2*j + k] = COM + Rot * anchor_point;
         }
       }
     }
@@ -382,7 +382,7 @@ class RaiboController {
             for (int j = 0; j < 2; j++) {
                 for (int k = 0; k < 2; k++)
                 {
-                    current_anchor_points[4*i + 2*j + k] = prev_anchor_points[4*i + 2*j + k] + Rot.transpose()*anchors.segment(3*(4*i + 2*j + k),3).cast<double>();
+                    current_anchor_points[4*i + 2*j + k] = prev_anchor_points[4*i + 2*j + k] + Rot * anchors.segment(3*(4*i + 2*j + k),3).cast<double>();
                 }
             }
         }
@@ -443,7 +443,7 @@ class RaiboController {
   void get_anchor_history(Eigen::Ref<EigenVec> &anchor_points) {
     for(int i = 0; i < actionNum_; i ++) {
       for (int j = 0; j < 8; j++) {
-        anchorHistory_e.segment(24 * i + 3 * j, 3) = start_rot_*anchorHistory_[i][j];
+        anchorHistory_e.segment(24 * i + 3 * j, 3) = start_rot_.transpose()*anchorHistory_[i][j];
       }
     }
     anchor_points = anchorHistory_e.cast<float>();
@@ -561,6 +561,9 @@ class RaiboController {
 
     obDouble_.segment((obBlockDim_)*historyNum_ + proprioceptiveDim_+exteroceptiveDim_, actionDim_)
         = actionInfoHistory_.back();
+
+    std::rotate(anchorHistory_.begin(), anchorHistory_.begin()+1, anchorHistory_.end());
+    anchorHistory_[actionNum_ - 1] = current_anchor_points;
   }
 
   inline void checkConfig(const Yaml::Node &cfg) {
@@ -796,12 +799,12 @@ class RaiboController {
   int exteroceptiveDim_ = 0;
   int dynamicsInfoDim_ = 0;
   static constexpr int actionDim_ = 3;
-  int historyNum_ = 19;
-  int actionNum_ = 20;
+  int historyNum_ = 20;
+  int actionNum_ = 21;
   int obBlockDim_ = 0;
   int privilegedDim_ = 0;
 
-  static constexpr size_t obDim_ = 820;
+  static constexpr size_t obDim_ = 861;
 
 //  static constexpr size_t obDim_ = (proprioceptiveDim_ + exteroceptiveDim_) * (historyNum_+1) +  actionDim_ * actionNum_;
 
@@ -877,7 +880,7 @@ class RaiboController {
   std::vector<Eigen::Vector2d> command_library_;
 
   // control variables
-  static constexpr double conDt_ = 0.1;
+  static constexpr double conDt_ = 0.2;
   bool standingMode_ = false;
   Eigen::VectorXd actionMean_, actionStd_, actionScaled_;
   Eigen::VectorXd actionTarget_;

@@ -51,6 +51,11 @@ class ENVIRONMENT {
     raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
     raibo_->setName("robot");
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
+
+
+//    auto imu = raibo_->getSensor<raisim::InertialMeasurementUnit>("depth_camera_front_camera_parent:imu");
+//    auto rgbCamera2 = raibo_->getSensor<raisim::RGBCamera>("depth_camera_front_camera_parent:color");
+//    rgbCamera2->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
     /// Object spawn
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, obj_mass, object_radius, object_height, object_width_1, object_width_2);
@@ -117,7 +122,6 @@ class ENVIRONMENT {
       command_Obj_ = server_->addVisualBox("command_Obj_", 0.5, 0.5, command_object_height_, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
       command_Obj_->setOrientation(command_Obj_quat_);
-
       for(int i =0; i<8; i++){
           anchors_pred[i] = server_->addVisualSphere("anchor"+std::to_string(i), 0.05,1-i/7,i/7,0,1.0);
           anchors_gt[i] = server_->addVisualSphere("anchor_gt"+std::to_string(i), 0.05,i/7,i/7,1-i/7,1.0);
@@ -232,10 +236,10 @@ class ENVIRONMENT {
     quat[2] = gc_init_[5];
     quat[3] = gc_init_[6];
     raisim::quatToRotMat(quat, baseRot);
-    Eigen::Vector3d base_x_axis = baseRot.e().col(0);
+    Eigen::Vector3d base_x_axis = baseRot.e().row(0);
     base_x_axis(2) = 0;
     Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
-    raisim::angleAxisToRotMat({0,0,1}, std::atan2(base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
+    raisim::angleAxisToRotMat({0,0,1}, std::atan2(-base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
 
     if(is_position_goal) {
       Low_controller_.reset(&world_);
@@ -334,7 +338,7 @@ class ENVIRONMENT {
         Eigen::VectorXd gc;
         gc.resize(raibo_->getGeneralizedCoordinateDim());
         gc = raibo_->getGeneralizedCoordinate().e();
-        prev_pos_={gc[0],gc[1],0.4725};
+        prev_pos_={gc[0],gc[1],gc[2]};
         raisim::Vec<4> quat;
         raisim::Mat<3, 3> baseRot;
         quat[0] = gc[3];
@@ -345,16 +349,16 @@ class ENVIRONMENT {
         Eigen::Vector3d base_x_axis = baseRot.e().row(0);
         base_x_axis(2) = 0;
         Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
-        raisim::angleAxisToRotMat({0,0,1}, std::atan2(base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
+        raisim::angleAxisToRotMat({0,0,1}, std::atan2(-base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
 
         controller_.get_anchor_points(prev_anchor_points, prev_pos_, prev_yaw_rot.e(), geometry);
         for(int i=0; i<8;i++){
             anchors_gt[i]->setPosition(prev_anchor_points[i]);
         }
 
-        command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.5, 1.5);
-        command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.5, 1.5);
-        command(2) = std::clamp(command(2) + normDist_(gen_) * 0.2, -1.0, 1.0);
+        command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.0, 1.0);
+        command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.0, 1.0);
+        command(2) = std::clamp(command(2) + normDist_(gen_) * 0.2, -0.5, 0.5);
         command = controller_.advance(&world_, command);
 
         controller_.update_actionHistory(&world_, command, curriculumFactor_);
@@ -398,6 +402,9 @@ class ENVIRONMENT {
                     break;
                 }
             }
+//            if(lowlevelSteps == final`) {
+//                controller_.updateHistory();
+//            }
         }
 
         return controller_.getRewardSum(visualize);

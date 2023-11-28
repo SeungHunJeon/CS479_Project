@@ -396,9 +396,9 @@ class PPO:
                 # print(anchors_batch.shape)
                 target = self.estimator_pre_process(anchors_batch)
 
-                # estimator_loss = self.GaussianNLLLoss(mean, target, cov)
+                estimator_loss = self.GaussianNLLLoss(mean, target, cov)
 
-                estimator_loss = self.MSELoss(mean, target)
+                # estimator_loss = self.MSELoss(mean, target)
 
                 # actions_log_prob_batch, entropy_batch = self.actor.evaluate(actor_input, actions_batch)
                 # value_batch = self.critic.evaluate(actor_input)

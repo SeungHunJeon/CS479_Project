@@ -14,7 +14,7 @@ environment:
   eval_every_n: 200
   num_threads: 30
   simulation_dt: 0.0025
-  control_dt: 0.1
+  control_dt: 0.2
   #  low_level_control_dt: 0.005
   low_level_control_dt: 0.01
   max_time: 8.0
@@ -52,7 +52,7 @@ environment:
     dynamicsInfoDim_: 0
     dynamicsPredictDim_: 0
     dynamicsInputDim_: 0
-    historyNum_: 20
+    historyNum_: 21
     actionDim_: 3
   ROA_dimension:
     exteroceptiveDim_: 28

@@ -18,6 +18,10 @@ import pandas as pd
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import matplotlib
+from estimator_helper import state_estimator, get_img_process
+#
+
+
 
 matplotlib.use('tkagg')
 device = torch.device('cuda:0')
@@ -118,6 +122,10 @@ def actor_input_concat(encoder, latent, obs):
 
     return torch.cat((latent, torch.Tensor(actor_input).to(device)), dim=-1)
 
+def estimator_pre_process(anchor_points):
+    return anchor_points[..., -24:] - anchor_points[..., :24]
+
+
 def obs_post_process(encoder, obs_batch):
     obs = []
 
@@ -216,6 +224,20 @@ else:
     #                                                                            cfg['seed']),
     #                          device)
 
+
+
+    filter_cfg = {
+        'dil_iter': 3,
+        'batch_size': 1024,
+        'kernel_size': 5,
+        'lrate': 1e-3,
+        'N_iter': 300,
+        'render_viz': True,
+        'show_rate': [20, 100]
+    }
+
+    # filter = state_estimator(filter_cfg, agent, start_state, get_rays_fn=get_rays_fn, render_fn=render_fn)
+
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
     # Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
     Estimator.architecture.load_state_dict(torch.load(weight_path)['Estimator_state_dict'])
@@ -267,10 +289,26 @@ else:
             with torch.no_grad():
                 obs = env.observe(False)
                 obs_processed = obs_post_process(Encoder, obs)
+                Encoder.architecture.reset()
                 latent = Encoder.evaluate(torch.from_numpy(obs_processed).to(device))
                 actor_input = actor_input_concat(Encoder, latent, obs)
+                anchors = env.getAnchorHistory()
 
+                target = estimator_pre_process(anchors)
                 estimated_anchors = Estimator.predict(actor_input)
+                estimation_cov = torch.exp_(2*Estimator_cov.predict(actor_input))
+
+                mse = np.mean(np.sqrt((torch.Tensor(target).cpu().numpy()-estimated_anchors.detach().cpu().numpy())**2))
+                print("estimation error: ", mse)
+                print("estimation COV :  ",estimation_cov)
+                # # dummy function for get camera_img from raisim_env
+                img = env.get_color_image()
+                img = get_img_process(img, white_bg=True)
+
+                current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor)
+                prev_anchor = current_anchor
+
+
                 # print(estimated_anchors.shape)
                 env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())
 
