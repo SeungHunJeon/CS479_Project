@@ -28,6 +28,8 @@ class RaisimGymVecEnv:
         self._switch = np.zeros(self.num_envs, dtype=bool)
         self._contact = np.zeros(self.num_envs, dtype=bool)
         self._env_val = np.zeros([self.num_envs, 22], dtype=np.float32)
+        self._cam_pos = np.zeros(3, dtype=np.float32)
+        self._cam_rot = np.zeros([3,3], dtype=np.float32)
         # 0-2 : H W D / 3-11 : Inertia row1+row2+row3 / 12-14 : COM / 15 : Mass / 16 : friction
         self.rewards = [[] for _ in range(self.num_envs)]
         self.wrapper.setSeed(seed)
@@ -59,6 +61,10 @@ class RaisimGymVecEnv:
     def step_visualize(self, action):
         self.wrapper.step_visualize(action, self._reward, self._done)
         return self._reward.copy(), self._done.copy()
+
+    def get_camera_pose(self):
+        self.wrapper.getCameraPose(self._cam_pos, self._cam_rot)
+        return self._cam_pos, self._cam_rot
 
     def step_evaluate(self, action, anchors):
         self.wrapper.step_evaluate(action, anchors, self._reward, self._done)

@@ -43,7 +43,8 @@ class ENVIRONMENT {
     }
 
 
-    world_.addGround(0.0, "ground");
+    auto map = world_.addGround(0.0, "ground");
+    map->setAppearance("hidden");
     world_.setDefaultMaterial(1.1, 0.0, 0.01);
     world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
 
@@ -113,11 +114,17 @@ class ENVIRONMENT {
     command_Obj_Pos_ << 2, 2, command_object_height_/2;
     command_Obj_quat_ << 1, 0, 0, 0;
 
+    rgbCameras[0] = raibo_->getSensor<raisim::RGBCamera>("d435i_R:color");
+    rgbCameras[0]->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
+    depthCameras[0] = raibo_->getSensor<raisim::DepthCamera>("d435i_R:depth");
+    depthCameras[0]->setMeasurementSource(raisim::Sensor::MeasurementSource::VISUALIZER);
+
     // visualize if it is the first environment
     if (visualizable_) {
       server_ = std::make_unique<raisim::RaisimServer>(&world_);
       server_->launchServer(8080);
       server_->focusOn(raibo_);
+      server_->setMap("office1");
       std::cout << "Launch Server !!" << std::endl;
       command_Obj_ = server_->addVisualBox("command_Obj_", 0.5, 0.5, command_object_height_, 1, 0, 0, 0.5);
       command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
@@ -212,6 +219,15 @@ class ENVIRONMENT {
 
 //    }
 
+  }
+
+  void getCameraPose(Eigen::Ref<EigenVec> cam_position, Eigen::Ref<EigenRowMajorMat> cam_rotMat) {
+    raisim::Vec<3> pos;
+    raisim::Mat<3,3> rot;
+    raibo_->getFramePosition(raibo_->getFrameIdxByLinkName("d435i_R"), pos);
+    raibo_->getFrameOrientation(raibo_->getFrameIdxByLinkName("d435i_R"), rot);
+    cam_position = pos.e().cast<float>();
+    cam_rotMat = rot.e().cast<float>();
   }
 
   void reset() {

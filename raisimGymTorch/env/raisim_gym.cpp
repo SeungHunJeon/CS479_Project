@@ -51,6 +51,7 @@ PYBIND11_MODULE(RAISIMGYM_TORCH_ENV_NAME, m) {
     .def("step_visualize_success", &VectorizedEnvironment<ENVIRONMENT>::step_visualize_success)
     .def("observationDeNormalize", &VectorizedEnvironment<ENVIRONMENT>::ObservationDeNormalize)
     .def("getContact", &VectorizedEnvironment<ENVIRONMENT>::getContact)
+    .def("getCameraPose", &VectorizedEnvironment<ENVIRONMENT>::getCameraPose)
     .def("getAnchorHistory", &VectorizedEnvironment<ENVIRONMENT>::getAnchorHistory);
 //    .def("synchronize", &VectorizedEnvironment<ENVIRONMENT>::synchronize);
 

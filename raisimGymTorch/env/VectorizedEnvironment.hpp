@@ -335,6 +335,10 @@ class VectorizedEnvironment {
       ob.row(i) = ob.row(i).template cwiseProduct((obVar_ + epsilon).cwiseSqrt().transpose()) + obMean_.transpose();
   }
 
+  void getCameraPose(Eigen::Ref<EigenVec> &pos, Eigen::Ref<EigenRowMajorMat> &rot) {
+    environments_[0]->getCameraPose(pos, rot);
+  }
+
  private:
 
   void updateObservationStatisticsAndNormalize(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics) {
