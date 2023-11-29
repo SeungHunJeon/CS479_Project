@@ -24,3 +24,5 @@ raisimGymTorch/.idea/
 wandb/
 */*.png
 */env_value.csv
+/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/data/nerf_synthetic/
+/raisimGymTorch/env/envs/rsg_raibo_rough_terrain/trial_nerf_custom_8/
