@@ -7,7 +7,7 @@ import time
 import cv2
 import matplotlib.pyplot as plt
 import imageio
-from  raisimGymTorch.nav.math_utils import vec_to_rot_matrix, mahalanobis, rot_x, nerf_matrix_to_ngp_torch, nearestPD, calcSE3Err
+from raisimGymTorch.nav.math_utils import vec_to_rot_matrix, mahalanobis, rot_x, nerf_matrix_to_ngp_torch, nearestPD, calcSE3Err
 
 
 
@@ -120,7 +120,7 @@ def find_POI(img_rgb, render=False): # img - RGB image in range 0...255
 #     return t_err, ang_err_deg
 
 class state_estimator():
-    def __init__(self, filter_cfg, start_state,start_anchor, get_rays_fn=None, render_fn=None) -> None:
+    def __init__(self, filter_cfg, get_rays_fn=None, render_fn=None) -> None:
 
         # Parameters
         self.batch_size = filter_cfg['batch_size']
@@ -138,9 +138,8 @@ class state_estimator():
         self.error_print_rate, self.render_rate = self.show_rate
 
         #State initial estimate at time t=0
-        self.xt = start_state                   #Size 12
+
         self.iter = filter_cfg['N_iter']
-        self.last_anchor = start_anchor
 
         #NERF SPECIFIC CONFIGS
         self.get_rays = get_rays_fn
@@ -304,132 +303,10 @@ class state_estimator():
                         plt.pause(1)
 
         print("Done with main relative_pose_estimation loop")
-        self.target = obs_img_noised
-        self.batch = batch
 
-        self.losses = losses
-        self.states = states
         return optimized_anchor.clone().detach(), True
 
-    def estimate_relative_pose(self, sensor_image, start_state, sig, obs_img_pose=None):
-        #start-state is 12-vector
 
-        obs_img_noised = sensor_image
-        W_obs = sensor_image.shape[0]
-        H_obs = sensor_image.shape[1]
-
-        # find points of interest of the observed image
-        POI, extras = find_POI(obs_img_noised, render=self.render_viz)  # xy pixel coordinates of points of interest (N x 2)
-
-        print(f'Found {POI.shape[0]} features')
-        ### IF FEATURE DETECTION CANT FIND POINTS, RETURN INITIAL
-        if len(POI.shape) == 1:
-            self.losses = []
-            self.states = []
-            error_text = 'Feature Detection Failed.'
-            print(f'{error_text:.^20}')
-            return start_state.clone().detach(), False
-
-        obs_img_noised = (np.array(obs_img_noised) / 255.).astype(np.float32)
-        obs_img_noised = torch.tensor(obs_img_noised).cuda()
-
-        # create meshgrid from the observed image
-        coords = np.asarray(np.stack(np.meshgrid(np.linspace(0, H_obs - 1, H_obs), np.linspace(0, W_obs - 1, W_obs)), -1), dtype=int)
-
-        # create sampling mask for interest region sampling strategy
-        interest_regions = np.zeros((H_obs, W_obs, ), dtype=np.uint8)
-        interest_regions[POI[:,0], POI[:,1]] = 1
-        I = self.dil_iter
-        interest_regions = cv2.dilate(interest_regions, np.ones((self.kernel_size, self.kernel_size), np.uint8), iterations=I)
-        interest_regions = np.array(interest_regions, dtype=bool)
-        interest_regions = coords[interest_regions]
-
-        #Optimzied state is 12 vector initialized as the starting state to be optimized. Add small epsilon to avoid singularities
-        optimized_state = start_state.clone().detach() + 1e-6
-        optimized_state.requires_grad_(True)
-
-        # Add velocities, omegas, and pose object to optimizer
-        if self.is_filter is True:
-            optimizer = torch.optim.Adam(params=[optimized_state], lr=self.lrate, betas=(0.9, 0.999), capturable=True)
-        else:
-            raise('Not implemented')
-
-        # calculate initial angles and translation error from observed image's pose
-        if obs_img_pose is not None:
-            pose = torch.eye(4)
-            pose[:3, :3] = vec_to_rot_matrix(optimized_state[6:9])
-            pose[:3, 3] = optimized_state[:3]
-            print('initial error', calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose))
-
-        #Store data
-        losses = []
-        states = []
-
-        for k in range(self.iter):
-            optimizer.zero_grad()
-            rand_inds = np.random.choice(interest_regions.shape[0], size=self.batch_size, replace=False)
-            batch = interest_regions[rand_inds]
-
-            #pix_losses.append(loss.clone().cpu().detach().numpy().tolist())
-            #Add dynamics loss
-
-            loss = self.measurement_fn(optimized_state, start_state, sig, obs_img_noised, batch)
-
-            losses.append(loss.item())
-            states.append(optimized_state.clone().cpu().detach().numpy().tolist())
-
-            loss.backward()
-            optimizer.step()
-
-            # NOT IMPLEMENTED: EXPONENTIAL DECAY OF LEARNING RATE
-            #new_lrate = self.lrate * (0.8 ** ((k + 1) / 100))
-            #new_lrate = extra_arg_dict['lrate'] * np.exp(-(k)/1000)
-            #for param_group in optimizer.param_groups:
-            #    param_group['lr'] = new_lrate
-
-            # print results periodically
-            if obs_img_pose is not None and ((k + 1) % self.error_print_rate == 0 or k == 0):
-                print('Step: ', k)
-                print('Loss: ', loss)
-                print('State', optimized_state)
-
-                with torch.no_grad():
-                    pose = torch.eye(4)
-                    pose[:3, :3] = vec_to_rot_matrix(optimized_state[6:9])
-                    pose[:3, 3] = optimized_state[:3]
-                    pose_error = calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose)
-                    print('error', pose_error)
-                    print('-----------------------------------')
-
-                    if (k+1) % self.render_rate == 0 and self.render_viz:
-                        rgb = self.render_from_pose(pose)
-                        rgb = torch.squeeze(rgb).cpu().detach().numpy()
-
-                        #Add keypoint visualization
-                        render = rgb.reshape((obs_img_noised.shape[0], obs_img_noised.shape[1], -1))
-                        gt_img = obs_img_noised.cpu().numpy()
-                        render[batch[:, 0], batch[:, 1]] = np.array([0., 1., 0.])
-                        gt_img[batch[:, 0], batch[:, 1]] = np.array([0., 1., 0.])
-
-                        self.f.suptitle(f'Time step: {self.iteration}. Grad step: {k+1}. Trans. error: {pose_error[0]} m. Rotate. error: {pose_error[1]} deg.')
-                        self.axarr[0].imshow(gt_img)
-                        self.axarr[0].set_title('Ground Truth')
-
-                        self.axarr[1].imshow(extras['features'])
-                        self.axarr[1].set_title('Features')
-
-                        self.axarr[2].imshow(render)
-                        self.axarr[2].set_title('NeRF Render')
-
-                        plt.pause(1)
-
-        print("Done with main relative_pose_estimation loop")
-        self.target = obs_img_noised
-        self.batch = batch
-
-        self.losses = losses
-        self.states = states
-        return optimized_state.clone().detach(), True
     def measurement_fn_fusion(self, anchor, start_anchor, sig, target, batch):
         #Process loss.
 
@@ -577,67 +454,6 @@ class state_estimator():
         return xt.clone().detach()
 
 
-    def estimate_state(self, sensor_img, obs_img_pose, action):
-        # Computes Jacobian w.r.t dynamics are time t-1. Then update state covariance Sig_{t|t-1}.
-        # Perform grad. descent on J = measurement loss + process loss
-        # Compute state covariance Sig_{t} by hessian at state at time t.
-
-        #with torch.no_grad():
-        #Propagated dynamics. x t|t-1
-        #xt should be 12-vector
-        self.xt = self.agent.drone_dynamics(self.xt, action)
-        self.action = action.clone().cpu().detach().numpy().tolist()
-
-        #State estimate at t-1 is self.xt. Find jacobian wrt dynamics
-        t1 = time.time()
-
-        #A should be 12 x 12
-        A = torch.autograd.functional.jacobian(lambda x: self.agent.drone_dynamics(x, action), self.xt)
-
-        t2 = time.time()
-        print('Elapsed time for Jacobian', t2-t1)
-
-        #Propagate covariance
-        # Covariance should be 12 x 12
-        sig_prop = A @ self.sig @ A.T + self.Q
-
-        #Argmin of total cost. Encapsulate this argmin optimization as a function call
-        then = time.time()
-        #xt is 12-vector
-        xt, success_flag = self.estimate_relative_pose(sensor_img, self.xt.clone().detach(), sig_prop, obs_img_pose=obs_img_pose)
-
-        print('Optimization step for filter', time.time()-then)
-
-        #Hessian to get updated covariance
-        t3 = time.time()
-
-        if self.is_filter is True and success_flag is True:
-            #xt is 12-vector
-            #Hessian is 12x12
-            hess = torch.autograd.functional.hessian(lambda x: self.measurement_fn(x, self.xt.clone().detach(), sig_prop, self.target, self.batch), xt.clone().detach())
-
-            #Turn covariance into positive definite
-            hess_np = hess.cpu().detach().numpy()
-
-            hess = nearestPD(hess_np)
-
-            t4 = time.time()
-            print('Elapsed time for hessian', t4-t3)
-
-            #Update state covariance
-            self.sig = torch.inverse(torch.tensor(hess))
-
-        self.xt = xt
-
-        self.covariance = self.sig.clone().cpu().detach().numpy().tolist()
-        self.state_estimate = self.xt.clone().cpu().detach().numpy().tolist()
-
-        save_path = self.basefolder / "estimator_data" / f"step{self.iteration}.json"
-        self.save_data(save_path)
-
-        self.iteration += 1
-
-        return self.xt.clone().detach()
 
     def save_data(self, filename):
         data = {}

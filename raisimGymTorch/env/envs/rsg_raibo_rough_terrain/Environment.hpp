@@ -610,7 +610,9 @@ class ENVIRONMENT {
     commandSphere_->setPosition(command_);
   }
 
+//  void get_camera_pose(Eigen::Ref<EigenVec> pose,){
 
+//  }
   void get_anchor_history(Eigen::Ref<EigenVec> anchors) {
     controller_.get_anchor_history(anchors);
   }

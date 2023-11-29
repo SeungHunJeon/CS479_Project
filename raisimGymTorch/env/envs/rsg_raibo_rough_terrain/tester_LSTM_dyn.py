@@ -18,17 +18,106 @@ import pandas as pd
 from matplotlib.animation import FuncAnimation
 import matplotlib.pyplot as plt
 import matplotlib
+
 from estimator_helper import state_estimator, get_img_process
-#
+from raisimGymTorch.nerf.utils import *
+from raisimGymTorch.nerf.provider import NeRFDataset
 
-
+# dddd
 
 matplotlib.use('tkagg')
 device = torch.device('cuda:0')
 # configuration
 parser = argparse.ArgumentParser()
 parser.add_argument('-w', '--weight', help='trained weight path', type=str, default='')
-args = parser.parse_args()
+
+parser.add_argument('path', type=str)
+parser.add_argument('-O', action='store_true', help="equals --fp16 --cuda_ray --preload")
+parser.add_argument('--test', action='store_true', help="test mode")
+parser.add_argument('--workspace', type=str, default='ngp')
+parser.add_argument('--seed', type=int, default=0)
+
+### training options
+parser.add_argument('--iters', type=int, default=30000, help="training iters")
+parser.add_argument('--lr', type=float, default=1e-2, help="initial learning rate")
+parser.add_argument('--ckpt', type=str, default='latest')
+parser.add_argument('--num_rays', type=int, default=4096, help="num rays sampled per image for each training step")
+parser.add_argument('--cuda_ray', action='store_true', help="use CUDA raymarching instead of pytorch")
+parser.add_argument('--max_steps', type=int, default=1024, help="max num steps sampled per ray (only valid when using --cuda_ray)")
+parser.add_argument('--num_steps', type=int, default=512, help="num steps sampled per ray (only valid when NOT using --cuda_ray)")
+parser.add_argument('--upsample_steps', type=int, default=0, help="num steps up-sampled per ray (only valid when NOT using --cuda_ray)")
+parser.add_argument('--update_extra_interval', type=int, default=16, help="iter interval to update extra status (only valid when using --cuda_ray)")
+parser.add_argument('--max_ray_batch', type=int, default=4096, help="batch size of rays at inference to avoid OOM (only valid when NOT using --cuda_ray)")
+
+### network backbone options
+parser.add_argument('--fp16', action='store_true', help="use amp mixed precision training")
+parser.add_argument('--ff', action='store_true', help="use fully-fused MLP")
+parser.add_argument('--tcnn', action='store_true', help="use TCNN backend")
+
+### dataset options
+parser.add_argument('--color_space', type=str, default='srgb', help="Color space, supports (linear, srgb)")
+parser.add_argument('--preload', action='store_true', help="preload all data into GPU, accelerate training but use more GPU memory")
+# (the default value is for the fox dataset)
+parser.add_argument('--bound', type=float, default=4.0, help="assume the scene is bounded in box[-bound, bound]^3, if > 1, will invoke adaptive ray marching.")
+parser.add_argument('--scale', type=float, default=0.33, help="scale camera location into box[-bound, bound]^3")
+parser.add_argument('--offset', type=float, nargs='*', default=[0, 0, 0], help="offset of camera location")
+parser.add_argument('--dt_gamma', type=float, default=0.02, help="dt_gamma (>=0) for adaptive ray marching. set to 0 to disable, >0 to accelerate rendering (but usually with worse quality)")
+parser.add_argument('--min_near', type=float, default=0.2, help="minimum near distance for camera")
+parser.add_argument('--density_thresh', type=float, default=10, help="threshold for density grid to be occupied")
+parser.add_argument('--bg_radius', type=float, default=-1, help="if positive, use a background model at sphere(bg_radius)")
+
+### GUI options
+parser.add_argument('--gui', action='store_true', help="start a GUI")
+parser.add_argument('--W', type=int, default=1920, help="GUI width")
+parser.add_argument('--H', type=int, default=1080, help="GUI height")
+parser.add_argument('--radius', type=float, default=5, help="default GUI camera radius from center")
+parser.add_argument('--fovy', type=float, default=50, help="default GUI camera fovy")
+parser.add_argument('--max_spp', type=int, default=64, help="GUI rendering max sample per pixel")
+
+
+### experimental
+parser.add_argument('--error_map', action='store_true', help="use error map to sample rays")
+parser.add_argument('--clip_text', type=str, default='', help="text input for CLIP guidance")
+parser.add_argument('--rand_pose', type=int, default=-1, help="<0 uses no rand pose, =0 only uses rand pose, >0 sample one rand pose every $ known poses")
+
+opt = parser.parse_args()
+
+if opt.O:
+    opt.fp16 = True
+    opt.cuda_ray = False
+    opt.preload = False
+
+if opt.ff:
+    opt.fp16 = False
+    assert opt.bg_radius <= 0, "background model is not implemented for --ff"
+    from raisimGymTorch.nerf.network_ff import NeRFNetwork
+elif opt.tcnn:
+    opt.fp16 = False
+    assert opt.bg_radius <= 0, "background model is not implemented for --tcnn"
+    from raisimGymTorch.nerf.network_tcnn import NeRFNetwork
+else:
+    from raisimGymTorch.nerf.network import NeRFNetwork
+
+
+
+
+seed_everything(opt.seed)
+
+nerf_model = NeRFNetwork(
+    encoding="hashgrid",
+    bound=opt.bound,
+    cuda_ray=opt.cuda_ray,
+    density_scale=1,
+    min_near=opt.min_near,
+    density_thresh=opt.density_thresh,
+    bg_radius=opt.bg_radius,
+)
+
+nerf_model.eval()
+metrics = [PSNRMeter(),]
+criterion = torch.nn.MSELoss(reduction='none')
+trainer = Trainer('ngp', opt, nerf_model, device=device, workspace=opt.workspace, criterion=criterion, fp16=opt.fp16, metrics=metrics, use_checkpoint=opt.ckpt)
+dataset = NeRFDataset(opt, device=device, type='train')
 
 # directories
 task_path = os.path.dirname(os.path.realpath(__file__))
@@ -67,7 +156,7 @@ print('env create success')
 ob_dim = env.num_obs
 act_dim = env.num_acts
 
-weight_path = args.weight
+weight_path = opt.weight
 iteration_number = weight_path.rsplit('/', 1)[1].split('_', 1)[1].rsplit('.', 1)[0]
 weight_dir = weight_path.rsplit('/', 1)[0] + '/'
 
@@ -194,7 +283,10 @@ else:
                                                             ), device=device)
 
 
-    # actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
+
+
+
+# actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
     #                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
     #                                                                            num_env,
     #                                                                            1.0,
@@ -236,7 +328,12 @@ else:
         'show_rate': [20, 100]
     }
 
-    # filter = state_estimator(filter_cfg, agent, start_state, get_rays_fn=get_rays_fn, render_fn=render_fn)
+
+
+    render_fn = lambda rays_o, rays_d: nerf_model.render(rays_o, rays_d, staged=True, bg_color=1., perturb=False, **vars(opt))
+    get_rays_fn = lambda pose: get_rays(pose, dataset.intrinsics, dataset.H, dataset.W)
+
+    filter = state_estimator(filter_cfg, get_rays_fn=get_rays_fn, render_fn=render_fn)
 
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
     # Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
@@ -302,11 +399,11 @@ else:
                 print("estimation error: ", mse)
                 print("estimation COV :  ",estimation_cov)
                 # # dummy function for get camera_img from raisim_env
-                img = env.get_color_image()
-                img = get_img_process(img, white_bg=True)
-
-                current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor)
-                prev_anchor = current_anchor
+                # img = env.get_color_image()
+                # img = get_img_process(img, white_bg=True)
+                # gt_anchor
+                # current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor)
+                # prev_anchor = current_anchor
 
 
                 # print(estimated_anchors.shape)
