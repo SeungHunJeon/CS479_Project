@@ -38,7 +38,8 @@ class RaisimGymVecEnv:
         self.var = np.zeros(self.num_obs, dtype=np.float32)
         self.obj_pos = np.zeros([cfg['nSamples_'], 3], dtype=np.float32)
         self._observation_Rollout = np.zeros([cfg['nSamples_'], self.num_obs], dtype=np.float32)
-
+        self.height = 720
+        self.width = 1080
     def seed(self, seed=None):
         self.wrapper.setSeed(seed)
 

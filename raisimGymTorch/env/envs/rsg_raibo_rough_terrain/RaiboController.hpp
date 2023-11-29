@@ -80,7 +80,7 @@ class RaiboController {
 
     actionMean_ << Eigen::VectorXd::Constant(actionDim_, 0.0); /// joint target
     actionStd_<< Eigen::VectorXd::Constant(actionDim_, 1.0); /// joint target
-
+    start_rot_.setIdentity();
     obDouble_.setZero(obDim_);
     foot_contact_.setZero();
     state_Info_.setZero(proprioceptiveDim_);

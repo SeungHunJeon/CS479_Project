@@ -398,13 +398,26 @@ else:
                 mse = np.mean(np.sqrt((torch.Tensor(target).cpu().numpy()-estimated_anchors.detach().cpu().numpy())**2))
                 print("estimation error: ", mse)
                 print("estimation COV :  ",estimation_cov)
+                cam_pos, cam_rot = env.get_camera_pose()
+                # img = torch.from_numpy(env.get_color_image()[0])
+
+                img = get_img_process(env.get_color_image()[0], False)
+
+
+                gt_pose = torch.eye(4)
+                gt_pose[:3, :3] = torch.from_numpy(cam_rot)
+                gt_pose[:3, 3] = torch.from_numpy(cam_pos)
                 # # dummy function for get camera_img from raisim_env
                 # img = env.get_color_image()
-                # img = get_img_process(img, white_bg=True)
+                # processed_img = get_img_process(img, white_bg=True)
                 # gt_anchor
-                # current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor)
+                prev_anchor = anchors[..., :24]
+                if(step != 0):
+                    current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor,gt_pose)
                 # prev_anchor = current_anchor
+                # cam_pose, cam_rot = env.get_camera_pose()
 
+                # plt.pause(1)
 
                 # print(estimated_anchors.shape)
                 env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())

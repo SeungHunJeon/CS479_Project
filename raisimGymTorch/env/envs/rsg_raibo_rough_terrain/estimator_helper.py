@@ -35,7 +35,7 @@ def find_POI(img_rgb, render=False): # img - RGB image in range 0...255
     # keypoints2 = orb.detect(img_gray,None)
 
     if render:
-        feat_img = cv2.drawKeypoints(img_gray, keypoints, img)
+        feat_img = cv2.drawKeypoints(img_gray.copy(), keypoints, img.copy())
     else:
         feat_img = None
 
@@ -191,8 +191,8 @@ class state_estimator():
     #start-state is 12-vector
 
         obs_img_noised = sensor_image
-        W_obs = sensor_image.shape[0]
-        H_obs = sensor_image.shape[1]
+        W_obs = sensor_image.shape[1]
+        H_obs = sensor_image.shape[0]
 
     # find points of interest of the observed image
         POI, extras = find_POI(obs_img_noised, render=self.render_viz)  # xy pixel coordinates of points of interest (N x 2)
@@ -226,7 +226,7 @@ class state_estimator():
 
         # Add velocities, omegas, and pose object to optimizer
         if self.is_filter is True:
-            optimizer = torch.optim.Adam(params=[optimized_state], lr=self.lrate, betas=(0.9, 0.999), capturable=True)
+            optimizer = torch.optim.Adam(params=[optimized_anchor], lr=self.lrate, betas=(0.9, 0.999), capturable=True)
         else:
             raise('Not implemented')
 
@@ -323,11 +323,11 @@ class state_estimator():
         # R = vec_to_rot_matrix(state[6:9])
         # rot = rot_x(torch.tensor(np.pi/2)) @ R[:3, :3]
 
-        pose, trans = nerf_matrix_to_ngp_torch(rot, pos)
+        # pose, trans = nerf_matrix_to_ngp_torch(rot, pos)
 
         new_pose = torch.eye(4)
-        new_pose[:3, :3] = pose
-        new_pose[:3, 3] = trans
+        new_pose[:3, :3] = rot
+        new_pose[:3, 3] = pos
 
         rays = self.get_rays(new_pose.reshape((1, 4, 4)))
 
@@ -386,10 +386,10 @@ class state_estimator():
     def render_from_pose(self, pose):
         rot = pose[:3, :3]
         trans = pose[:3, 3]
-        pose, trans = nerf_matrix_to_ngp_torch(rot, trans)
+        # pose, trans = nerf_matrix_to_ngp_torch(rot, trans)
 
         new_pose = torch.eye(4)
-        new_pose[:3, :3] = pose
+        new_pose[:3, :3] = rot
         new_pose[:3, 3] = trans
 
         rays = self.get_rays(new_pose.reshape((1, 4, 4)))
@@ -433,17 +433,17 @@ class state_estimator():
     def estimate_state_fusion(self, sensor_img, network_anchors, network_cov, prev_anchor, obs_img_pose):
 
         yaw_rot = self.get_rotation_from_abs_anchor(prev_anchor)
-        prev_anchor = prev_anchor.reshape(-1, 3)
-        network_anchors = network_anchors.reshape(-1, 3)
+        prev_anchor = torch.from_numpy(prev_anchor.reshape(-1, 3))
+        network_anchors = network_anchors.reshape(-1, 3).cpu()
         anchor_init = torch.zeros(8, 3)
         for i in range(8):
-            anchor_init[i] = prev_anchor[i]+(yaw_rot*network_anchors[i]).sum(dim=-1)
+            anchor_init[i] = prev_anchor[i]+(yaw_rot@network_anchors[i].unsqueeze(-1)).squeeze(-1)
 
-        network_cov = network_cov.reshape(-1,3)
+        network_cov = network_cov.reshape(-1,3).cpu()
         #Argmin of total cost. Encapsulate this argmin optimization as a function call
         then = time.time()
         #xt is 12-vector
-        xt, success_flag = self.estimate_relative_pose_fusion(sensor_img, self.xt.clone().detach(), network_cov, obs_img_pose=obs_img_pose)
+        xt, success_flag = self.estimate_relative_pose_fusion(sensor_img, anchor_init.clone().detach(), network_cov, obs_img_pose=obs_img_pose)
 
         print('Optimization step for filter', time.time()-then)
 

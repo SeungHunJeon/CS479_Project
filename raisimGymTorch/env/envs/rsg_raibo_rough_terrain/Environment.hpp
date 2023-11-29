@@ -49,7 +49,7 @@ class ENVIRONMENT {
     world_.setMaterialPairProp("ground", "object", friction, 0.1, 0.0);
 
     /// add objects
-    raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_simplified.urdf");
+    raibo_ = world_.addArticulatedSystem(resourceDir + "/raibot/urdf/raibot_sensors.urdf");
     raibo_->setName("robot");
     raibo_->setControlMode(raisim::ControlMode::PD_PLUS_FEEDFORWARD_TORQUE);
 
@@ -61,10 +61,12 @@ class ENVIRONMENT {
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, obj_mass, object_radius, object_height, object_width_1, object_width_2);
 
+    //웨안
 
     double height = objectGenerator_.get_height();
     Obj_->setPosition(2, 2, height/2);
     Obj_->setOrientation(1, 0, 0, 0);
+    Obj_->setAppearance("hidden");
 
     /// create controller
     controller_.create(&world_, Obj_);
@@ -126,9 +128,10 @@ class ENVIRONMENT {
       server_->focusOn(raibo_);
       server_->setMap("office1");
       std::cout << "Launch Server !!" << std::endl;
-      command_Obj_ = server_->addVisualBox("command_Obj_", 0.5, 0.5, command_object_height_, 1, 0, 0, 0.5);
-      command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
+      command_Obj_ = server_->addVisualBox("command_Obj_", 0.1,0.1,0.1,0, 0, 0, 0.0);
+      command_Obj_->setPosition(10, 10, 10);
       command_Obj_->setOrientation(command_Obj_quat_);
+
       for(int i =0; i<8; i++){
           anchors_pred[i] = server_->addVisualSphere("anchor"+std::to_string(i), 0.05,1-i/7,i/7,0,1.0);
           anchors_gt[i] = server_->addVisualSphere("anchor_gt"+std::to_string(i), 0.05,i/7,i/7,1-i/7,1.0);
@@ -136,9 +139,7 @@ class ENVIRONMENT {
       }
 
 //      target_pos_ = server_->addVisualSphere("target_Pos_", 0.3, 1, 0, 0, 1.0);
-      command_ball_ = server_->addVisualArrow("command_Arrow_", 0.2, 0.2, 1.0, 0.0, 0.0, 1.0);
-      com_pos_ = server_->addVisualSphere("com_pos", 0.05, 0, 0.5, 0.5, 1.0);
-      com_noisify_ = server_->addVisualSphere("com_nosify_pos", 0.05, 1.0, 0.5, 0.5, 1.0);
+
     }
   }
 
@@ -433,7 +434,8 @@ class ENVIRONMENT {
     world_.removeObject(Obj_);
     Obj_ = objectGenerator_.generateObject(&world_, RandomObjectGenerator::ObjectShape(object_type), curriculumFactor_, gen_, uniDist_,
                                            normDist_, bound_ratio, obj_mass, object_radius, object_height, object_width_1, object_width_2);
-    Obj_->setAppearance("0, 1, 0, 0.3");
+    Obj_->setAppearance("hidden");
+
     controller_.updateObject(Obj_);
     double height = objectGenerator_.get_height();
 
@@ -486,8 +488,8 @@ class ENVIRONMENT {
 
     if(visualizable_) {
       server_->removeVisualObject("command_Obj_");
-      command_Obj_ = server_->addVisualBox("command_Obj_", objectGenerator_.get_geometry()[0], objectGenerator_.get_geometry()[1], objectGenerator_.get_geometry()[2], 1, 0, 0, 0.5);
-      command_Obj_->setPosition(command_Obj_Pos_[0], command_Obj_Pos_[1], command_Obj_Pos_[2]);
+      command_Obj_ = server_->addVisualBox("command_Obj_", 0.1, 0.1, 0.1, 0, 0, 0, 0.0);
+      command_Obj_->setPosition(10 , 10, 10);
       command_Obj_->setOrientation(command_Obj_quat_);
 
       ///TODO
@@ -518,13 +520,13 @@ class ENVIRONMENT {
   void subStep() {
     bool success;
     controller_.is_success(success);
-    if(success) {
-      Obj_->setAppearance("0, 0, 1, 0.7");
-    }
-
-    else{
-        Obj_->setAppearance("0, 1, 0, 0.3");
-    }
+//    if(success) {
+//      Obj_->setAppearance("0, 0, 1, 0.7");
+//    }
+//
+//    else{
+//        Obj_->setAppearance("0, 1, 0, 0.3");
+//    }
 
     if(is_position_goal)
       Low_controller_.updateHistory();
@@ -557,11 +559,8 @@ class ENVIRONMENT {
       temp = raibo_->getBaseOrientation() * arrow_rotation_matrix * initial_matrix;
       raisim::Vec<4> arrow_quat;
       raisim::rotMatToQuat(temp, arrow_quat);
-      command_ball_->setPosition(arrow_pos);
-      command_ball_->setOrientation(arrow_quat.e());
 
-      com_pos_->setPosition(controller_.get_com_pos());
-      com_noisify_->setPosition(controller_.get_noisify_com_pos());
+
     }
 
     world_.integrate1();
