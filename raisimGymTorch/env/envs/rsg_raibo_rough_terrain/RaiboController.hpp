@@ -189,7 +189,7 @@ class RaiboController {
         footContactState_[index] = true;
       }
     }
-
+   ///sksmsmsmsms
     /// Update State Info
     state_Info_.segment(0,3) = baseRot_.e().row(2);
     state_Info_.segment(3,3) = bodyLinVel_;
