@@ -378,12 +378,19 @@ else:
         Encoder.architecture.reset()
         # Encoder_ROA.architecture.reset()
 
+        plt.ion()
+        fig, ax = plt.subplots()
+
+        x_data = []
+        y_data = []
+
         if(is_rollout):
             target_pos = env.get_target_pos()
 
         actions = np.zeros((env.num_envs, 3), dtype=np.float32)
         for step in range(total_steps):
             with torch.no_grad():
+                x = step
                 obs = env.observe(False)
                 obs_processed = obs_post_process(Encoder, obs)
                 Encoder.architecture.reset()
@@ -407,22 +414,39 @@ else:
                 gt_pose = torch.eye(4)
                 gt_pose[:3, :3] = torch.from_numpy(cam_rot)
                 gt_pose[:3, 3] = torch.from_numpy(cam_pos)
-                # # dummy function for get camera_img from raisim_env
+
+
+                # dummy function for get camera_img from raisim_env
                 # img = env.get_color_image()
                 # processed_img = get_img_process(img, white_bg=True)
                 # gt_anchor
                 prev_anchor = anchors[..., :24]
                 if(step != 0):
                     current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor,gt_pose)
-                # prev_anchor = current_anchor
-                # cam_pose, cam_rot = env.get_camera_pose()
+                prev_anchor = current_anchor
+                cam_pose, cam_rot = env.get_camera_pose()
 
-                # plt.pause(1)
+
 
                 # print(estimated_anchors.shape)
                 env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())
+                if(step < 5):
+                    get = False
+                else:
+                    get = True
 
+                y = env.get_error(get, estimated_anchors.detach().cpu().numpy().transpose(1,0))/8
 
+                x_data.append(x)
+                y_data.append(y)
+
+                ax.clear()
+                plt.rc('font', size=40)
+                ax.plot(x_data, y_data,linewidth =10)
+                plt.xlabel('num of time step(0.2sec)')
+                plt.ylabel('estimation error of SE(3) projected on 8 anchor point (meter)')
+                plt.show()
+                plt.pause(0.2)
 
                 '''
         # For action plotting

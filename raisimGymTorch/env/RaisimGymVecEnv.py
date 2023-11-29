@@ -90,6 +90,10 @@ class RaisimGymVecEnv:
         self.wrapper.getAnchorHistory(self.anchor_history)
         return self.anchor_history
 
+    def get_error(self, get, anchors):
+
+        return self.wrapper.get_error(get, anchors)
+
 
     def load_scaling(self, dir_name, iteration, count=1e5):
         mean_file_name = dir_name + "/mean" + str(iteration) + ".csv"

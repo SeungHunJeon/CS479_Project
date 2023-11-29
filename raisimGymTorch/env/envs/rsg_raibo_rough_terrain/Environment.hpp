@@ -94,6 +94,7 @@ class ENVIRONMENT {
 
     current_anchor_points.resize(8);
     prev_anchor_points.resize(8);
+    accum_anchor_points.resize(8);
     anchors_pred.resize(8);
     anchors_prev.resize(8);
     anchors_gt.resize(8);
@@ -343,6 +344,7 @@ class ENVIRONMENT {
         Eigen::Vector3d geometry{0.2,0.2,0.2};
         controller_.get_anchor_points(prev_anchor_points, prev_pos_, prev_yaw_rot.e(), geometry);
         controller_.estimate_anchor_points(current_anchor_points, prev_anchor_points, anchors,prev_yaw_rot.e());
+        prev_prev_yaw_rot =prev_yaw_rot;
 
         for(int i=0; i<8;i++){
             anchors_prev[i]->setPosition(prev_anchor_points[i]);
@@ -427,7 +429,32 @@ class ENVIRONMENT {
         return controller_.getRewardSum(visualize);
     }
 
+    double get_estimation_error(bool get, const Eigen::Ref<EigenVec>& anchors){
 
+
+      Eigen::Vector3d delta;
+      std::vector<Eigen::Vector3d> anchor_points;
+      anchor_points.resize(8);
+      delta.setZero();
+      double error =0;
+      if(get=false){
+
+          for(int i=0; i<8; i++){
+             error += (current_anchor_points[i]-prev_anchor_points[i]).squaredNorm();
+          }
+          accum_anchor_points = current_anchor_points;
+          return error;
+      }else{
+          controller_.estimate_anchor_points(anchor_points, accum_anchor_points, anchors,prev_prev_yaw_rot.e());
+          for(int i=0; i<8; i++){
+              error += (anchor_points[i]-prev_anchor_points[i]).squaredNorm();
+              accum_anchor_points = anchor_points;
+              return error;
+          }
+      }
+
+
+    }
 
   void updateObstacle(bool curriculum_Update = false) {
 
@@ -683,6 +710,8 @@ class ENVIRONMENT {
   Eigen::Vector3d Dist_eo_, Dist_og_;
   Eigen::Vector3d prev_pos_;
   raisim::Mat<3,3> prev_yaw_rot;
+  raisim::Mat<3,3> prev_prev_yaw_rot;
+  std::vector<Eigen::Vector3d> accum_anchor_points;
   std::vector<Eigen::Vector3d> prev_anchor_points;
   std::vector<Eigen::Vector3d> current_anchor_points;
   std::vector<raisim::Visuals *> anchors_pred;

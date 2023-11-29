@@ -202,6 +202,10 @@ class VectorizedEnvironment {
     environments_[0]->getState(gc, gv);
   }
 
+  double get_error(bool get, Eigen::Ref<EigenVec> anchor ){
+      return environments_[0]->get_estimation_error(get, anchor);
+  }
+
   void getContact(Eigen::Ref<EigenBoolVec> &contact) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++) {
