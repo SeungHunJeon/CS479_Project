@@ -115,10 +115,10 @@ class VectorizedEnvironment {
 //
 //  }
 
-  void getAnchorHistory(Eigen::Ref<EigenRowMajorMat> &anchor) {
+  void getAnchorHistory(Eigen::Ref<EigenRowMajorMat> &anchor, bool is_robotFrame=true) {
 #pragma omp parallel for schedule(auto)
     for (int i = 0; i < num_envs_; i++)
-      environments_[i]->get_anchor_history(anchor.row(i));
+      environments_[i]->get_anchor_history(anchor.row(i), is_robotFrame);
   }
 
   void observe_Rollout(Eigen::Ref<EigenRowMajorMat> &ob, bool updateStatistics=false) {

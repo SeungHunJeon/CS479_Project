@@ -20,8 +20,9 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 from estimator_helper import state_estimator, get_img_process
-from raisimGymTorch.nerf.utils import *
-from raisimGymTorch.nerf.provider import NeRFDataset
+from nerf_helper import load_intrinsic_params
+from nerf.utils import *
+from nerf.provider import NeRFDataset
 
 # dddd
 
@@ -81,7 +82,8 @@ parser.add_argument('--clip_text', type=str, default='', help="text input for CL
 parser.add_argument('--rand_pose', type=int, default=-1, help="<0 uses no rand pose, =0 only uses rand pose, >0 sample one rand pose every $ known poses")
 
 opt = parser.parse_args()
-
+opt.path = os.path.dirname(os.path.realpath(__file__)) + "/" + opt.path
+opt.workspace = os.path.dirname(os.path.realpath(__file__)) + "/" + opt.workspace
 if opt.O:
     opt.fp16 = True
     opt.cuda_ray = False
@@ -90,17 +92,17 @@ if opt.O:
 if opt.ff:
     opt.fp16 = False
     assert opt.bg_radius <= 0, "background model is not implemented for --ff"
-    from raisimGymTorch.nerf.network_ff import NeRFNetwork
+    from nerf.network_ff import NeRFNetwork
 elif opt.tcnn:
     opt.fp16 = False
     assert opt.bg_radius <= 0, "background model is not implemented for --tcnn"
-    from raisimGymTorch.nerf.network_tcnn import NeRFNetwork
+    from nerf.network_tcnn import NeRFNetwork
 else:
-    from raisimGymTorch.nerf.network import NeRFNetwork
+    from nerf.network import NeRFNetwork
 
 
 
-
+# torch.set_default_tensor_type(torch.cuda.FloatTensor)
 seed_everything(opt.seed)
 
 nerf_model = NeRFNetwork(
@@ -116,8 +118,13 @@ nerf_model = NeRFNetwork(
 nerf_model.eval()
 metrics = [PSNRMeter(),]
 criterion = torch.nn.MSELoss(reduction='none')
-trainer = Trainer('ngp', opt, nerf_model, device=device, workspace=opt.workspace, criterion=criterion, fp16=opt.fp16, metrics=metrics, use_checkpoint=opt.ckpt)
-dataset = NeRFDataset(opt, device=device, type='train')
+
+
+
+# trainer = Trainer('ngp', opt, nerf_model, device=device, workspace=opt.workspace, criterion=criterion, fp16=opt.fp16, metrics=metrics, use_checkpoint=opt.ckpt)
+
+
+intrinsics, img_W, img_H = load_intrinsic_params(opt)
 
 # directories
 task_path = os.path.dirname(os.path.realpath(__file__))
@@ -132,24 +139,40 @@ n_horizon = cfg['MPPI']['nHorizon_']
 gamma = cfg['MPPI']['gamma_']
 use_dynamics = cfg['MPPI']['use_dynamics_']
 
-# create environment from the configuration file
-# cfg['environment']['num_envs'] = 1 + n_samples
 cfg['environment']['num_envs'] = 1
-
 cfg['environment']['render'] = True
 cfg['environment']['curriculum']['initial_factor'] = 1.
 is_rollout = cfg['environment']['Rollout']
-# create environment from the configuration file
-# cfg['environment']['num_envs'] = 1 + n_samples
-# if(is_rollout):
-#     num_env = cfg['environment']['num_envs']
-# else:
-#     num_env = 1
-#     cfg['environment']['num_envs'] = 1
 num_env = 1
 
 #
 env = VecEnv(rsg_raibo_rough_terrain.RaisimGymRaiboRoughTerrain(home_path + "/rsc", dump(cfg['environment'], Dumper=RoundTripDumper)), cfg['environment'])
+
+
+nerf_model = nerf_model.to(device)
+
+ckpt_path = os.path.join(opt.workspace, 'checkpoints')
+checkpoint = None
+if checkpoint is None:
+    checkpoint_list = sorted(glob.glob(f'{ckpt_path}/ngp_ep*.pth'))
+if checkpoint_list:
+    checkpoint = checkpoint_list[-1]
+    print(f"[INFO] Latest checkpoint is {checkpoint}")
+else:
+    print("[WARN] No checkpoint found, model randomly initialized.")
+
+checkpoint_dict = torch.load(checkpoint, map_location='cpu')
+if 'model' not in checkpoint_dict:
+    nerf_model.load_state_dict(checkpoint_dict)
+    print("[INFO] loaded model.")
+
+else:
+    missing_keys, unexpected_keys = nerf_model.load_state_dict(checkpoint_dict['model'], strict=False)
+    print("[INFO] loaded model.")
+    if len(missing_keys) > 0:
+        print(f"[WARN] missing keys: {missing_keys}")
+    if len(unexpected_keys) > 0:
+        print(f"[WARN] unexpected keys: {unexpected_keys}")
 
 print('env create success')
 # shortcuts
@@ -214,7 +237,6 @@ def actor_input_concat(encoder, latent, obs):
 def estimator_pre_process(anchor_points):
     return anchor_points[..., -24:] - anchor_points[..., :24]
 
-
 def obs_post_process(encoder, obs_batch):
     obs = []
 
@@ -250,21 +272,6 @@ else:
                                                         nn.LeakyReLU,
                                                         hidden_dim + pro_dim * 2 + act_dim,
                                                         24), device=device)
-#
-
-    # Encoder_ROA = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
-    #                                                               hidden_dim=hidden_dim,
-    #                                                               ext_dim=ROA_ext_dim,
-    #                                                               pro_dim=pro_dim,
-    #                                                               act_dim=act_dim,
-    #                                                               dyn_info_dim=dynamics_info_dim,
-    #                                                               dyn_predict_dim=dynamics_predict_dim,
-    #                                                               hist_num=historyNum,
-    #                                                               device=device,
-    #                                                               batch_num=batchNum,
-    #                                                               layer_num=layerNum,
-    #                                                               num_minibatch = num_mini_batches,
-    #                                                               num_env=num_env), device=device)
 
     Encoder = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(Encoder_ob_dim/historyNum),
                                                               hidden_dim=hidden_dim,
@@ -282,42 +289,6 @@ else:
                                                               inertial_dim= 0
                                                             ), device=device)
 
-
-
-
-
-# actor = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
-    #                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
-    #                                                                            num_env,
-    #                                                                            1.0,
-    #                                                                            NormalSampler(act_dim),
-    #                                                                            cfg['seed']),
-    #                          device)
-
-    # Encoder_Rollout = ppo_module.Encoder(architecture=ppo_module.LSTM(input_dim=int(ROA_Encoder_ob_dim/historyNum),
-    #                                                                   hidden_dim=hidden_dim,
-    #                                                                   ext_dim=ROA_ext_dim,
-    #                                                                   pro_dim=pro_dim,
-    #                                                                   act_dim=act_dim,
-    #                                                                   dyn_info_dim=dynamics_info_dim,
-    #                                                                   dyn_predict_dim=dynamics_predict_dim,
-    #                                                                   hist_num=historyNum,
-    #                                                                   device=device,
-    #                                                                   batch_num=batchNum,
-    #                                                                   layer_num=layerNum,
-    #                                                                   num_minibatch = num_mini_batches,
-    #                                                                   num_env=num_env), device=device)
-    #
-    # actor_Rollout = ppo_module.Actor(ppo_module.MLP(cfg['architecture']['encoding']['policy_net'], nn.LeakyReLU, hidden_dim, act_dim, actor=True),
-    #                          ppo_module.MultivariateGaussianDiagonalCovariance(act_dim,
-    #                                                                            n_samples,
-    #                                                                            1.0,
-    #                                                                            NormalSampler(act_dim),
-    #                                                                            cfg['seed']),
-    #                          device)
-
-
-
     filter_cfg = {
         'dil_iter': 3,
         'batch_size': 1024,
@@ -331,9 +302,9 @@ else:
 
 
     render_fn = lambda rays_o, rays_d: nerf_model.render(rays_o, rays_d, staged=True, bg_color=1., perturb=False, **vars(opt))
-    get_rays_fn = lambda pose: get_rays(pose, dataset.intrinsics, dataset.H, dataset.W)
+    get_rays_fn = lambda pose: get_rays(pose, intrinsics, img_H, img_W)
 
-    filter = state_estimator(filter_cfg, get_rays_fn=get_rays_fn, render_fn=render_fn)
+    filter = state_estimator(filter_cfg, get_rays_fn=get_rays_fn, render_fn=render_fn, device=device)
 
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
     # Encoder_ROA.architecture.load_state_dict(torch.load(weight_path)['Encoder_ROA_state_dict'])
@@ -389,6 +360,7 @@ else:
 
         actions = np.zeros((env.num_envs, 3), dtype=np.float32)
         for step in range(total_steps):
+            torch.cuda.empty_cache()
             with torch.no_grad():
                 x = step
                 obs = env.observe(False)
@@ -408,47 +380,45 @@ else:
                 cam_pos, cam_rot = env.get_camera_pose()
                 # img = torch.from_numpy(env.get_color_image()[0])
 
-                img = get_img_process(env.get_color_image()[0], False)
+                # img = get_img_process(env.get_color_image()[0], False).to(device)
 
+                img = torch.load('sample_img.pt')
+
+                # img = get_img_process(torch.ones((720,1080,3)),False).to(device)
 
                 gt_pose = torch.eye(4)
                 gt_pose[:3, :3] = torch.from_numpy(cam_rot)
                 gt_pose[:3, 3] = torch.from_numpy(cam_pos)
-
+                gt_pose = gt_pose.to(device)
 
                 # dummy function for get camera_img from raisim_env
                 # img = env.get_color_image()
                 # processed_img = get_img_process(img, white_bg=True)
                 # gt_anchor
-                prev_anchor = anchors[..., :24]
-                if(step != 0):
-                    current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor,gt_pose)
-                prev_anchor = current_anchor
-                cam_pose, cam_rot = env.get_camera_pose()
+                anchors_w = env.getAnchorHistory(robotFrame=False)
+                prev_anchor_w = anchors_w[..., :24]
+            current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor_w, gt_pose)
+            # prev_anchor_w = current_anchor
+            cam_pose, cam_rot = env.get_camera_pose()
 
 
 
-                # print(estimated_anchors.shape)
-                env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())
-                if(step < 5):
-                    get = False
-                else:
-                    get = True
+            # TODO : Here, replace estimated_anchors to current_anchor. However, the represented frame mismatches.
+            env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())
+            y = env.get_error(step >= 5, estimated_anchors.detach().cpu().numpy().transpose(1,0))/8
 
-                y = env.get_error(get, estimated_anchors.detach().cpu().numpy().transpose(1,0))/8
+            x_data.append(x)
+            y_data.append(y)
 
-                x_data.append(x)
-                y_data.append(y)
+            ax.clear()
+            plt.rc('font', size=40)
+            ax.plot(x_data, y_data,linewidth =10)
+            plt.xlabel('num of time step(0.2sec)')
+            plt.ylabel('estimation error of SE(3) projected on 8 anchor point (meter)')
+            plt.show()
+            plt.pause(0.2)
 
-                ax.clear()
-                plt.rc('font', size=40)
-                ax.plot(x_data, y_data,linewidth =10)
-                plt.xlabel('num of time step(0.2sec)')
-                plt.ylabel('estimation error of SE(3) projected on 8 anchor point (meter)')
-                plt.show()
-                plt.pause(0.2)
-
-                '''
+    '''
         # For action plotting
         # plt.close(figure)
         # print( "Trial : {} ".format(i))

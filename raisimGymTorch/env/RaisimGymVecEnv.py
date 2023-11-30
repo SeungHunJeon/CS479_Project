@@ -86,8 +86,8 @@ class RaisimGymVecEnv:
     def get_color_image(self): ## only for one env
         return np.array(self.wrapper.getColorImage()).reshape(-1, self.height, self.width,4)[..., [2,1,0]].astype(np.uint8)
 
-    def getAnchorHistory(self):
-        self.wrapper.getAnchorHistory(self.anchor_history)
+    def getAnchorHistory(self, robotFrame = True):
+        self.wrapper.getAnchorHistory(self.anchor_history, robotFrame)
         return self.anchor_history
 
     def get_error(self, get, anchors):

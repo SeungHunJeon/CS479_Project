@@ -440,12 +440,23 @@ class RaiboController {
     return Obj_Pos_.e() + Obj_->getCom().e();
   }
 
-  void get_anchor_history(Eigen::Ref<EigenVec> &anchor_points) {
-    for(int i = 0; i < actionNum_; i ++) {
-      for (int j = 0; j < 8; j++) {
-        anchorHistory_e.segment(24 * i + 3 * j, 3) = start_rot_.transpose()*anchorHistory_[i][j];
+  void get_anchor_history(Eigen::Ref<EigenVec> &anchor_points, bool robotFrame) {
+    if(robotFrame) {
+      for(int i = 0; i < actionNum_; i ++) {
+        for (int j = 0; j < 8; j++) {
+          anchorHistory_e.segment(24 * i + 3 * j, 3) = start_rot_.transpose()*anchorHistory_[i][j];
+        }
       }
     }
+
+    else {
+      for(int i = 0; i < actionNum_; i ++) {
+        for (int j = 0; j < 8; j++) {
+          anchorHistory_e.segment(24 * i + 3 * j, 3) = anchorHistory_[i][j];
+        }
+      }
+    }
+
     anchor_points = anchorHistory_e.cast<float>();
   }
 

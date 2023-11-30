@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from encoding import get_encoder
-from activation import trunc_exp
+from .encoding import get_encoder
+from .activation import trunc_exp
 from .renderer import NeRFRenderer
 
 

@@ -136,7 +136,7 @@ class NeRFRenderer(nn.Module):
 
         # choose aabb
         aabb = self.aabb_train if self.training else self.aabb_infer
-
+        aabb = aabb.to(device)
         # sample steps
         with torch.no_grad():
             nears, fars = raymarching.near_far_from_aabb(rays_o, rays_d, aabb, self.min_near)

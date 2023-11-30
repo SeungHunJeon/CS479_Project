@@ -4,7 +4,7 @@ import json
 import time
 import cv2
 import matplotlib.pyplot as plt
-from  raisimGymTorch.nav.math_utils import vec_to_rot_matrix, mahalanobis, rot_x, nerf_matrix_to_ngp_torch, nearestPD, calcSE3Err
+from .math_utils import vec_to_rot_matrix, mahalanobis, rot_x, nerf_matrix_to_ngp_torch, nearestPD, calcSE3Err
 
 # def mahalanobis(u, v, cov):
 #     delta = u - v

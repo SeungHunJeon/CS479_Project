@@ -357,7 +357,7 @@ class ENVIRONMENT {
         Eigen::VectorXd gc;
         gc.resize(raibo_->getGeneralizedCoordinateDim());
         gc = raibo_->getGeneralizedCoordinate().e();
-        prev_pos_={gc[0],gc[1],gc[2]};
+
         raisim::Vec<4> quat;
         raisim::Mat<3, 3> baseRot;
         quat[0] = gc[3];
@@ -368,12 +368,16 @@ class ENVIRONMENT {
         Eigen::Vector3d base_x_axis = baseRot.e().row(0);
         base_x_axis(2) = 0;
         Eigen::Vector3d base_x_axis_norm = base_x_axis.normalized();
-        raisim::angleAxisToRotMat({0,0,1}, std::atan2(-base_x_axis(1), base_x_axis(0)), prev_yaw_rot);
+        raisim::Mat<3,3> yaw_rot;
+        raisim::angleAxisToRotMat({0,0,1}, std::atan2(-base_x_axis(1), base_x_axis(0)), yaw_rot);
 
-        controller_.get_anchor_points(prev_anchor_points, prev_pos_, prev_yaw_rot.e(), geometry);
+        controller_.get_anchor_points(prev_anchor_points, gc.head(3), yaw_rot.e(), geometry);
         for(int i=0; i<8;i++){
             anchors_gt[i]->setPosition(prev_anchor_points[i]);
         }
+
+        prev_pos_=gc.head(3);
+        prev_yaw_rot = yaw_rot;
 
         command(0) = std::clamp(command(0) + normDist_(gen_) * 0.2, -1.0, 1.0);
         command(1) = std::clamp(command(1) + normDist_(gen_) * 0.2, -1.0, 1.0);
@@ -413,17 +417,12 @@ class ENVIRONMENT {
             for(howManySteps = 0; howManySteps< int(low_level_control_dt_ / simulation_dt_ + 1e-10); howManySteps++) {
 
                 subStep();
-//        if(visualize)
                 std::this_thread::sleep_for(std::chrono::microseconds(1000));
-//
                 if(isTerminalState(dummy)) {
                     howManySteps++;
                     break;
                 }
             }
-//            if(lowlevelSteps == final`) {
-//                controller_.updateHistory();
-//            }
         }
 
         return controller_.getRewardSum(visualize);
@@ -448,9 +447,9 @@ class ENVIRONMENT {
           controller_.estimate_anchor_points(anchor_points, accum_anchor_points, anchors,prev_prev_yaw_rot.e());
           for(int i=0; i<8; i++){
               error += (anchor_points[i]-prev_anchor_points[i]).squaredNorm();
-              accum_anchor_points = anchor_points;
-              return error;
           }
+          accum_anchor_points = anchor_points;
+          return error;
       }
 
 
@@ -655,8 +654,8 @@ class ENVIRONMENT {
 //  void get_camera_pose(Eigen::Ref<EigenVec> pose,){
 
 //  }
-  void get_anchor_history(Eigen::Ref<EigenVec> anchors) {
-    controller_.get_anchor_history(anchors);
+  void get_anchor_history(Eigen::Ref<EigenVec> anchors, bool is_robotFrame) {
+    controller_.get_anchor_history(anchors, is_robotFrame);
   }
 
   static constexpr int getObDim() { return RaiboController::getObDim(); }

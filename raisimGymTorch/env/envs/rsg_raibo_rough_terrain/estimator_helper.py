@@ -7,8 +7,8 @@ import time
 import cv2
 import matplotlib.pyplot as plt
 import imageio
-from raisimGymTorch.nav.math_utils import vec_to_rot_matrix, mahalanobis, rot_x, nerf_matrix_to_ngp_torch, nearestPD, calcSE3Err
-
+from nav.math_utils import vec_to_rot_matrix, mahalanobis, rot_x, nerf_matrix_to_ngp_torch, nearestPD, calcSE3Err
+import os
 
 
 
@@ -55,78 +55,14 @@ def find_POI(img_rgb, render=False): # img - RGB image in range 0...255
 
     return xy, extras # pixel coordinates
 
-# def nearestPD(A):
-#     """Find the nearest positive-definite matrix to input
-#     A Python/Numpy port of John D'Errico's `nearestSPD` MATLAB code [1], which
-#     credits [2].
-#     [1] https://www.mathworks.com/matlabcentral/fileexchange/42885-nearestspd
-#     [2] N.J. Higham, "Computing a nearest symmetric positive semidefinite
-#     matrix" (1988): https://doi.org/10.1016/0024-3795(88)90223-6
-#     """
-
-#     B = (A + A.T) / 2
-#     _, s, V = la.svd(B)
-
-#     H = np.dot(V.T, np.dot(np.diag(s), V))
-
-#     A2 = (B + H) / 2
-
-#     A3 = (A2 + A2.T) / 2
-
-#     if isPD(A3):
-#         return A3
-
-#     spacing = np.spacing(la.norm(A))
-#     # The above is different from [1]. It appears that MATLAB's `chol` Cholesky
-#     # decomposition will accept matrixes with exactly 0-eigenvalue, whereas
-#     # Numpy's will not. So where [1] uses `eps(mineig)` (where `eps` is Matlab
-#     # for `np.spacing`), we use the above definition. CAVEAT: our `spacing`
-#     # will be much larger than [1]'s `eps(mineig)`, since `mineig` is usually on
-#     # the order of 1e-16, and `eps(1e-16)` is on the order of 1e-34, whereas
-#     # `spacing` will, for Gaussian random matrixes of small dimension, be on
-#     # othe order of 1e-16. In practice, both ways converge, as the unit test
-#     # below suggests.
-#     I = np.eye(A.shape[0])
-#     k = 1
-#     while not isPD(A3):
-#         mineig = np.min(np.real(la.eigvals(A3)))
-#         A3 += I * (-mineig * k**2 + spacing)
-#         k += 1
-
-#     return A3
-
-# def isPD(B):
-#     """Returns true when input is positive-definite, via Cholesky"""
-#     try:
-#         _ = la.cholesky(B)
-#         return True
-#     except la.LinAlgError:
-#         return False
-
-# def calcSO3Err(R_gt, R_est):
-#     ''' angle between two rotation matrices (in degrees) '''
-#     rotDiff = np.dot(R_gt, np.transpose(R_est))
-#     trace = np.trace(rotDiff)
-#     if trace < -1 and (-1 - trace) < 0.0001:
-#         return np.rad2deg(np.arccos(-1))
-#     if trace > 3 and (trace - 3) < 0.0001:
-#         return np.rad2deg(np.arccos(1))
-#     return np.rad2deg(np.arccos((trace-1.0)/2.0))
-
-# def calcSE3Err(T_gt, T_est):
-#     ''' translation err & angle between two rotation matrices (in degrees) '''
-#     ang_err_deg = calcSO3Err(T_gt[0:3, 0:3], T_est[0:3, 0:3])
-#     t_err = np.linalg.norm(T_gt[0:3, 3] - T_est[0:3, 3])
-#     return t_err, ang_err_deg
-
 class state_estimator():
-    def __init__(self, filter_cfg, get_rays_fn=None, render_fn=None) -> None:
+    def __init__(self, filter_cfg, get_rays_fn=None, render_fn=None, is_filter=True, device='cpu') -> None:
 
         # Parameters
         self.batch_size = filter_cfg['batch_size']
         self.kernel_size = filter_cfg['kernel_size']
         self.dil_iter = filter_cfg['dil_iter']
-
+        self.is_filter = is_filter
         self.lrate = filter_cfg['lrate']
 
 
@@ -153,44 +89,15 @@ class state_estimator():
         self.action = None
 
         self.iteration = 0
+        self.device = device
 
 
-    def anchor_to_SE3(self, anchor):
-        # anchor to cartesian pos and 3*3 rotmat
-        anchor = anchor.reshape(-1, 3)
-        trans = anchor.mean(dim=0)
-        x_axis = torch.zeros(3)
-        for i in range(4):
-            x_axis += (anchor[4+i]-anchor[i])/4
-        yaw_angle = math.atan2(x_axis[1], x_axis[0])
-        rot = torch.ones(3, 3)
-        rot[0][0] = math.cos(yaw_angle)
-        rot[0][1] = -math.sin(yaw_angle)
-        rot[1][0] = math.sin(yaw_angle)
-        rot[1][1] = math.cos(yaw_angle)
-        offset = torch.tensor([0.12476, 0, 0.16252])
-        trans = trans + rot*offset.sum(dim=-1)
-        return trans, rot
 
-    def anchor_to_SE3_no_offset(self, anchor):
-        # anchor to cartesian pos and 3*3 rotmat
-        anchor = anchor.reshape(-1, 3)
-        trans = anchor.mean(dim=0)
-        x_axis = torch.zeros(3)
-        for i in range(4):
-            x_axis += (anchor[4+i]-anchor[i])/4
-        yaw_angle = math.atan2(x_axis[1], x_axis[0])
-        rot = torch.ones(3, 3)
-        rot[0][0] = math.cos(yaw_angle)
-        rot[0][1] = -math.sin(yaw_angle)
-        rot[1][0] = math.sin(yaw_angle)
-        rot[1][1] = math.cos(yaw_angle)
 
-        return trans, rot
     def estimate_relative_pose_fusion(self, sensor_image, init_anchor, sig, obs_img_pose=None):
     #start-state is 12-vector
 
-        obs_img_noised = sensor_image
+        obs_img_noised = sensor_image.cpu()
         W_obs = sensor_image.shape[1]
         H_obs = sensor_image.shape[0]
 
@@ -207,13 +114,14 @@ class state_estimator():
             return init_anchor.clone().detach(), False
 
         obs_img_noised = (np.array(obs_img_noised) / 255.).astype(np.float32)
-        obs_img_noised = torch.tensor(obs_img_noised).cuda()
+        obs_img_noised = torch.tensor(obs_img_noised).to(self.device)
 
         # create meshgrid from the observed image
         coords = np.asarray(np.stack(np.meshgrid(np.linspace(0, H_obs - 1, H_obs), np.linspace(0, W_obs - 1, W_obs)), -1), dtype=int)
 
         # create sampling mask for interest region sampling strategy
-        interest_regions = np.zeros((H_obs, W_obs, ), dtype=np.uint8)
+        # interest_regions = np.zeros((H_obs, W_obs, ), dtype=np.uint8)
+        interest_regions = np.zeros((W_obs, H_obs, ), dtype=np.uint8)
         interest_regions[POI[:,0], POI[:,1]] = 1
         I = self.dil_iter
         interest_regions = cv2.dilate(interest_regions, np.ones((self.kernel_size, self.kernel_size), np.uint8), iterations=I)
@@ -236,7 +144,7 @@ class state_estimator():
             pose = torch.eye(4)
             pose[:3, :3] = rot
             pose[:3, 3] = pos
-            print('initial error', calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose))
+            print('initial error', calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose.cpu().numpy()))
 
         #Store data
         losses = []
@@ -268,7 +176,7 @@ class state_estimator():
             if obs_img_pose is not None and ((k + 1) % self.error_print_rate == 0 or k == 0):
                 print('Step: ', k)
                 print('Loss: ', loss)
-                pos, rot = self.anchor_to_SE3_no_offset(optimized_anchor)
+                pos, rot = self.anchor_to_SE3(optimized_anchor, include_offset=False)
                 print('State', pos, rot)
 
                 with torch.no_grad():
@@ -276,7 +184,7 @@ class state_estimator():
                     pose = torch.eye(4)
                     pose[:3, :3] = rot
                     pose[:3, 3] = pos
-                    pose_error = calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose)
+                    pose_error = calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose.detach().cpu().numpy())
                     print('error', pose_error)
                     print('-----------------------------------')
 
@@ -309,25 +217,18 @@ class state_estimator():
 
     def measurement_fn_fusion(self, anchor, start_anchor, sig, target, batch):
         #Process loss.
-
+        # start_anchor.requires_grad_(True)
+        # sig.requires_grad_(True)
         loss_dyn = (((anchor[...,:2]-start_anchor[...,:2])**2) / sig[...,:2]).mean()
 
         H, W, _ = target.shape
 
-        #Assuming the camera frustrum is oriented in the body y-axis. The camera frustrum is in the -z axis
-        # in its own frame, so we need a 90 degree rotation about the x-axis to transform
-
-
         pos, rot = self.anchor_to_SE3(anchor)
-
-        # R = vec_to_rot_matrix(state[6:9])
-        # rot = rot_x(torch.tensor(np.pi/2)) @ R[:3, :3]
-
-        # pose, trans = nerf_matrix_to_ngp_torch(rot, pos)
 
         new_pose = torch.eye(4)
         new_pose[:3, :3] = rot
         new_pose[:3, 3] = pos
+        new_pose = new_pose.to(self.device)
 
         rays = self.get_rays(new_pose.reshape((1, 4, 4)))
 
@@ -346,49 +247,49 @@ class state_estimator():
         loss = loss_rgb + loss_dyn
 
         return loss
-    def measurement_fn(self, state, start_state, sig, target, batch):
-        #Process loss.
-
-        loss_dyn = mahalanobis(state, start_state, sig)
-
-        H, W, _ = target.shape
-
-        #Assuming the camera frustrum is oriented in the body y-axis. The camera frustrum is in the -z axis
-        # in its own frame, so we need a 90 degree rotation about the x-axis to transform
-
-        R = vec_to_rot_matrix(state[6:9])
-        rot = rot_x(torch.tensor(np.pi/2)) @ R[:3, :3]
-
-        pose, trans = nerf_matrix_to_ngp_torch(rot, state[:3])
-
-        new_pose = torch.eye(4)
-        new_pose[:3, :3] = pose
-        new_pose[:3, 3] = trans
-
-        rays = self.get_rays(new_pose.reshape((1, 4, 4)))
-
-        rays_o = rays["rays_o"].reshape((H, W, -1))[batch[:, 0], batch[:, 1]]
-        rays_d = rays["rays_d"].reshape((H, W, -1))[batch[:, 0], batch[:, 1]]
-
-        output = self.render_fn(rays_o.reshape((1, -1, 3)), rays_d.reshape((1, -1, 3)))
-        #output also contains a depth channel for use with depth data if one chooses
-
-        rgb = output['image'].reshape((-1, 3))
-
-        target = target[batch[:, 0], batch[:, 1]]
-
-        loss_rgb = torch.nn.functional.mse_loss(rgb, target)
-
-        loss = loss_rgb + loss_dyn
-
-        return loss
+    # def measurement_fn(self, state, start_state, sig, target, batch):
+    #     #Process loss.
+    #
+    #     loss_dyn = mahalanobis(state, start_state, sig)
+    #
+    #     H, W, _ = target.shape
+    #
+    #     #Assuming the camera frustrum is oriented in the body y-axis. The camera frustrum is in the -z axis
+    #     # in its own frame, so we need a 90 degree rotation about the x-axis to transform
+    #
+    #     R = vec_to_rot_matrix(state[6:9])
+    #     rot = rot_x(torch.tensor(np.pi/2)) @ R[:3, :3]
+    #
+    #     pose, trans = nerf_matrix_to_ngp_torch(rot, state[:3])
+    #
+    #     new_pose = torch.eye(4)
+    #     new_pose[:3, :3] = pose
+    #     new_pose[:3, 3] = trans
+    #
+    #     rays = self.get_rays(new_pose.reshape((1, 4, 4)))
+    #
+    #     rays_o = rays["rays_o"].reshape((H, W, -1))[batch[:, 0], batch[:, 1]]
+    #     rays_d = rays["rays_d"].reshape((H, W, -1))[batch[:, 0], batch[:, 1]]
+    #
+    #     output = self.render_fn(rays_o.reshape((1, -1, 3)), rays_d.reshape((1, -1, 3)))
+    #     #output also contains a depth channel for use with depth data if one chooses
+    #
+    #     rgb = output['image'].reshape((-1, 3))
+    #
+    #     target = target[batch[:, 0], batch[:, 1]]
+    #
+    #     loss_rgb = torch.nn.functional.mse_loss(rgb, target)
+    #
+    #     loss = loss_rgb + loss_dyn
+    #
+    #     return loss
 
     def render_from_pose(self, pose):
         rot = pose[:3, :3]
         trans = pose[:3, 3]
         # pose, trans = nerf_matrix_to_ngp_torch(rot, trans)
 
-        new_pose = torch.eye(4)
+        new_pose = torch.eye(4).to(self.device)
         new_pose[:3, :3] = rot
         new_pose[:3, 3] = trans
 
@@ -401,45 +302,64 @@ class state_estimator():
 
         return rgb
 
-    def process_anchors(self, est_anchor):
+    def process_anchors(self, anchor):
         # anchor to cartesian pos and 3*3 rotmat
-        anchor=est_anchor.reshape(-1,3)
+        if (isinstance(anchor[0], np.ndarray)):
+            anchor = torch.from_numpy(anchor)
+        anchor=anchor.reshape(-1,3).to(self.device)
         trans = anchor.mean(dim=0)
-        x_axis = torch.zeros(3)
+        x_axis = torch.zeros(3).to(self.device)
         for i in range(4):
             x_axis += (anchor[4+i]-anchor[i])/4
         yaw_angle = math.atan2(x_axis[1],x_axis[0])
-        rot = torch.ones(3,3)
+        rot = torch.eye(3,3).to(self.device)
         rot[0][0] = math.cos(yaw_angle)
         rot[0][1] = -math.sin(yaw_angle)
         rot[1][0] = math.sin(yaw_angle)
         rot[1][1] = math.cos(yaw_angle)
         return trans, rot
 
-    def get_rotation_from_abs_anchor(self, anchor):
+    def anchor_to_SE3(self, anchor, include_offset=True):
         # anchor to cartesian pos and 3*3 rotmat
-        anchor = anchor.reshape(-1,3)
-        x_axis = torch.zeros(3)
+        anchor = anchor.reshape(-1, 3).to(self.device)
+        trans = anchor.mean(dim=0)
+        x_axis = torch.zeros(3).to(self.device)
         for i in range(4):
             x_axis += (anchor[4+i]-anchor[i])/4
         yaw_angle = math.atan2(x_axis[1], x_axis[0])
-        rot = torch.ones(3,3)
+        rot = torch.eye(3).to(self.device)
         rot[0][0] = math.cos(yaw_angle)
         rot[0][1] = -math.sin(yaw_angle)
         rot[1][0] = math.sin(yaw_angle)
         rot[1][1] = math.cos(yaw_angle)
-        return rot
+        if(include_offset):
+            offset = torch.tensor([0.12476, 0, 0.16252]).to(self.device)
+            trans = trans + rot@offset
+        return trans, rot
+    # def get_rotation_from_abs_anchor(self, anchor):
+    #     # anchor to cartesian pos and 3*3 rotmat
+    #     anchor = anchor.reshape(-1,3)
+    #     x_axis = torch.zeros(3)
+    #     for i in range(4):
+    #         x_axis += (anchor[4+i]-anchor[i])/4
+    #     yaw_angle = math.atan2(x_axis[1], x_axis[0])
+    #     rot = torch.eye(3)
+    #     rot[0][0] = math.cos(yaw_angle)
+    #     rot[0][1] = -math.sin(yaw_angle)
+    #     rot[1][0] = math.sin(yaw_angle)
+    #     rot[1][1] = math.cos(yaw_angle)
+    #     return rot
 
     def estimate_state_fusion(self, sensor_img, network_anchors, network_cov, prev_anchor, obs_img_pose):
 
-        yaw_rot = self.get_rotation_from_abs_anchor(prev_anchor)
-        prev_anchor = torch.from_numpy(prev_anchor.reshape(-1, 3))
-        network_anchors = network_anchors.reshape(-1, 3).cpu()
-        anchor_init = torch.zeros(8, 3)
+        _, yaw_rot = self.process_anchors(prev_anchor) # world frame
+        prev_anchor = torch.from_numpy(prev_anchor.reshape(-1, 3)).to(self.device)
+        network_anchors = network_anchors.reshape(-1, 3)
+        anchor_init = torch.zeros(8, 3).to(self.device)
         for i in range(8):
-            anchor_init[i] = prev_anchor[i]+(yaw_rot@network_anchors[i].unsqueeze(-1)).squeeze(-1)
+            anchor_init[i] = prev_anchor[i]+(yaw_rot@network_anchors[i].unsqueeze(-1)).squeeze(-1) # prev_anchor : World frame
 
-        network_cov = network_cov.reshape(-1,3).cpu()
+        network_cov = network_cov.reshape(-1,3)
         #Argmin of total cost. Encapsulate this argmin optimization as a function call
         then = time.time()
         #xt is 12-vector
