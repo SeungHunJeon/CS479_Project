@@ -57,6 +57,16 @@ environment:
   ROA_dimension:
     exteroceptiveDim_: 28
 
+Planner:
+  T_final: 2
+  steps: 20
+  lr: 0.001
+  epochs_init: 2500
+  fade_out_epoch: 0
+  fade_out_sharpness: 10
+  epochs_update: 250
+  K: 20
+
 PPO:
   num_learning_epoch: 4
   num_mini_batches: 4

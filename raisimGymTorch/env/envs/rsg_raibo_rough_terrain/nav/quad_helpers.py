@@ -3,7 +3,7 @@ import numpy as np
 import json
 import heapq 
 import matplotlib.pyplot as plt
-from nav.math_utils import skew_matrix
+from .math_utils import skew_matrix
 
 class Simulator:
 
@@ -181,7 +181,6 @@ class QuadPlot:
         # while show:
         #     plt.pause(1)
         # plt.close(self.fig)
-
 
 def next_rotation(R, omega, dt):
     # Propagate rotation matrix using exponential map of the angle displacements

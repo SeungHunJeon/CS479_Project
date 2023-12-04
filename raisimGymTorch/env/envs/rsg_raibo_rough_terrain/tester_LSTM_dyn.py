@@ -22,7 +22,9 @@ import matplotlib
 from estimator_helper import state_estimator, get_img_process
 from nerf_helper import load_intrinsic_params
 from nerf.utils import *
+from nav.math_utils import vec_to_rot_matrix, rot_matrix_to_vec
 from nerf.provider import NeRFDataset
+from nav.planner_helper import Planner
 
 # dddd
 
@@ -118,11 +120,6 @@ nerf_model = NeRFNetwork(
 nerf_model.eval()
 metrics = [PSNRMeter(),]
 criterion = torch.nn.MSELoss(reduction='none')
-
-
-
-# trainer = Trainer('ngp', opt, nerf_model, device=device, workspace=opt.workspace, criterion=criterion, fp16=opt.fp16, metrics=metrics, use_checkpoint=opt.ckpt)
-
 
 intrinsics, img_W, img_H = load_intrinsic_params(opt)
 
@@ -299,11 +296,72 @@ else:
         'show_rate': [20, 100]
     }
 
+    body_lims = np.array([
+        [-0.05, 0.05],
+        [-0.05, 0.05],
+        [-0.02, 0.02]
+    ])
+
+    # Discretizations of sample points in x,y,z direction
+    body_nbins = [10, 10, 5]
+
+    start_pos = [0.0, 0.0, 0.5]      # Starting position [x,y,z]
+    end_pos = [-2.0, 0.7, 0.5]        # Goal position
+
+    # start_pos = [-0.09999999999999926,
+    #             -0.8000000000010297,
+    #             0.0999999999999695]
+    # end_pos = [0.10000000000000231,
+    #             0.4999999999996554,
+    #             0.09999999999986946]
+
+    # Rotation vector
+    start_R = [0., 0., 0.0]     # Starting orientation (Euler angles)
+    end_R = [0., 0., 0.0]
+
+    # Angular and linear velocities
+    # init_rates = torch.zeros(3) # All rates
+
+    ### Integration
+    start_pos = torch.tensor(start_pos).float()
+    end_pos = torch.tensor(end_pos).float()
+
+    # Change rotation vector to rotation matrix 3x3
+    start_R = vec_to_rot_matrix( torch.tensor(start_R))
+    end_R = vec_to_rot_matrix(torch.tensor(end_R))
+
+    # Convert 12 dimensional to 18 dimensional vec
+    # start_state = torch.cat( [start_pos, init_rates, start_R.reshape(-1), init_rates], dim=0 )
+    # end_state = torch.cat( [end_pos,   init_rates, end_R.reshape(-1), init_rates], dim=0 )
+    start_state = torch.cat( [start_pos, start_R.reshape(-1)], dim=0 ).to(device)
+    end_state = torch.cat( [end_pos, end_R.reshape(-1)], dim=0 ).to(device)
+
+    planner_cfg = {
+        "T_final": cfg['Planner']['T_final'],
+        "steps": cfg['Planner']['steps'],
+        "lr": cfg['Planner']['lr'],
+        "epochs_init": cfg['Planner']['epochs_init'],
+        "fade_out_epoch": cfg['Planner']['fade_out_epoch'],
+        "fade_out_sharpness": cfg['Planner']['fade_out_sharpness'],
+        "epochs_update": cfg['Planner']['epochs_update'],
+        'start_state': start_state.to(device),
+        'end_state': end_state.to(device),
+        'exp_name': opt.workspace,                  # Experiment name
+        'body': body_lims,
+        'nbins': body_nbins,
+        'command': torch.zeros((1,3)),
+        'K': cfg['Planner']['K']
+    }
 
 
+    # density_fn = lambda x: nerf_model.density(x.reshape((-1, 3)) @ rot)['sigma'].reshape(x.shape[:-1])
+    rot = torch.tensor([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]], device=device, dtype=torch.float32)
+    density_fn = lambda x: nerf_model.density(x.reshape((-1, 3)) @ rot)['sigma'].reshape(x.shape[:-1])
     render_fn = lambda rays_o, rays_d: nerf_model.render(rays_o, rays_d, staged=True, bg_color=1., perturb=False, **vars(opt))
     get_rays_fn = lambda pose: get_rays(pose, intrinsics, img_H, img_W)
 
+    traj = Planner(start_state, end_state, planner_cfg, density_fn)
+    traj.a_star_init()
     filter = state_estimator(filter_cfg, get_rays_fn=get_rays_fn, render_fn=render_fn, device=device)
 
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
@@ -397,26 +455,28 @@ else:
                 # gt_anchor
                 anchors_w = env.getAnchorHistory(robotFrame=False)
                 prev_anchor_w = anchors_w[..., :24]
+
             current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor_w, gt_pose)
-            # prev_anchor_w = current_anchor
-            cam_pose, cam_rot = env.get_camera_pose()
-
-
+            tran, rot = filter.anchor_to_SE3(current_anchor, include_offset=True, positive_offset=False)
+            estimated_state = torch.cat([tran, rot.reshape(-1)], dim=0)
+            traj.update_state(estimated_state)
+            traj.learn_update(iteration=i)
 
             # TODO : Here, replace estimated_anchors to current_anchor. However, the represented frame mismatches.
-            env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())
-            y = env.get_error(step >= 5, estimated_anchors.detach().cpu().numpy().transpose(1,0))/8
+            with torch.no_grad():
+                env.step_evaluate(actions, estimated_anchors.detach().cpu().numpy())
+                y = env.get_error(step >= 5, estimated_anchors.detach().cpu().numpy().transpose(1,0))/8
 
-            x_data.append(x)
-            y_data.append(y)
+                x_data.append(x)
+                y_data.append(y)
 
-            ax.clear()
-            plt.rc('font', size=40)
-            ax.plot(x_data, y_data,linewidth =10)
-            plt.xlabel('num of time step(0.2sec)')
-            plt.ylabel('estimation error of SE(3) projected on 8 anchor point (meter)')
-            plt.show()
-            plt.pause(0.2)
+                ax.clear()
+                plt.rc('font', size=40)
+                ax.plot(x_data, y_data,linewidth =10)
+                plt.xlabel('num of time step(0.2sec)')
+                plt.ylabel('estimation error of SE(3) projected on 8 anchor point (meter)')
+                plt.show()
+                plt.pause(0.2)
 
     '''
         # For action plotting
