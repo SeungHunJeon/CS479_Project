@@ -61,7 +61,7 @@ parser.add_argument('--tcnn', action='store_true', help="use TCNN backend")
 parser.add_argument('--color_space', type=str, default='srgb', help="Color space, supports (linear, srgb)")
 parser.add_argument('--preload', action='store_true', help="preload all data into GPU, accelerate training but use more GPU memory")
 # (the default value is for the fox dataset)
-parser.add_argument('--bound', type=float, default=4.0, help="assume the scene is bounded in box[-bound, bound]^3, if > 1, will invoke adaptive ray marching.")
+parser.add_argument('--bound', type=float, default=5.0, help="assume the scene is bounded in box[-bound, bound]^3, if > 1, will invoke adaptive ray marching.")
 parser.add_argument('--scale', type=float, default=0.33, help="scale camera location into box[-bound, bound]^3")
 parser.add_argument('--offset', type=float, nargs='*', default=[0, 0, 0], help="offset of camera location")
 parser.add_argument('--dt_gamma', type=float, default=0.02, help="dt_gamma (>=0) for adaptive ray marching. set to 0 to disable, >0 to accelerate rendering (but usually with worse quality)")
@@ -360,8 +360,8 @@ else:
     render_fn = lambda rays_o, rays_d: nerf_model.render(rays_o, rays_d, staged=True, bg_color=1., perturb=False, **vars(opt))
     get_rays_fn = lambda pose: get_rays(pose, intrinsics, img_H, img_W)
 
-    traj = Planner(start_state, end_state, planner_cfg, density_fn)
-    traj.a_star_init()
+    # traj = Planner(start_state, end_state, planner_cfg, density_fn)
+    # traj.a_star_init()
     filter = state_estimator(filter_cfg, get_rays_fn=get_rays_fn, render_fn=render_fn, device=device)
 
     Encoder.architecture.load_state_dict(torch.load(weight_path)['Encoder_state_dict'])
@@ -459,8 +459,8 @@ else:
             current_anchor = filter.estimate_state_fusion(img, estimated_anchors, estimation_cov, prev_anchor_w, gt_pose)
             tran, rot = filter.anchor_to_SE3(current_anchor, include_offset=True, positive_offset=False)
             estimated_state = torch.cat([tran, rot.reshape(-1)], dim=0)
-            traj.update_state(estimated_state)
-            traj.learn_update(iteration=i)
+            # traj.update_state(estimated_state)
+            # traj.learn_update(iteration=i)
 
             # TODO : Here, replace estimated_anchors to current_anchor. However, the represented frame mismatches.
             with torch.no_grad():

@@ -150,67 +150,67 @@ class state_estimator():
         losses = []
         states = []
 
-        # for k in range(self.iter):
-        #     optimizer.zero_grad()
-        #     rand_inds = np.random.choice(interest_regions.shape[0], size=self.batch_size, replace=False)
-        #     batch = interest_regions[rand_inds]
-        #
-        #     #pix_losses.append(loss.clone().cpu().detach().numpy().tolist())
-        #     #Add dynamics loss
-        #
-        #     loss = self.measurement_fn_fusion(optimized_anchor, init_anchor, sig, obs_img_noised, batch)
-        #
-        #     losses.append(loss.item())
-        #     states.append(optimized_anchor.clone().cpu().detach().numpy().tolist())
-        #
-        #     loss.backward()
-        #     optimizer.step()
-        #
-        #     # NOT IMPLEMENTED: EXPONENTIAL DECAY OF LEARNING RATE
-        #     #new_lrate = self.lrate * (0.8 ** ((k + 1) / 100))
-        #     #new_lrate = extra_arg_dict['lrate'] * np.exp(-(k)/1000)
-        #     #for param_group in optimizer.param_groups:
-        #     #    param_group['lr'] = new_lrate
-        #
-        #     # print results periodically
-        #     if obs_img_pose is not None and ((k + 1) % self.error_print_rate == 0 or k == 0):
-        #         print('Step: ', k)
-        #         print('Loss: ', loss)
-        #         pos, rot = self.anchor_to_SE3(optimized_anchor, include_offset=False)
-        #         print('State', pos, rot)
-        #
-        #         with torch.no_grad():
-        #             pos, rot = self.anchor_to_SE3(optimized_anchor)
-        #             pose = torch.eye(4)
-        #             pose[:3, :3] = rot
-        #             pose[:3, 3] = pos
-        #             pose_error = calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose.detach().cpu().numpy())
-        #             print('error', pose_error)
-        #             print('-----------------------------------')
-        #
-        #             if (k+1) % self.render_rate == 0 and self.render_viz:
-        #                 rgb = self.render_from_pose(pose)
-        #                 rgb = torch.squeeze(rgb).cpu().detach().numpy()
-        #
-        #                 #Add keypoint visualization
-        #                 render = rgb.reshape((obs_img_noised.shape[0], obs_img_noised.shape[1], -1))
-        #                 gt_img = obs_img_noised.cpu().numpy()
-        #                 render[batch[:, 0], batch[:, 1]] = np.array([0., 1., 0.])
-        #                 gt_img[batch[:, 0], batch[:, 1]] = np.array([0., 1., 0.])
-        #
-        #                 self.f.suptitle(f'Time step: {self.iteration}. Grad step: {k+1}. Trans. error: {pose_error[0]} m. Rotate. error: {pose_error[1]} deg.')
-        #                 self.axarr[0].imshow(gt_img)
-        #                 self.axarr[0].set_title('Ground Truth')
-        #
-        #                 self.axarr[1].imshow(extras['features'])
-        #                 self.axarr[1].set_title('Features')
-        #
-        #                 self.axarr[2].imshow(render)
-        #                 self.axarr[2].set_title('NeRF Render')
-        #
-        #                 plt.pause(1)
-        #
-        # print("Done with main relative_pose_estimation loop")
+        for k in range(self.iter):
+            optimizer.zero_grad()
+            rand_inds = np.random.choice(interest_regions.shape[0], size=self.batch_size, replace=False)
+            batch = interest_regions[rand_inds]
+
+            #pix_losses.append(loss.clone().cpu().detach().numpy().tolist())
+            #Add dynamics loss
+
+            loss = self.measurement_fn_fusion(optimized_anchor, init_anchor, sig, obs_img_noised, batch)
+
+            losses.append(loss.item())
+            states.append(optimized_anchor.clone().cpu().detach().numpy().tolist())
+
+            loss.backward()
+            optimizer.step()
+
+            # NOT IMPLEMENTED: EXPONENTIAL DECAY OF LEARNING RATE
+            #new_lrate = self.lrate * (0.8 ** ((k + 1) / 100))
+            #new_lrate = extra_arg_dict['lrate'] * np.exp(-(k)/1000)
+            #for param_group in optimizer.param_groups:
+            #    param_group['lr'] = new_lrate
+
+            # print results periodically
+            if obs_img_pose is not None and ((k + 1) % self.error_print_rate == 0 or k == 0):
+                print('Step: ', k)
+                print('Loss: ', loss)
+                pos, rot = self.anchor_to_SE3(optimized_anchor, include_offset=False)
+                print('State', pos, rot)
+
+                with torch.no_grad():
+                    pos, rot = self.anchor_to_SE3(optimized_anchor)
+                    pose = torch.eye(4)
+                    pose[:3, :3] = rot
+                    pose[:3, 3] = pos
+                    pose_error = calcSE3Err(pose.detach().cpu().numpy(), obs_img_pose.detach().cpu().numpy())
+                    print('error', pose_error)
+                    print('-----------------------------------')
+
+                    if (k+1) % self.render_rate == 0 and self.render_viz:
+                        rgb = self.render_from_pose(pose)
+                        rgb = torch.squeeze(rgb).cpu().detach().numpy()
+
+                        #Add keypoint visualization
+                        render = rgb.reshape((obs_img_noised.shape[0], obs_img_noised.shape[1], -1))
+                        gt_img = obs_img_noised.cpu().numpy()
+                        render[batch[:, 0], batch[:, 1]] = np.array([0., 1., 0.])
+                        gt_img[batch[:, 0], batch[:, 1]] = np.array([0., 1., 0.])
+
+                        self.f.suptitle(f'Time step: {self.iteration}. Grad step: {k+1}. Trans. error: {pose_error[0]} m. Rotate. error: {pose_error[1]} deg.')
+                        self.axarr[0].imshow(gt_img)
+                        self.axarr[0].set_title('Ground Truth')
+
+                        self.axarr[1].imshow(extras['features'])
+                        self.axarr[1].set_title('Features')
+
+                        self.axarr[2].imshow(render)
+                        self.axarr[2].set_title('NeRF Render')
+
+                        plt.pause(1)
+
+        print("Done with main relative_pose_estimation loop")
 
         return optimized_anchor.clone().detach(), True
 
